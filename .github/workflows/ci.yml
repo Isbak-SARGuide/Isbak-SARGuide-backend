@@ -1,0 +1,50 @@
+name: CI
+
+# Ne zaman calissin?
+#
+# push          : main ve develop'a giren her sey dogrulanir.
+# pull_request  : feature/* -> develop veya develop -> main PR'lari
+#                 MERGE EDILMEDEN ONCE dogrulanir.
+#
+# feature/* branch'leri push listesinde YOK. Gerek de yok:
+# PR acildiktan sonra o branch'e yaptigin her push CI'i tekrar tetikler.
+# Yani geri bildirimi kaybetmeden gereksiz kosuyu onlemis oluyoruz.
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+# Ayni branch'e arka arkaya push gelirse, onceki kosuyu iptal et.
+# Bosuna runner dakikasi harcamamak icin.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1) Repo'yu runner'a indir
+      - name: Kodu cek
+        uses: actions/checkout@v4
+
+      # 2) .NET SDK kur - surumu global.json'dan okur
+      - name: .NET SDK kur
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      # 3) NuGet paketlerini indir
+      - name: Bagimliliklari geri yukle
+        run: dotnet restore
+
+      # 4) Derle. --no-restore: 3. adim zaten yapti, tekrar etme.
+      - name: Derle
+        run: dotnet build --no-restore --configuration Release
+
+      # 5) Testleri kosur. --no-build: 4. adim zaten derledi.
+      - name: Testleri calistir
+        run: dotnet test --no-build --configuration Release
