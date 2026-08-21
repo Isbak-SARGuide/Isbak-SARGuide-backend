@@ -1,0 +1,6 @@
+@AramaKurtarma.API_HostAddress = http://localhost:5007
+
+GET {{AramaKurtarma.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
