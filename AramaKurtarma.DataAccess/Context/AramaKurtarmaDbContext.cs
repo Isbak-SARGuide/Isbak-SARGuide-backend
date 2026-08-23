@@ -9,5 +9,6 @@ public class AramaKurtarmaDbContext : IdentityDbContext<ApplicationUser>
     public AramaKurtarmaDbContext(DbContextOptions<AramaKurtarmaDbContext> options)
         : base(options)
     {
+        
     }
 }
