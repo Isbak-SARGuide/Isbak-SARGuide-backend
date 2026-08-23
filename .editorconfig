@@ -1,0 +1,63 @@
+# EditorConfig - IDE'den bagimsiz kod stili
+# Visual Studio, Rider ve VS Code bu dosyayi otomatik okur.
+# Amac: "benim IDE'm boyle formatliyor" kaynakli anlamsiz diff'leri onlemek.
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = crlf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+
+[*.{cs,csx}]
+indent_size = 4
+
+[*.{csproj,props,targets,xml,config}]
+indent_size = 2
+
+[*.{json,yml,yaml}]
+indent_size = 2
+
+[*.md]
+indent_size = 2
+# Markdown'da satir sonundaki iki bosluk "satir atla" demek - silme
+trim_trailing_whitespace = false
+
+# ---------------------------------------------------------------
+# C# kod stili
+# ---------------------------------------------------------------
+[*.cs]
+
+# using'ler namespace disinda, System once
+dotnet_sort_system_directives_first = true
+csharp_using_directive_placement = outside_namespace:warning
+
+# Dosya kapsamli namespace:  namespace X;   (suslu parantezli degil)
+csharp_style_namespace_declarations = file_scoped:warning
+
+# var yerine acik tip - okurken tipi gormek icin
+csharp_style_var_for_built_in_types = false:suggestion
+csharp_style_var_when_type_is_apparent = true:suggestion
+csharp_style_var_elsewhere = false:suggestion
+
+# Tek satirlik if'lerde bile suslu parantez zorunlu
+csharp_prefer_braces = true:warning
+
+# Modern C# ifadeleri
+csharp_style_expression_bodied_properties = true:suggestion
+csharp_style_expression_bodied_methods = false:suggestion
+csharp_style_pattern_matching_over_is_with_cast_check = true:suggestion
+csharp_style_prefer_null_check_over_type_check = true:suggestion
+
+# Isimlendirme: private alanlar _camelCase
+dotnet_naming_rule.private_fields_underscore.severity = warning
+dotnet_naming_rule.private_fields_underscore.symbols = private_fields
+dotnet_naming_rule.private_fields_underscore.style = underscore_prefix
+
+dotnet_naming_symbols.private_fields.applicable_kinds = field
+dotnet_naming_symbols.private_fields.applicable_accessibilities = private
+
+dotnet_naming_style.underscore_prefix.required_prefix = _
+dotnet_naming_style.underscore_prefix.capitalization = camel_case
