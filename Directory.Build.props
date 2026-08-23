@@ -1,0 +1,22 @@
+<Project>
+
+  <!--
+    Bu dosya, ayni klasordeki ve ALT klasorlerdeki TUM .csproj dosyalarina
+    otomatik olarak uygulanir. MSBuild bunu proje dosyasindan ONCE okur,
+    yani bir proje isterse kendi icinde ezebilir.
+
+    Amac: 4 csproj'da tekrar eden ayarlari tek yerde toplamak.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+
+    <!-- Uyarilari hataya cevirir: derleme uyari varken GECMEZ.
+         "Sonra bakarim" diye biriken uyari borcunu bastan engeller. -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+</Project>
