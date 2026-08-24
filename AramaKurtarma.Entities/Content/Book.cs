@@ -1,20 +1,20 @@
+using AramaKurtarma.Entities.Common;
+
 namespace AramaKurtarma.Entities.Content;
 
-public class Book
+public class Book : BaseEntity
 {
-    public int Id { get; set; }
-
     public string Title { get; set; } = null!;
 
+    public string Slug { get; set; } = null!;
+
     public string? Description { get; set; }
+
+    public string LanguageCode { get; set; } = "tr";
 
     public int Version { get; set; }
 
     public bool IsPublished { get; set; }
-
-    public DateTime CreatedAt { get; set; }
-
-    public DateTime UpdatedAt { get; set; }
 
     public ICollection<Module> Modules { get; set; } = new List<Module>();
 }
