@@ -1,11 +1,10 @@
+using AramaKurtarma.Entities.Common;
 using AramaKurtarma.Entities.Content.Enums;
 
 namespace AramaKurtarma.Entities.Content;
 
-public class Media
+public class Media : BaseEntity
 {
-    public int Id { get; set; }
-
     public string FileName { get; set; } = null!;
 
     public string StoragePath { get; set; } = null!;
@@ -16,11 +15,14 @@ public class Media
 
     public long FileSize { get; set; }
 
+    /// <summary>
+    /// SHA-256 checksum. Offline mobil istemci indirdigi dosyayi bununla dogrular.
+    /// </summary>
+    public string Checksum { get; set; } = null!;
+
     public int? Width { get; set; }
 
     public int? Height { get; set; }
 
     public double? Duration { get; set; }
-
-    public DateTime CreatedAt { get; set; }
 }
