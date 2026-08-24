@@ -1,4 +1,6 @@
-using AramaKurtarma.Business.Books;
+using AramaKurtarma.Business.Services.Abstract;
+using AramaKurtarma.Business.Services.Concrete;
+using AramaKurtarma.Business.Validation.Books;
 using FluentValidation;
 
 namespace Microsoft.Extensions.DependencyInjection;
@@ -12,6 +14,8 @@ public static class BusinessServiceCollectionExtensions
         services.AddValidatorsFromAssemblyContaining<CreateBookDtoValidator>();
 
         services.AddScoped<IBookService, BookService>();
+        services.AddScoped<ITokenService, TokenService>();
+        services.AddScoped<IAuthService, AuthService>();
 
         return services;
     }

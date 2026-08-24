@@ -1,5 +1,6 @@
 using AramaKurtarma.DataAccess.Context;
-using AramaKurtarma.DataAccess.Repositories;
+using AramaKurtarma.DataAccess.Repositories.Abstract;
+using AramaKurtarma.DataAccess.Repositories.Concrete;
 using AramaKurtarma.Entities.Identity;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;

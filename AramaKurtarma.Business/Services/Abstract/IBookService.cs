@@ -1,6 +1,7 @@
 using AramaKurtarma.Business.Common;
+using AramaKurtarma.Business.DTOs.Books;
 
-namespace AramaKurtarma.Business.Books;
+namespace AramaKurtarma.Business.Services.Abstract;
 
 public interface IBookService
 {

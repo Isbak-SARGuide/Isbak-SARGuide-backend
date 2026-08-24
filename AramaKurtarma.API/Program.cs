@@ -45,6 +45,8 @@ builder.Services.AddCors(options =>
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();
 
+builder.Services.AddApiAuthentication(builder.Configuration);
+
 builder.Services
     .AddDataAccess(builder.Configuration)
     .AddBusiness();
@@ -65,6 +67,9 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 
 app.UseCors();
+
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.MapControllers();
 

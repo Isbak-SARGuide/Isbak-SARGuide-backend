@@ -1,10 +1,12 @@
 using AramaKurtarma.Business.Common;
-using AramaKurtarma.DataAccess.Repositories;
+using AramaKurtarma.Business.DTOs.Books;
+using AramaKurtarma.Business.Services.Abstract;
+using AramaKurtarma.DataAccess.Repositories.Abstract;
 using AramaKurtarma.Entities.Content;
 using FluentValidation;
 using Mapster;
 
-namespace AramaKurtarma.Business.Books;
+namespace AramaKurtarma.Business.Services.Concrete;
 
 public class BookService(
     IUnitOfWork unitOfWork,
