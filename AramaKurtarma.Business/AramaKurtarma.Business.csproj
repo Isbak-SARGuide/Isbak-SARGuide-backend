@@ -5,4 +5,9 @@
     <ProjectReference Include="..\AramaKurtarma.Entities\AramaKurtarma.Entities.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="12.1.1" />
+    <PackageReference Include="Mapster" Version="10.0.12" />
+  </ItemGroup>
+
 </Project>
