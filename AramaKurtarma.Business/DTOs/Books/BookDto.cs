@@ -1,4 +1,4 @@
-namespace AramaKurtarma.Business.Books;
+namespace AramaKurtarma.Business.DTOs.Books;
 
 /// <summary>
 /// Okuma modeli. Property adlari Book entity'siyle birebir ayni oldugu icin

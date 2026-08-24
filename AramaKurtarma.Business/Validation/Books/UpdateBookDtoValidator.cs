@@ -1,10 +1,11 @@
+using AramaKurtarma.Business.DTOs.Books;
 using FluentValidation;
 
-namespace AramaKurtarma.Business.Books;
+namespace AramaKurtarma.Business.Validation.Books;
 
-public sealed class CreateBookDtoValidator : AbstractValidator<CreateBookDto>
+public sealed class UpdateBookDtoValidator : AbstractValidator<UpdateBookDto>
 {
-    public CreateBookDtoValidator()
+    public UpdateBookDtoValidator()
     {
         RuleFor(x => x.Title)
             .NotEmpty()

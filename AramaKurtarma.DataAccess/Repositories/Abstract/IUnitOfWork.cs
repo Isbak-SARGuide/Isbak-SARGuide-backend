@@ -1,7 +1,7 @@
 using AramaKurtarma.Entities.Content;
 using Microsoft.EntityFrameworkCore.Storage;
 
-namespace AramaKurtarma.DataAccess.Repositories;
+namespace AramaKurtarma.DataAccess.Repositories.Abstract;
 
 public interface IUnitOfWork
 {

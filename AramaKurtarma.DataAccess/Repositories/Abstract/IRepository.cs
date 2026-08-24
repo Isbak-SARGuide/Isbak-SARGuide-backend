@@ -1,6 +1,6 @@
 using AramaKurtarma.Entities.Common;
 
-namespace AramaKurtarma.DataAccess.Repositories;
+namespace AramaKurtarma.DataAccess.Repositories.Abstract;
 
 /// <summary>
 /// Generic CRUD sozlesmesi. Ozel sorgular (Include, filtreleme vb.) gerektiginde

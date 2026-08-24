@@ -1,8 +1,9 @@
 using AramaKurtarma.DataAccess.Context;
+using AramaKurtarma.DataAccess.Repositories.Abstract;
 using AramaKurtarma.Entities.Common;
 using Microsoft.EntityFrameworkCore;
 
-namespace AramaKurtarma.DataAccess.Repositories;
+namespace AramaKurtarma.DataAccess.Repositories.Concrete;
 
 public class EfRepository<T>(AramaKurtarmaDbContext dbContext) : IRepository<T>
     where T : BaseEntity
