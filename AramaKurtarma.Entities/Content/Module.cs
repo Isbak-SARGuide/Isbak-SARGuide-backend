@@ -1,9 +1,9 @@
+using AramaKurtarma.Entities.Common;
+
 namespace AramaKurtarma.Entities.Content;
 
-public class Module
+public class Module : BaseEntity
 {
-    public int Id { get; set; }
-
     public int BookId { get; set; }
 
     public string Name { get; set; } = null!;

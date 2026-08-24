@@ -1,16 +1,20 @@
+using AramaKurtarma.Entities.Common;
 using AramaKurtarma.Entities.Content.Enums;
 
 namespace AramaKurtarma.Entities.Content;
 
-public class ContentBlock
+public class ContentBlock : BaseEntity
 {
-    public int Id { get; set; }
-
     public int ContentId { get; set; }
 
     public ContentBlockType Type { get; set; }
 
     public string? Text { get; set; }
+
+    /// <summary>
+    /// Table, Warning, Animation gibi yapisal blok verisi (jsonb).
+    /// </summary>
+    public string? DataJson { get; set; }
 
     public int? MediaId { get; set; }
 
