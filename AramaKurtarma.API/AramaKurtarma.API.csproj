@@ -1,5 +1,16 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
+  <PropertyGroup>
+    <!--
+      AV0029/AV0030: Asp.Versioning analyzer'i, OpenAPI dokumanlarinin her
+      API versiyonu icin ayri uretilmesini istiyor. Su an tek versiyon (v1)
+      var - bu entegrasyon simdilik gereksiz karmasiklik. Cok versiyonlu
+      hale gelince (gercek v2 controller'i eklendiginde) kaldirilip dogru
+      kurulacak.
+    -->
+    <NoWarn>$(NoWarn);AV0029;AV0030</NoWarn>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="Asp.Versioning.Mvc.ApiExplorer" Version="10.2.1" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.11" />

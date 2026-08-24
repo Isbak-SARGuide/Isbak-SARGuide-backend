@@ -1,37 +1,71 @@
-using AramaKurtarma.DataAccess.Context;
-using AramaKurtarma.DataAccess.Seed;
-using AramaKurtarma.Entities.Identity;
-using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore;
+using AramaKurtarma.API.Middleware;
+using Asp.Versioning;
+using Scalar.AspNetCore;
+using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-builder.Services.AddOpenApi();
-builder.Services.AddDbContext<AramaKurtarmaDbContext>(options =>
-    options.UseNpgsql(
-        builder.Configuration.GetConnectionString("DefaultConnection")));
+builder.Host.UseSerilog((context, services, configuration) => configuration
+    .ReadFrom.Services(services)
+    .Enrich.FromLogContext()
+    .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}"));
 
-// Asgari Identity kaydi: UserManager/RoleManager seed icin simdi gerekli.
-// AddIdentityCore (AddIdentity DEGIL) bilerek secildi - cookie tabanli auth
-// semasini kaydetmiyor. Tam JWT auth pipeline'i Faz 2 / gorev 6.1'de gelecek.
+// Add services to the container.
+builder.Services.AddControllers();
+
 builder.Services
-    .AddIdentityCore<ApplicationUser>()
-    .AddRoles<IdentityRole>()
-    .AddEntityFrameworkStores<AramaKurtarmaDbContext>();
+    .AddApiVersioning(options =>
+    {
+        options.DefaultApiVersion = new ApiVersion(1, 0);
+        options.ReportApiVersions = true;
+        // Versiyon SADECE URL segmentinden okunur (/api/v1/...). AssumeDefaultVersionWhenUnspecified
+        // gerekmiyor cunku her controller'da [ApiVersion] zaten acikca yazili, header/query-string
+        // gibi ek kaynaklari taramaya gerek yok - analyzer'in AV0015/AV0016 uyarilari bu yuzden.
+        options.ApiVersionReader = new UrlSegmentApiVersionReader();
+    })
+    .AddMvc()
+    .AddApiExplorer(options =>
+    {
+        options.GroupNameFormat = "'v'VVV";
+        options.SubstituteApiVersionInUrl = true;
+    });
+
+builder.Services.AddOpenApi();
+
+builder.Services.AddCors(options =>
+{
+    var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
+
+    options.AddDefaultPolicy(policy => policy
+        .WithOrigins(allowedOrigins)
+        .AllowAnyHeader()
+        .AllowAnyMethod());
+});
+
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+builder.Services.AddProblemDetails();
+
+builder.Services
+    .AddDataAccess(builder.Configuration)
+    .AddBusiness();
 
 var app = builder.Build();
+
+app.UseExceptionHandler();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
+    app.MapScalarApiReference();
 
-    using var scope = app.Services.CreateScope();
-    await DatabaseSeeder.SeedAsync(scope.ServiceProvider);
+    await app.Services.SeedDatabaseAsync();
 }
 
 app.UseHttpsRedirection();
+
+app.UseCors();
+
+app.MapControllers();
 
 app.Run();
