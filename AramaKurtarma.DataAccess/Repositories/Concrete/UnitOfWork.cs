@@ -13,14 +13,14 @@ public class UnitOfWork : IUnitOfWork
     {
         _dbContext = dbContext;
 
-        Books = new EfRepository<Book>(dbContext);
+        Books = new BookRepository(dbContext);
         Modules = new EfRepository<Module>(dbContext);
         Contents = new EfRepository<Content>(dbContext);
         ContentBlocks = new EfRepository<ContentBlock>(dbContext);
         Media = new EfRepository<Media>(dbContext);
     }
 
-    public IRepository<Book> Books { get; }
+    public IBookRepository Books { get; }
 
     public IRepository<Module> Modules { get; }
 
