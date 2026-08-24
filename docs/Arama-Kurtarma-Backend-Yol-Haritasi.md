@@ -2,7 +2,7 @@
 
 Kentsel arama-kurtarma el kitabı için ASP.NET Core REST API'sinin mimari kararları, iş kırılımı ve uygulama sırası.
 
-**Durum:** Faz 0 ve Faz 1 tamamlandı (M0, M1) · Faz 2 devam ediyor (6.1 Auth çekirdeği bitti, sıra 4.5 + 5.0'da)
+**Durum:** Faz 0, Faz 1, Faz 2 tamamlandı (M0, M1, M2 — Walking Skeleton) · Sıra Faz 3'te (Publishing Engine)
 **Son güncelleme:** 24 Ağustos 2026
 
 ---
@@ -784,7 +784,7 @@ ve deploy edilemeyen bir sistem kalır.
 - [x] 4.3 `BookService` (validation dahil)
 - [x] 4.4 `BooksController` — 8 canlı HTTP testiyle doğrulandı (CRUD + validation + soft-delete)
 - [x] 4.5 Entegrasyon test harness'ı — Testcontainers + `WebApplicationFactory`, 6/6 test geçti (unit + smoke + auth akışı)
-- [ ] 5.0 Sync contract stub
+- [x] 5.0 Sync contract stub — `manifest`/`snapshot`/`changes` (`[AllowAnonymous]`), gerçek seed verisiyle 4 canlı testle doğrulandı; `changes` bilerek stub (Faz 4'te gerçek delta)
 
 ### PHASE 3 — Publishing Engine → M3
 

@@ -16,6 +16,7 @@ public static class BusinessServiceCollectionExtensions
         services.AddScoped<IBookService, BookService>();
         services.AddScoped<ITokenService, TokenService>();
         services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<ISyncService, SyncService>();
 
         return services;
     }

@@ -5,7 +5,7 @@ namespace AramaKurtarma.DataAccess.Repositories.Abstract;
 
 public interface IUnitOfWork
 {
-    IRepository<Book> Books { get; }
+    IBookRepository Books { get; }
 
     IRepository<Module> Modules { get; }
 
