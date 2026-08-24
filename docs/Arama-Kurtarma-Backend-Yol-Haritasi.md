@@ -711,11 +711,29 @@ ve deploy edilemeyen bir sistem kalır.
 ### PHASE 0 — Foundation & Green Build → M0
 
 - [x] 1.1 Git init + `.gitignore` + `obj`/`bin` temizliği
-- [ ] 1.6 `global.json` + GitHub Actions CI + remote → ilk push (**CI kırmızı beklenir**)
-- [ ] 1.2 `ApplicationUser` + `Class1.cs` temizliği + `Directory.Build.props` + `.editorconfig` (**CI yeşile döner**)
-- [ ] 1.3 NuGet paketleri + .NET 10 uyum doğrulaması
-- [ ] 1.4 Test projesi iskeleti
-- [ ] 1.5 `docker compose up` + PG18 bağlantı doğrulaması
+- [x] 1.6 `global.json` + GitHub Actions CI + remote → ilk push (CI kırmızı görüldü)
+- [x] 1.2 `ApplicationUser` + `Class1.cs` temizliği + `Directory.Build.props` + `.editorconfig` (CI yeşile döndü — PR #1)
+- [x] 1.3 NuGet paketleri + .NET 10 uyum doğrulaması → **Risk #8 kapandı**
+- [x] 1.4 Test projesi (`tests/AramaKurtarma.Tests`) + ilk 2 test geçti
+- [x] 1.5 `docker compose up` + PG18 bağlantı doğrulaması
+
+**Faz 0 kurulan altyapı:**
+
+| Karar | Seçim | Not |
+|---|---|---|
+| SDK kilidi | `global.json` → 10.0.400, `rollForward: latestFeature` | Yerel/CI sürüm kayması önlendi |
+| Ortak csproj ayarları | `Directory.Build.props` | `TreatWarningsAsErrors` açık |
+| Mapping | Mapster 10.0.12 | |
+| Validation | FluentValidation 12.1.1 | |
+| Logging | Serilog.AspNetCore 10.0.0 | |
+| API versiyonlama | Asp.Versioning.Mvc.ApiExplorer 10.2.1 | |
+| OpenAPI UI | Scalar.AspNetCore 2.17.1 | `Microsoft.AspNetCore.OpenApi` ile birlikte; Swagger UI klasik alternatif |
+| Test | xUnit 2.9.3 + Shouldly + NSubstitute + Testcontainers.PostgreSql | |
+| Identity | `ApplicationUser : IdentityUser`, `Id` = string/GUID, giriş `UserName` ile | `Microsoft.Extensions.Identity.Stores` — EF Core sürüklemiyor |
+
+> **Kural dosyasından iki sapma:** (1) FluentAssertions yerine **Shouldly** — v8+ ticari lisans gerektiriyor
+> (nuget sayfasından doğrula). (2) Moq yerine **NSubstitute** — Moq 4.20 SponsorLink olayı sonrası.
+> Her ikisi de tek satırla geri alınabilir.
 
 ### PHASE 1 — Domain, Persistence & Seed → M1
 

@@ -1,4 +1,7 @@
 <Solution>
+  <Folder Name="/tests/">
+    <Project Path="tests/AramaKurtarma.Tests/AramaKurtarma.Tests.csproj" />
+  </Folder>
   <Project Path="AramaKurtarma.API/AramaKurtarma.API.csproj" />
   <Project Path="AramaKurtarma.Business/AramaKurtarma.Business.csproj" />
   <Project Path="AramaKurtarma.DataAccess/AramaKurtarma.DataAccess.csproj" />
