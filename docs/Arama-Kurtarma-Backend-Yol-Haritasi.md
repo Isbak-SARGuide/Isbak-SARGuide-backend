@@ -783,7 +783,7 @@ ve deploy edilemeyen bir sistem kalır.
 - [x] 4.2 Book DTO (`Dtos/`) + Mapster + Validation (`Validators/`)
 - [x] 4.3 `BookService` (validation dahil)
 - [x] 4.4 `BooksController` — 8 canlı HTTP testiyle doğrulandı (CRUD + validation + soft-delete)
-- [ ] 4.5 Entegrasyon test harness'ı
+- [x] 4.5 Entegrasyon test harness'ı — Testcontainers + `WebApplicationFactory`, 6/6 test geçti (unit + smoke + auth akışı)
 - [ ] 5.0 Sync contract stub
 
 ### PHASE 3 — Publishing Engine → M3
