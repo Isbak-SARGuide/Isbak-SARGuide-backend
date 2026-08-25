@@ -15,6 +15,8 @@ public interface IUnitOfWork
 
     IRepository<Media> Media { get; }
 
+    IPublicationRepository Publications { get; }
+
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
