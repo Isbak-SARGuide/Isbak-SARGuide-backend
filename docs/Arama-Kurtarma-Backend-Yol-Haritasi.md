@@ -2,7 +2,7 @@
 
 Kentsel arama-kurtarma el kitabı için ASP.NET Core REST API'sinin mimari kararları, iş kırılımı ve uygulama sırası.
 
-**Durum:** Faz 0, Faz 1, Faz 2 tamamlandı (M0, M1, M2 — Walking Skeleton) · Sıra Faz 3'te (Publishing Engine)
+**Durum:** Faz 0-3 tamamlandı (M0, M1, M2, M3 — Publishing Engine) · Sıra Faz 4'te (Synchronization)
 **Son güncelleme:** 24 Ağustos 2026
 
 ---
@@ -815,10 +815,10 @@ ve deploy edilemeyen bir sistem kalır.
 > web okuyucu, mobil gibi aynı immutable yayın tablolarından beslenen ikinci bir tüketicidir.
 > Gerekirse ileriki fazlarda ayrı bir public web read API görevi açılır (backlog).
 
-- [ ] 6.3 `IPublishingService`
-- [ ] 6.4 Tombstone
-- [ ] 6.5 Publish senaryo testleri
-- [ ] 6.6 Publish endpoint
+- [x] 6.3 `IPublishingService`
+- [x] 6.4 Tombstone
+- [x] 6.5 Publish senaryo testleri
+- [x] 6.6 Publish endpoint
 
 ### PHASE 4 — Synchronization → M4
 
