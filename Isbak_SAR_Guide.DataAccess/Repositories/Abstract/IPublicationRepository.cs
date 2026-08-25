@@ -18,6 +18,17 @@ public interface IPublicationRepository
     Task<int> GetLatestVersionAsync(int bookId, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Verilen yayinin (bookId + version) IsDeleted=false satirlarinin
+    /// ContentId'lerini doner - tombstone diff'inin sol kumesi: bir sonraki
+    /// publish, "onceki yayinda hayatta olup simdiki snapshot'ta olmayan"
+    /// iceriklere tombstone yazar. Zaten tombstone olan satirlar bilerek
+    /// haric (tombstone bir kez yazilir, her yayinda tekrarlanmaz).
+    /// Ilk publish'te version=0 ile cagrilir: hic satir bulunmaz, bos liste
+    /// doner, hic tombstone uretilmez - ozel bir dal gerekmez.
+    /// </summary>
+    Task<IReadOnlyList<int>> GetActiveContentIdsAsync(int bookId, int version, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Yeni yayini ekler. PublishedContents koleksiyonu doldurulmus gelirse
     /// EF, cocuk satirlari navigation uzerinden ayni SaveChanges'te insert
     /// eder - PublishedContent icin ayri bir repo bilerek yok.

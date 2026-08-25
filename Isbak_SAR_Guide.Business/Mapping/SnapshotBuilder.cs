@@ -94,9 +94,17 @@ public static class SnapshotBuilder
     /// "checksum, payload'in ozetidir" sozu ancak ikisi ayni serilestirmeyi
     /// paylastigi surece dogru kalir; ayri serialize cagrisina izin verme.
     /// </summary>
-    public static string ComputeChecksum<T>(T value)
+    public static string ComputeChecksum<T>(T value) => ComputeChecksum(Serialize(value));
+
+    /// <summary>
+    /// Evrensel invariant: her PublishedContent satirinda (tombstone dahil)
+    /// Checksum, PayloadJson kolonunun AYNEN SHA-256'sidir. Mobil her satiri
+    /// tek tip dogrular - tombstone icin istisna ogrenmesi gerekmez.
+    /// Bu overload ayni zamanda "bir kez serialize et, ham checksum'i al"
+    /// akisina izin verir (cift serialize maliyetini kaldirir).
+    /// </summary>
+    public static string ComputeChecksum(string json)
     {
-        var json = Serialize(value);
         var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(json));
         return Convert.ToHexString(bytes);
     }
