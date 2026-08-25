@@ -1,4 +1,4 @@
-# Arama-Kurtarma Backend — Yol Haritası
+# Isbak_SAR_Guide Backend — Yol Haritası
 
 Kentsel arama-kurtarma el kitabı için ASP.NET Core REST API'sinin mimari kararları, iş kırılımı ve uygulama sırası.
 
@@ -52,13 +52,13 @@ düzeltilen hata bir sonraki sürümde geri döner.
 ### 2.1 Katman sorumlulukları
 
 ```
-AramaKurtarma.API          HTTP. İnce controller, middleware, DI wiring, auth config.
+Isbak_SAR_Guide.API          HTTP. İnce controller, middleware, DI wiring, auth config.
         ↓ (sadece Business'ı tanır)
-AramaKurtarma.Business     İş kuralları. Service, DTO, validation, mapping, Result.
+Isbak_SAR_Guide.Business     İş kuralları. Service, DTO, validation, mapping, Result.
         ↓ (sadece DataAccess soyutlamalarını tanır)
-AramaKurtarma.DataAccess   Kalıcılık. DbContext, EF config, Repository, UnitOfWork, migration.
+Isbak_SAR_Guide.DataAccess   Kalıcılık. DbContext, EF config, Repository, UnitOfWork, migration.
         ↓
-AramaKurtarma.Entities     POCO entity + enum. Hiçbir şeye bağımlı değil.
+Isbak_SAR_Guide.Entities     POCO entity + enum. Hiçbir şeye bağımlı değil.
 ```
 
 **Kural:** API projesi `DataAccess`'i doğrudan referans almaz. Her katman kendi DI kaydını
@@ -67,7 +67,7 @@ AramaKurtarma.Entities     POCO entity + enum. Hiçbir şeye bağımlı değil.
 **Klasör yapısı (24 Ağustos 2026'da güncellendi — Abstract/Concrete ayrımına geçildi):**
 
 ```
-AramaKurtarma.Business
+Isbak_SAR_Guide.Business
 ├── DTOs/{Feature}              CreateBookDto, LoginDto, ...
 ├── Validation/{Feature}        FluentValidation validator'ları
 ├── Services
@@ -76,7 +76,7 @@ AramaKurtarma.Business
 ├── Common                      Error, Result, JwtOptions
 └── ServiceRegistration.cs
 
-AramaKurtarma.DataAccess
+Isbak_SAR_Guide.DataAccess
 ├── Context / Configurations / Migrations / Seed
 └── Repositories
     ├── Abstract                IRepository<T>, IUnitOfWork
@@ -740,7 +740,7 @@ ve deploy edilemeyen bir sistem kalır.
 - [x] 1.6 `global.json` + GitHub Actions CI + remote → ilk push (CI kırmızı görüldü)
 - [x] 1.2 `ApplicationUser` + `Class1.cs` temizliği + `Directory.Build.props` + `.editorconfig` (CI yeşile döndü — PR #1)
 - [x] 1.3 NuGet paketleri + .NET 10 uyum doğrulaması → **Risk #8 kapandı**
-- [x] 1.4 Test projesi (`tests/AramaKurtarma.Tests`) + ilk 2 test geçti
+- [x] 1.4 Test projesi (`tests/Isbak_SAR_Guide.Tests`) + ilk 2 test geçti
 - [x] 1.5 `docker compose up` + PG18 bağlantı doğrulaması
 
 **Faz 0 kurulan altyapı:**

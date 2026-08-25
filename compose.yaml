@@ -1,10 +1,10 @@
 services:
   postgres:
     image: postgres:18
-    container_name: arama-kurtarma-postgres
+    container_name: isbak-sar-guide-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: arama_kurtarma
+      POSTGRES_DB: isbak_sar_guide
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:

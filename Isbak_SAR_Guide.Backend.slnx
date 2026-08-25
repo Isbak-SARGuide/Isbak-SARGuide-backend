@@ -1,0 +1,6 @@
+<Solution>
+  <Folder Name="/tests/">
+    <Project Path="tests/Isbak_SAR_Guide.Tests/Isbak_SAR_Guide.Tests.csproj" />
+  </Folder>
+  <Project Path="Isbak_SAR_Guide.API/Isbak_SAR_Guide.API.csproj" />
+</Solution>
