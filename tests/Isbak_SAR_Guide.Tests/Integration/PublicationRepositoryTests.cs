@@ -25,7 +25,7 @@ public class PublicationRepositoryTests(ApiFactory factory)
         using var scope = factory.Services.CreateScope();
         var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
         var book = await CreateBookAsync(unitOfWork);
-
+    
         // Act
         var version = await unitOfWork.Publications.GetLatestVersionAsync(book.Id);
 

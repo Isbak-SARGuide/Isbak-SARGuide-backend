@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using Isbak_SAR_Guide.Business.DTOs.Sync;
 using Isbak_SAR_Guide.Entities.Content;
@@ -20,10 +21,23 @@ public static class SnapshotBuilder
 {
     /// <summary>
     /// Kanonik form - PayloadJson/ManifestJson ve checksum'lar bu options ile
-    /// uretilir. DEGISTIRMEK TUM MEVCUT CHECKSUM'LARI GECERSIZ KILAR.
-    /// (API'nin camelCase HTTP serilestirmesi ayri dunya - onu etkilemez.)
+    /// uretilir. Ilke: kanonik form = wire format - saklanan bayt, servis
+    /// edilecek bayttir, arada hicbir donusum yoktur.
+    ///
+    /// BU OPTIONS DONMUSTUR: herhangi bir degisiklik, yayinlanmis tum
+    /// checksum'lari gecersiz kilar ve mobil dogrulamayi kirar.
+    ///
+    /// CamelCase: 5.0'da donan wire sozlesmesiyle hizali ("title", "moduleId") -
+    /// Faz 4'te PayloadJson'in deserialize edilmeden aynen gecirilmesinin sarti.
+    /// UnsafeRelaxedJsonEscaping: Turkce karakterler \uXXXX yerine oldugu gibi
+    /// (UTF-8) yazilir. Bu JSON hicbir zaman HTML icine ham gomulmez (API-only);
+    /// gomulecek olursa bu karar yeniden degerlendirilmeli.
     /// </summary>
-    private static readonly JsonSerializerOptions CanonicalOptions = new();
+    private static readonly JsonSerializerOptions CanonicalOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+    };
 
     public static SyncSnapshotDto BuildSnapshot(Book book)
     {

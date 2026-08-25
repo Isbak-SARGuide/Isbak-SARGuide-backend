@@ -15,7 +15,8 @@ public class BookPublication
     public int Version { get; set; }
 
     /// <summary>
-    /// Manifest payload'i (jsonb) - mobil /sync/manifest bu json'dan uretilir.
+    /// Manifest payload'i (json - bilerek jsonb degil, bayt sadakati icin) -
+    /// mobil /sync/manifest bu json'dan uretilir.
     /// </summary>
     public string ManifestJson { get; set; } = null!;
 
