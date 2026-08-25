@@ -2,8 +2,8 @@
 
 Kentsel arama-kurtarma el kitabı için ASP.NET Core REST API'sinin mimari kararları, iş kırılımı ve uygulama sırası.
 
-**Durum:** Planlandı · Faz 0 başlıyor
-**Son güncelleme:** 21 Ağustos 2026
+**Durum:** Faz 0, Faz 1, Faz 2 tamamlandı (M0, M1, M2 — Walking Skeleton) · Sıra Faz 3'te (Publishing Engine)
+**Son güncelleme:** 24 Ağustos 2026
 
 ---
 
@@ -64,6 +64,31 @@ AramaKurtarma.Entities     POCO entity + enum. Hiçbir şeye bağımlı değil.
 **Kural:** API projesi `DataAccess`'i doğrudan referans almaz. Her katman kendi DI kaydını
 `AddDataAccess()` / `AddBusiness()` extension metoduyla yapar. (Dependency Inversion'ın pratik karşılığı.)
 
+**Klasör yapısı (24 Ağustos 2026'da güncellendi — Abstract/Concrete ayrımına geçildi):**
+
+```
+AramaKurtarma.Business
+├── DTOs/{Feature}              CreateBookDto, LoginDto, ...
+├── Validation/{Feature}        FluentValidation validator'ları
+├── Services
+│   ├── Abstract                IBookService, IAuthService, ITokenService
+│   └── Concrete                BookService, TokenService
+├── Common                      Error, Result, JwtOptions
+└── ServiceRegistration.cs
+
+AramaKurtarma.DataAccess
+├── Context / Configurations / Migrations / Seed
+└── Repositories
+    ├── Abstract                IRepository<T>, IUnitOfWork
+    └── Concrete                EfRepository<T>, UnitOfWork
+```
+
+Gerekçe: interface ve implementasyonun nerede olduğu klasör isminden belli oluyor,
+yeni katılan biri arama yapmak zorunda kalmıyor. Sınır: her private/yardımcı metot
+interface'e çıkmıyor — sadece başka katmanın tükettiği gerçek soyutlamalar
+(`IBookService`, `IRepository<T>` gibi) Abstract'a gider. `Entities` katmanı bu
+ayrımın dışında bırakıldı (§2.3'teki mega-hiyerarşi kararıyla tutarlı).
+
 ### 2.2 Kullanılacak pattern'ler
 
 | Pattern | Gerekçe |
@@ -74,6 +99,7 @@ AramaKurtarma.Entities     POCO entity + enum. Hiçbir şeye bağımlı değil.
 | Options Pattern | `JwtOptions`, `StorageOptions` — magic string yok |
 | Strategy (hafif) | `IStorageService` → `LocalFileStorageService` / ileride `MinioStorageService` |
 | Middleware | Global exception handling, request logging |
+| Abstract/Concrete klasör ayrımı | Interface ve implementasyon ayrı klasörde; okunabilirlik ve keşfedilebilirlik için (Business/Services, DataAccess/Repositories) |
 
 ### 2.3 Bilinçli olarak KULLANILMAYACAKLAR
 
@@ -735,30 +761,30 @@ ve deploy edilemeyen bir sistem kalır.
 > (nuget sayfasından doğrula). (2) Moq yerine **NSubstitute** — Moq 4.20 SponsorLink olayı sonrası.
 > Her ikisi de tek satırla geri alınabilir.
 
-### PHASE 1 — Domain, Persistence & Seed → M1
+### PHASE 1 — Domain, Persistence & Seed → M1 ✅ Tamamlandı
 
-- [ ] 2.1 `BaseEntity` + audit/soft-delete arayüzleri
-- [ ] 2.2 İçerik entity'lerini tamamla
-- [ ] 2.3 `BookPublication` + `PublishedContent`
-- [ ] 2.4 EF Configuration + index + jsonb
-- [ ] 2.5 `DbContext`
-- [ ] 2.6 İlk migration
-- [ ] 2.7 Seed
+- [x] 2.1 `BaseEntity` + soft-delete alanları (`IsDeleted`, `DeletedAt`)
+- [x] 2.2 İçerik entity'leri tamamlandı (`Slug`, `LanguageCode`, `Checksum`, `DataJson`)
+- [x] 2.3 `BookPublication` + `PublishedContent` (immutable, `BaseEntity`'den türemiyor)
+- [x] 2.4 6 `IEntityTypeConfiguration<T>` + jsonb + index'ler — Risk #6 canlı yakalanıp `IsRequired(false)` ile düzeltildi
+- [x] 2.5 `DbContext` + `SaveChanges` override'ında merkezi audit damgalama
+- [x] 2.6 İlk migration → Postgres'e uygulandı (14 tablo doğrulandı)
+- [x] 2.7 Seed: roller (Admin/Editor), admin kullanıcı, 1 kitap / 4 modül / 16 içerik / 17 blok
 
 ### PHASE 2 — Walking Skeleton + Contract Stub → M2
 
-- [ ] 3.1 DI kompozisyonu
-- [ ] 3.2 `Result<T>`
-- [ ] 3.3 ProblemDetails + Result→ActionResult
-- [ ] 3.4 Serilog
-- [ ] 3.5 Swagger + versiyonlama + CORS
-- [ ] 6.1 Auth çekirdeği
-- [ ] 4.1 Repository + UnitOfWork
-- [ ] 4.2 Book DTO + Mapster + Validation
-- [ ] 4.3 `BookService`
-- [ ] 4.4 `BooksController`
-- [ ] 4.5 Entegrasyon test harness'ı
-- [ ] 5.0 Sync contract stub
+- [x] 3.1 DI kompozisyonu (`AddDataAccess`/`AddBusiness`, katman sızıntısı düzeltildi)
+- [x] 3.2 `Result<T>` + `Error`
+- [x] 3.3 `GlobalExceptionHandler` (IExceptionHandler) + `ResultExtensions.ToActionResult()`
+- [x] 3.4 Serilog
+- [x] 3.5 API versioning (Asp.Versioning) + Scalar UI + CORS
+- [x] 6.1 Auth çekirdeği — 5 canlı HTTP testiyle doğrulandı (401 → login → 200 → yanlış şifre → olmayan kullanıcı, enumeration koruması dahil)
+- [x] 4.1 `IRepository<T>` + `EfRepository<T>` + `IUnitOfWork`
+- [x] 4.2 Book DTO (`Dtos/`) + Mapster + Validation (`Validators/`)
+- [x] 4.3 `BookService` (validation dahil)
+- [x] 4.4 `BooksController` — 8 canlı HTTP testiyle doğrulandı (CRUD + validation + soft-delete)
+- [x] 4.5 Entegrasyon test harness'ı — Testcontainers + `WebApplicationFactory`, 6/6 test geçti (unit + smoke + auth akışı)
+- [x] 5.0 Sync contract stub — `manifest`/`snapshot`/`changes` (`[AllowAnonymous]`), gerçek seed verisiyle 4 canlı testle doğrulandı; `changes` bilerek stub (Faz 4'te gerçek delta)
 
 ### PHASE 3 — Publishing Engine → M3
 

@@ -1,0 +1,40 @@
+using AramaKurtarma.Business.Common;
+using Microsoft.AspNetCore.Mvc;
+
+namespace AramaKurtarma.API.Extensions;
+
+/// <summary>
+/// Business katmaninin dondurdugu Result/Result&lt;T&gt; degerlerini HTTP
+/// yanitina cevirir. Error.Type -> HTTP durum kodu eslemesi burada tek
+/// yerde toplanir, her controller'da tekrar etmez.
+/// </summary>
+public static class ResultExtensions
+{
+    public static IActionResult ToActionResult<T>(this Result<T> result, ControllerBase controller) =>
+        result.IsSuccess
+            ? controller.Ok(result.Value)
+            : CreateProblemResult(result.Error!, controller);
+
+    public static IActionResult ToActionResult(this Result result, ControllerBase controller) =>
+        result.IsSuccess
+            ? controller.NoContent()
+            : CreateProblemResult(result.Error!, controller);
+
+    private static IActionResult CreateProblemResult(Error error, ControllerBase controller)
+    {
+        var statusCode = error.Type switch
+        {
+            ErrorType.Validation => StatusCodes.Status400BadRequest,
+            ErrorType.Unauthorized => StatusCodes.Status401Unauthorized,
+            ErrorType.Forbidden => StatusCodes.Status403Forbidden,
+            ErrorType.NotFound => StatusCodes.Status404NotFound,
+            ErrorType.Conflict => StatusCodes.Status409Conflict,
+            _ => StatusCodes.Status500InternalServerError,
+        };
+
+        return controller.Problem(
+            detail: error.Message,
+            statusCode: statusCode,
+            title: error.Code);
+    }
+}
