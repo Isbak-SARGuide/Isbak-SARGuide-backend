@@ -822,6 +822,17 @@ ve deploy edilemeyen bir sistem kalır.
 
 ### PHASE 4 — Synchronization → M4
 
+> **Faz 4 öncesi tasarım notları (2026-08-25 — web/mobil ilk tasarımlar incelendi):**
+> 1. **Public web read API — yeni görev bloğu gerekiyor.** Son kullanıcı kitabı web'de de okuyacak.
+>    Web, sync endpoint'lerini KULLANMAZ (tam paket indirmek web için israf); kendi per-resource
+>    uçlarını alır (TOC + içerik detayı), ama aynı yayın tablolarından okur — asla draft'tan.
+> 2. **`GetSnapshot`/TOC kaynağı sorunu:** Yayın tablolarında modül ağacı ve kitap metadata'sı
+>    şu an DONDURULMUYOR (sadece content payload'ları + manifest var). 7.2 tam paketi ve web TOC'u
+>    bunlara muhtaç — Faz 4 tasarımında çözülmeli (aday: publish'te SnapshotJson kolonu da dondur).
+> 3. **Web frontend sözleşme uyumsuzluğu:** Mock, içerik gövdesini tek markdown string tutuyor;
+>    backend sözleşmesi yapısal ContentBlock listesi. Web'ciyle hizalanmalı (öneri: frontend block
+>    render eder; backend markdown'a çevirmez — iki format = drift).
+
 - [ ] 7.1 Manifest
 - [ ] 7.2 Snapshot
 - [ ] 7.3 Changes (delta)
