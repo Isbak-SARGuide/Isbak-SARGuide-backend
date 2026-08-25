@@ -494,3 +494,7 @@ appsettings.*.local.json
 
 # EF Core migration bundle ciktilari
 efbundle*
+
+# AI kod asistani dosyalari - repo disinda kalsin, sadece yerel
+CLAUDE.md
+.claude/
