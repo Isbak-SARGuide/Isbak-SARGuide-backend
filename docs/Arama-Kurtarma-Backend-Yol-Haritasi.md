@@ -829,6 +829,10 @@ ve deploy edilemeyen bir sistem kalır.
 > 2. **`GetSnapshot`/TOC kaynağı sorunu:** Yayın tablolarında modül ağacı ve kitap metadata'sı
 >    şu an DONDURULMUYOR (sadece content payload'ları + manifest var). 7.2 tam paketi ve web TOC'u
 >    bunlara muhtaç — Faz 4 tasarımında çözülmeli (aday: publish'te SnapshotJson kolonu da dondur).
+>    **✔ Çözüldü (2026-08-25):** `BookPublication.SnapshotJson` kolonu (`json`, NOT NULL) — tam kanonik
+>    snapshot publish'te dondurulur, `GetSnapshot` deserialize etmeden aynen döner. İnvariant genişledi:
+>    `Checksum = SHA256(SnapshotJson)`. Tek-serialize kuralı: `BuildManifest` checksum'ı parametre alır.
+>    Bilinçli veri tekrarı (satırlar delta'nın, snapshot ilk kurulumun kaynağı — immutable, drift edemez).
 > 3. **Web frontend sözleşme uyumsuzluğu:** Mock, içerik gövdesini tek markdown string tutuyor;
 >    backend sözleşmesi yapısal ContentBlock listesi. Web'ciyle hizalanmalı (öneri: frontend block
 >    render eder; backend markdown'a çevirmez — iki format = drift).

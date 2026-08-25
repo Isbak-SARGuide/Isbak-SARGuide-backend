@@ -35,8 +35,10 @@ public class SyncService(IUnitOfWork unitOfWork) : ISyncService
             return Result.Failure<SyncManifestDto>(snapshotResult.Error!);
         }
 
-        // STUB: gercek PublishedAt, Faz 4'te BookPublication.PublishedAt'ten okunacak.
-        var manifest = SnapshotBuilder.BuildManifest(snapshotResult.Value, DateTime.UtcNow);
+        // STUB: gercek PublishedAt/Checksum, Faz 4'te BookPublication'dan okunacak.
+        var snapshot = snapshotResult.Value;
+        var manifest = SnapshotBuilder.BuildManifest(
+            snapshot, DateTime.UtcNow, SnapshotBuilder.ComputeChecksum(snapshot));
 
         return Result.Success(manifest);
     }

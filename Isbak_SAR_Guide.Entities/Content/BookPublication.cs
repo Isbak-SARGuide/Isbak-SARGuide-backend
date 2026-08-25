@@ -20,6 +20,17 @@ public class BookPublication
     /// </summary>
     public string ManifestJson { get; set; } = null!;
 
+    /// <summary>
+    /// Yayinin tam kanonik snapshot'i (SyncSnapshotDto JSON'u). GetSnapshot bu
+    /// kolonu deserialize etmeden AYNEN doner (verbatim). Checksum = SHA256(bu
+    /// kolonun aynen kendisi). Silinen content'ler burada YOKTUR - tombstone
+    /// yalnizca PublishedContent kavramidir; snapshot yeni istemcinin dunyasidir.
+    /// Icerik PublishedContent satirlarinda da var - bilincli tekrar: immutable
+    /// verinin kopyasi drift edemez, roller ayri (satirlar delta'nin,
+    /// SnapshotJson ilk kurulumun kaynagi).
+    /// </summary>
+    public string SnapshotJson { get; set; } = null!;
+
     public string Checksum { get; set; } = null!;
 
     public DateTime PublishedAt { get; set; }

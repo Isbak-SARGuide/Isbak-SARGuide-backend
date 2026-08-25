@@ -51,16 +51,23 @@ public class PublishingService(IUnitOfWork unitOfWork) : IPublishingService
 
         var snapshot = SnapshotBuilder.BuildSnapshot(book);
 
+        // Tek-serialize kurali: snapshot BIR KEZ serialize edilir; ayni baytlar
+        // hem SnapshotJson kolonuna hem checksum'a gider. Baska hicbir yerde
+        // yeniden serialize edilmez - invariant: Checksum = SHA256(SnapshotJson).
+        var snapshotJson = SnapshotBuilder.Serialize(snapshot);
+        var snapshotChecksum = SnapshotBuilder.ComputeChecksum(snapshotJson);
+
         // Manifest'in ContentCount'u "hayatta olan icerik sayisi" - tombstone'lar
         // snapshot.Contents'te olmadigi icin sayim bilerek boyle dogru.
-        var manifest = SnapshotBuilder.BuildManifest(snapshot, publishedAt);
+        var manifest = SnapshotBuilder.BuildManifest(snapshot, publishedAt, snapshotChecksum);
 
         var publication = new BookPublication
         {
             BookId = bookId,
             Version = newVersion,
+            SnapshotJson = snapshotJson,
             ManifestJson = SnapshotBuilder.Serialize(manifest),
-            Checksum = manifest.Checksum,
+            Checksum = snapshotChecksum,
             PublishedAt = publishedAt,
             PublishedById = publishedById,
         };

@@ -68,6 +68,11 @@ public class PublishingTests(ApiFactory factory)
             row.PayloadJson.ShouldNotContain("\"Title\"", Case.Sensitive);
         }
 
+        // Invariant'in ucuncu ornegi: yayin checksum'i, SnapshotJson kolonunun
+        // AYNEN SHA-256'si (taze scope'tan okunan degerle - DB'nin sakladigi
+        // baytlar dogrulanir, change tracker'daki degil).
+        publication.Checksum.ShouldBe(Sha256Hex(publication.SnapshotJson));
+
         var book = await dbContext.Set<Book>().SingleAsync(b => b.Id == bookId);
         book.Version.ShouldBe(1);
     }
@@ -159,6 +164,14 @@ public class PublishingTests(ApiFactory factory)
             tombstone.IsDeleted.ShouldBeTrue();
             tombstone.PayloadJson.ShouldBe("{}");
             tombstone.Checksum.ShouldBe(Sha256Hex("{}"));
+
+            // Sozlesme: silinen content SNAPSHOT'ta yoktur (tombstone yalnizca
+            // PublishedContent kavramidir). Bugun bunu saglayan sey
+            // GetWithFullTreeAsync'in soft-delete filtresi - yarin biri o
+            // filtreyi kaldirirsa bu assert patlar, "tesadufen dogru" olmaz.
+            var v2Publication = await dbContext.Set<BookPublication>()
+                .SingleAsync(p => p.BookId == bookId && p.Version == 2);
+            v2Publication.SnapshotJson.ShouldNotContain("Silinecek");
         }
 
         // Act 2 - v3: tombstone TEKRARLANMAMALI (bir-kez kurali)
