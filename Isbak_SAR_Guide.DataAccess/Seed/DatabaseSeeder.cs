@@ -30,7 +30,7 @@ public static class DatabaseSeeder
 
     private static async Task SeedRolesAsync(RoleManager<IdentityRole> roleManager)
     {
-        string[] roles = ["Admin", "Editor"];
+        string[] roles = [RoleNames.Admin, RoleNames.Editor];
 
         foreach (var role in roles)
         {
@@ -70,7 +70,7 @@ public static class DatabaseSeeder
             throw new InvalidOperationException($"Admin kullanicisi olusturulamadi: {errors}");
         }
 
-        await userManager.AddToRoleAsync(admin, "Admin");
+        await userManager.AddToRoleAsync(admin, RoleNames.Admin);
     }
 
     private static async Task SeedContentTreeAsync(Isbak_SAR_GuideDbContext dbContext)
