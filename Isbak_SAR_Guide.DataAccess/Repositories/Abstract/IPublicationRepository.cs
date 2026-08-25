@@ -36,15 +36,13 @@ public interface IPublicationRepository
     Task<string?> GetLatestSnapshotJsonAsync(int bookId, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Verilen yayinin (bookId + version) IsDeleted=false satirlarinin
-    /// ContentId'lerini doner - tombstone diff'inin sol kumesi: bir sonraki
-    /// publish, "onceki yayinda hayatta olup simdiki snapshot'ta olmayan"
-    /// iceriklere tombstone yazar. Zaten tombstone olan satirlar bilerek
-    /// haric (tombstone bir kez yazilir, her yayinda tekrarlanmaz).
-    /// Ilk publish'te version=0 ile cagrilir: hic satir bulunmaz, bos liste
-    /// doner, hic tombstone uretilmez - ozel bir dal gerekmez.
+    /// Content basina yayin gunlugundeki en son satirin ozetini doner
+    /// (greatest-per-group). Journal modelinin temeli: satir tablosu tam
+    /// kopya degil degisiklik gunlugu oldugu icin "v'deki satirlar" sorusu
+    /// yanlis soru olurdu - degismeyen content'in son satiri eski bir
+    /// versiyondadir. Ilk publish'te bos liste doner - ozel dal gerekmez.
     /// </summary>
-    Task<IReadOnlyList<int>> GetActiveContentIdsAsync(int bookId, int version, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<PublishedContentState>> GetLatestContentStatesAsync(int bookId, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Yeni yayini ekler. PublishedContents koleksiyonu doldurulmus gelirse

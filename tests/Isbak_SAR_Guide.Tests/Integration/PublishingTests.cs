@@ -101,8 +101,8 @@ public class PublishingTests(ApiFactory factory)
     [Fact]
     public async Task PublishAsync_SecondPublishWithChanges_CreatesVersionTwoAndPreservesVersionOne()
     {
-        // Arrange
-        var bookId = await CreateBookWithContentsAsync("Orijinal Başlık");
+        // Arrange - iki content: biri degisecek, digeri sabit kalacak.
+        var bookId = await CreateBookWithContentsAsync("Orijinal Başlık", "Sabit İçerik");
         var adminId = await GetAdminIdAsync();
         await PublishAsync(bookId, adminId);
         await MutateFirstContentAsync(bookId, c => c.Title = "Yeni Başlık");
@@ -123,6 +123,14 @@ public class PublishingTests(ApiFactory factory)
 
         using var scope = factory.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<Isbak_SAR_GuideDbContext>();
+
+        // Journal modeli: v2'de YALNIZ degisen content'in satiri var -
+        // "Sabit İçerik" degismedi, yeniden yazilmadi.
+        var v2Rows = await dbContext.Set<PublishedContent>()
+            .Where(pc => pc.BookId == bookId && pc.Version == 2)
+            .ToListAsync();
+        v2Rows.Count.ShouldBe(1);
+
         var book = await dbContext.Set<Book>().SingleAsync(b => b.Id == bookId);
         book.Version.ShouldBe(2);
     }
@@ -172,6 +180,12 @@ public class PublishingTests(ApiFactory factory)
             var v2Publication = await dbContext.Set<BookPublication>()
                 .SingleAsync(p => p.BookId == bookId && p.Version == 2);
             v2Publication.SnapshotJson.ShouldNotContain("Silinecek");
+
+            // Journal modeli: v2'nin TEK satiri tombstone - "Kalan" degismedi,
+            // yeniden yazilmadi.
+            var v2RowCount = await dbContext.Set<PublishedContent>()
+                .CountAsync(pc => pc.BookId == bookId && pc.Version == 2);
+            v2RowCount.ShouldBe(1);
         }
 
         // Act 2 - v3: tombstone TEKRARLANMAMALI (bir-kez kurali)
@@ -190,7 +204,7 @@ public class PublishingTests(ApiFactory factory)
     }
 
     [Fact]
-    public async Task PublishAsync_UnchangedContent_ProducesIdenticalContentChecksums()
+    public async Task PublishAsync_UnchangedContent_WritesNoContentRows()
     {
         // Arrange
         var bookId = await CreateBookWithContentsAsync("Sabit İçerik", "Diğer İçerik");
@@ -200,7 +214,11 @@ public class PublishingTests(ApiFactory factory)
         // Act - arada hicbir degisiklik yok
         var result = await PublishAsync(bookId, adminId);
 
-        // Assert - publish bir komuttur, hedef duruma yakinsama degil: v2 acilir.
+        // Assert - publish bir komuttur: yayin eylemi kaydedilir (v2 +
+        // snapshot olusur) ama JOURNAL BOSTUR - degismeyen icerik yeniden
+        // yazilmaz. Bu, "delta = tam indirme" tuzagini kapatan kuralin kaniti
+        // (7.3-a journal modeli); deterministik serilestirme (6.2) sayesinde
+        // degismeyen icerigin checksum'i tutar ve satir atlanabilir.
         result.Value.Version.ShouldBe(2);
 
         using var scope = factory.Services.CreateScope();
@@ -210,22 +228,13 @@ public class PublishingTests(ApiFactory factory)
             .Where(pc => pc.BookId == bookId)
             .ToListAsync();
 
-        // Deterministik serilestirme kanitlanir (6.2 karari): content bazinda
-        // v1 ve v2 bayt bayt ayni payload + ayni checksum uretir.
-        var v1ByContent = rows.Where(r => r.Version == 1).ToDictionary(r => r.ContentId);
-        var v2ByContent = rows.Where(r => r.Version == 2).ToDictionary(r => r.ContentId);
-
-        v2ByContent.Keys.ShouldBe(v1ByContent.Keys, ignoreOrder: true);
-        foreach (var (contentId, v2Row) in v2ByContent)
-        {
-            v2Row.PayloadJson.ShouldBe(v1ByContent[contentId].PayloadJson);
-            v2Row.Checksum.ShouldBe(v1ByContent[contentId].Checksum);
-        }
+        rows.Where(r => r.Version == 1).Count().ShouldBe(2);
+        rows.Where(r => r.Version == 2).ShouldBeEmpty();
 
         // Yayin-seviyesi checksum'lar ise FARKLI olmali - bug degil, tasarim:
         // o checksum snapshot'in ozeti ve snapshot Version alanini iceriyor
-        // (v1'de 1, v2'de 2). Idempotency sozu content seviyesinde gecerli;
-        // yayin seviyesinde versiyon zaten degisen seyin ta kendisi.
+        // (v1'de 1, v2'de 2). Yayin seviyesinde versiyon zaten degisen seyin
+        // ta kendisi.
         var publications = await dbContext.Set<BookPublication>()
             .Where(p => p.BookId == bookId)
             .ToListAsync();

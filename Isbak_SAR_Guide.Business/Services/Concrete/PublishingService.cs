@@ -72,11 +72,32 @@ public class PublishingService(IUnitOfWork unitOfWork) : IPublishingService
             PublishedById = publishedById,
         };
 
+        // Journal modeli (7.3-a): satir tablosu tam kopya DEGIL, degisiklik
+        // gunlugu - tam durum SnapshotJson'da. Her yayinda tum content'leri
+        // yeniden yazmak deltayi tam indirmeye esitlerdi. Content basina en
+        // son durum tek sorguyla gelir; hem "degisti mi?" kontrolu hem
+        // tombstone diff'i bundan beslenir.
+        var latestStates = await _unitOfWork.Publications
+            .GetLatestContentStatesAsync(bookId, cancellationToken);
+        var stateByContentId = latestStates.ToDictionary(s => s.ContentId);
+
         foreach (var contentDto in snapshot.Contents)
         {
             // Bir kez serialize, ham metinden checksum - invariant:
             // Checksum = SHA256(PayloadJson), her satirda, tombstone dahil.
             var payload = SnapshotBuilder.Serialize(contentDto);
+            var checksum = SnapshotBuilder.ComputeChecksum(payload);
+
+            // Satir yalnizca icerik gercekten degistiyse yazilir: yeni content,
+            // dirilis (son satir tombstone - checksum'i "{}"ninki oldugu icin
+            // zaten farklidir, IsDeleted kontrolu niyeti acikca soyler) veya
+            // checksum farki.
+            if (stateByContentId.TryGetValue(contentDto.Id, out var state)
+                && !state.IsDeleted
+                && state.Checksum == checksum)
+            {
+                continue;
+            }
 
             publication.PublishedContents.Add(new PublishedContent
             {
@@ -84,26 +105,24 @@ public class PublishingService(IUnitOfWork unitOfWork) : IPublishingService
                 ContentId = contentDto.Id,
                 Version = newVersion,
                 PayloadJson = payload,
-                Checksum = SnapshotBuilder.ComputeChecksum(payload),
+                Checksum = checksum,
                 IsDeleted = false,
             });
         }
 
-        // Tombstone (6.4): onceki yayinda hayatta olup bu snapshot'ta olmayan
+        // Tombstone (6.4): son durumu "hayatta" olup bu snapshot'ta olmayan
         // content'ler. Bir kez yazilir - delta Version > from araligini
         // taradigi icin ondan eski her istemci tombstone'u er ya da gec gorur;
         // sonraki yayinlarda tekrarlamak sadece payload sisirirdi. Ilk
-        // publish'te latestVersion=0 hic satir bulmaz, dongu hic donmez.
+        // publish'te latestStates bos, dongu hic donmez.
         var currentIds = snapshot.Contents.Select(c => c.Id).ToHashSet();
-        var previousAlive = await _unitOfWork.Publications
-            .GetActiveContentIdsAsync(bookId, latestVersion, cancellationToken);
 
-        foreach (var deletedId in previousAlive.Where(id => !currentIds.Contains(id)))
+        foreach (var state in latestStates.Where(s => !s.IsDeleted && !currentIds.Contains(s.ContentId)))
         {
             publication.PublishedContents.Add(new PublishedContent
             {
                 BookId = bookId,
-                ContentId = deletedId,
+                ContentId = state.ContentId,
                 Version = newVersion, // pazarliksiz: eski numarayla deltada kimse goremezdi
                 PayloadJson = TombstonePayload,
                 Checksum = SnapshotBuilder.ComputeChecksum(TombstonePayload),
