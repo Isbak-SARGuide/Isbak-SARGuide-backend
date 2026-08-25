@@ -11,6 +11,13 @@ namespace Isbak_SAR_Guide.Business.Services.Concrete;
 
 public class PublishingService(IUnitOfWork unitOfWork) : IPublishingService
 {
+    /// <summary>
+    /// Tombstone satirinin payload'i: icerik artik yok, kimligi ContentId
+    /// kolonu tasiyor - son bilinen payload'i tasimak hem bayt israfi hem
+    /// anlam bozuklugu olurdu. Bos obje, jsonb NOT NULL kisitini da karsilar.
+    /// </summary>
+    private const string TombstonePayload = "{}";
+
     private readonly IUnitOfWork _unitOfWork = unitOfWork;
 
     public async Task<Result<PublishResultDto>> PublishAsync(
@@ -35,7 +42,8 @@ public class PublishingService(IUnitOfWork unitOfWork) : IPublishingService
         // rollback yapar - ayrica catch { Rollback } gerekmez.
         await using var transaction = await _unitOfWork.BeginTransactionAsync(cancellationToken);
 
-        var newVersion = await _unitOfWork.Publications.GetLatestVersionAsync(bookId, cancellationToken) + 1;
+        var latestVersion = await _unitOfWork.Publications.GetLatestVersionAsync(bookId, cancellationToken);
+        var newVersion = latestVersion + 1;
 
         // Snapshot kurulmadan ONCE bump: BuildSnapshot DTO'ya book.Version'i
         // yazar. Entity zaten izleniyor (tracked) - SaveChanges farki gorur.
@@ -43,6 +51,8 @@ public class PublishingService(IUnitOfWork unitOfWork) : IPublishingService
 
         var snapshot = SnapshotBuilder.BuildSnapshot(book);
 
+        // Manifest'in ContentCount'u "hayatta olan icerik sayisi" - tombstone'lar
+        // snapshot.Contents'te olmadigi icin sayim bilerek boyle dogru.
         var manifest = SnapshotBuilder.BuildManifest(snapshot, publishedAt);
 
         var publication = new BookPublication
@@ -57,19 +67,42 @@ public class PublishingService(IUnitOfWork unitOfWork) : IPublishingService
 
         foreach (var contentDto in snapshot.Contents)
         {
+            // Bir kez serialize, ham metinden checksum - invariant:
+            // Checksum = SHA256(PayloadJson), her satirda, tombstone dahil.
+            var payload = SnapshotBuilder.Serialize(contentDto);
+
             publication.PublishedContents.Add(new PublishedContent
             {
                 BookId = bookId, // denormalize - bkz. PublishedContent.BookId yorumu
                 ContentId = contentDto.Id,
                 Version = newVersion,
-                PayloadJson = SnapshotBuilder.Serialize(contentDto),
-                Checksum = SnapshotBuilder.ComputeChecksum(contentDto),
+                PayloadJson = payload,
+                Checksum = SnapshotBuilder.ComputeChecksum(payload),
                 IsDeleted = false,
             });
         }
 
-        // 6.4 (tombstone) buraya gelecek: onceki yayinda olup bu snapshot'ta
-        // olmayan content'ler icin IsDeleted=true satirlari.
+        // Tombstone (6.4): onceki yayinda hayatta olup bu snapshot'ta olmayan
+        // content'ler. Bir kez yazilir - delta Version > from araligini
+        // taradigi icin ondan eski her istemci tombstone'u er ya da gec gorur;
+        // sonraki yayinlarda tekrarlamak sadece payload sisirirdi. Ilk
+        // publish'te latestVersion=0 hic satir bulmaz, dongu hic donmez.
+        var currentIds = snapshot.Contents.Select(c => c.Id).ToHashSet();
+        var previousAlive = await _unitOfWork.Publications
+            .GetActiveContentIdsAsync(bookId, latestVersion, cancellationToken);
+
+        foreach (var deletedId in previousAlive.Where(id => !currentIds.Contains(id)))
+        {
+            publication.PublishedContents.Add(new PublishedContent
+            {
+                BookId = bookId,
+                ContentId = deletedId,
+                Version = newVersion, // pazarliksiz: eski numarayla deltada kimse goremezdi
+                PayloadJson = TombstonePayload,
+                Checksum = SnapshotBuilder.ComputeChecksum(TombstonePayload),
+                IsDeleted = true,
+            });
+        }
 
         await _unitOfWork.Publications.AddAsync(publication, cancellationToken);
 
