@@ -34,13 +34,13 @@ public class AuthTests(ApiFactory factory)
     {
         var client = factory.CreateClient();
 
-        var loginResponse = await client.PostAsJsonAsync("/api/v1/auth/login", new { userName = "admin", password = "Admin!Dev12i3" });
+        var loginResponse = await client.PostAsJsonAsync("/api/v1/auth/login", new { userName = "admin", password = "Admin!Dev123" });
 
         var loginResult = await loginResponse.Content.ReadFromJsonAsync<LoginResponseDto>();
 
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", loginResult!.AccessToken);
         var response = await client.GetAsync("api/v1/books");
-
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
         
     }
 }
