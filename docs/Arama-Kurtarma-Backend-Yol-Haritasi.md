@@ -788,7 +788,24 @@ ve deploy edilemeyen bir sistem kalır.
 
 ### PHASE 3 — Publishing Engine → M3
 
-- [ ] 6.2 Snapshot tasarımı
+- [x] 6.2 Snapshot tasarımı
+
+> **6.2 tasarım kararları (2026-08-25):**
+> 1. **`PublishedContent.PayloadJson` = `SyncContentDto` JSON'ı, aynen.** Publish anında her content
+>    (Blocks + Media özeti dahil) 5.0'da donmuş `SyncContentDto` şemasıyla serialize edilip yazılır.
+>    Faz 4'te snapshot/delta bu kolonu deserialize etmeden doğrudan mobile geçirir; ikinci bir şema
+>    ve dönüşüm katmanı yok (YAGNI). `ModuleId` DTO'da zaten mevcut.
+> 2. **`BookPublication.ManifestJson` publish transaction'ında dondurulur.** Versiyon, `PublishedAt`,
+>    içerik sayısı, medya listesi ve checksum publish anında hesaplanıp yazılır. Yayın gerçekten
+>    immutable: admin draft'ı sonra değiştirse bile yayınlanmış manifest değişmez. Sync sadece okur.
+> 3. **Deterministik sıralama DTO kurulurken C# tarafında garanti edilir:** Modules/Contents/Blocks
+>    serialize edilmeden önce `OrderBy(DisplayOrder).ThenBy(Id)`. Checksum idempotency'si (6.5) buna
+>    dayanır; garanti sorguda değil, serileştirmenin yanında durur ki sorgu değişse de bozulmasın.
+>
+> **Not — web okuyucu:** Kitapçık ileride halka açık web'de de yayınlanacak. Bu tasarımı değiştirmez:
+> web okuyucu, mobil gibi aynı immutable yayın tablolarından beslenen ikinci bir tüketicidir.
+> Gerekirse ileriki fazlarda ayrı bir public web read API görevi açılır (backlog).
+
 - [ ] 6.3 `IPublishingService`
 - [ ] 6.4 Tombstone
 - [ ] 6.5 Publish senaryo testleri
