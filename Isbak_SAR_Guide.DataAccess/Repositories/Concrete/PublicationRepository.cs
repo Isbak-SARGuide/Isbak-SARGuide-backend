@@ -19,6 +19,13 @@ public class PublicationRepository(Isbak_SAR_GuideDbContext dbContext) : IPublic
             .Where(p => p.BookId == bookId)
             .MaxAsync(p => (int?)p.Version, cancellationToken) ?? 0;
 
+    public async Task<string?> GetLatestManifestJsonAsync(int bookId, CancellationToken cancellationToken = default) =>
+        await _publications
+            .Where(p => p.BookId == bookId)
+            .OrderByDescending(p => p.Version)
+            .Select(p => p.ManifestJson)
+            .FirstOrDefaultAsync(cancellationToken);
+
     public async Task<IReadOnlyList<int>> GetActiveContentIdsAsync(int bookId, int version, CancellationToken cancellationToken = default) =>
         // IsDeleted filtresi elle: PublishedContent'te bilerek HasQueryFilter
         // yok (tombstone'lar delta feed'inde gorunmek zorunda) - global

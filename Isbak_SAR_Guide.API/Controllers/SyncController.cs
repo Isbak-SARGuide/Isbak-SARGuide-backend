@@ -20,7 +20,8 @@ public class SyncController(ISyncService syncService) : ControllerBase
     public async Task<IActionResult> GetManifest([FromQuery] int bookId, CancellationToken cancellationToken)
     {
         var result = await syncService.GetManifestAsync(bookId, cancellationToken);
-        return result.ToActionResult(this);
+        // Verbatim: ManifestJson kolonu deserialize edilmeden aynen gecirilir.
+        return result.ToJsonContentResult(this);
     }
 
     [HttpGet("snapshot")]

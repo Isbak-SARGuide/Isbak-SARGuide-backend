@@ -7,9 +7,11 @@ using Isbak_SAR_Guide.DataAccess.Repositories.Abstract;
 namespace Isbak_SAR_Guide.Business.Services.Concrete;
 
 /// <summary>
-/// STUB (5.0): draft veriden calisir, gercek yayin/versiyon sistemi (Faz 3/4)
-/// gelmeden mobil gelistiricinin sozlesme uzerinde ilerleyebilmesi icin.
-/// GetChangesAsync bu yuzden her zaman "degisiklik yok" doner.
+/// GetManifestAsync GERCEK (7.1): yayin tablosundan verbatim okur.
+/// GetSnapshotAsync/GetChangesAsync henuz STUB (5.0'dan): draft veriden
+/// calisir, 7.2/7.3'te gercek okumalarla degisecek. Karisik donem bilerek
+/// bu feature branch'ine hapsedilmistir - 7.1-7.3 tek PR olarak iner,
+/// develop/main hep tutarli kalir.
 /// </summary>
 public class SyncService(IUnitOfWork unitOfWork) : ISyncService
 {
@@ -26,21 +28,25 @@ public class SyncService(IUnitOfWork unitOfWork) : ISyncService
         return Result.Success(SnapshotBuilder.BuildSnapshot(book));
     }
 
-    public async Task<Result<SyncManifestDto>> GetManifestAsync(int bookId, CancellationToken cancellationToken = default)
+    public async Task<Result<string>> GetManifestAsync(int bookId, CancellationToken cancellationToken = default)
     {
-        var snapshotResult = await GetSnapshotAsync(bookId, cancellationToken);
+        var manifestJson = await unitOfWork.Publications.GetLatestManifestJsonAsync(bookId, cancellationToken);
 
-        if (snapshotResult.IsFailure)
+        if (manifestJson is not null)
         {
-            return Result.Failure<SyncManifestDto>(snapshotResult.Error!);
+            return Result.Success(manifestJson);
         }
 
-        // STUB: gercek PublishedAt/Checksum, Faz 4'te BookPublication'dan okunacak.
-        var snapshot = snapshotResult.Value;
-        var manifest = SnapshotBuilder.BuildManifest(
-            snapshot, DateTime.UtcNow, SnapshotBuilder.ComputeChecksum(snapshot));
+        // Null'un iki sebebi var, tek ek PK sorgusuyla ayrilir (yalnizca bu
+        // yolda - happy path etkilenmez): yanlis id (konfigurasyon hatasi) mi,
+        // henuz yayinlanmamis kitap (mesru bos durum - "icerik hazirlaniyor") mu?
+        var book = await unitOfWork.Books.FindByIdAsync(bookId, cancellationToken);
 
-        return Result.Success(manifest);
+        return book is null
+            ? Result.Failure<string>(
+                Error.NotFound("Sync.BookNotFound", $"Id={bookId} olan kitap bulunamadı."))
+            : Result.Failure<string>(
+                Error.NotFound("Sync.NotPublished", "Kitap henüz yayınlanmadı."));
     }
 
     public Task<Result<SyncChangesDto>> GetChangesAsync(int bookId, int fromVersion, CancellationToken cancellationToken = default)

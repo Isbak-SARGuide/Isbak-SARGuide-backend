@@ -18,6 +18,16 @@ public interface IPublicationRepository
     Task<int> GetLatestVersionAsync(int bookId, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Son yayinin ManifestJson'unu doner; hic yayin yoksa null. Projection
+    /// bilerek: SnapshotJson'i (megabaytlik kolon) HIC cekmez - Select,
+    /// FirstOrDefault'tan once SQL'e iner (SELECT "ManifestJson" ... LIMIT 1),
+    /// buyuk kolon diskten okunmaz, aga cikmaz. Manifest mobilin en sik
+    /// cagrisi - entity'yi cekip .ManifestJson okumak her istekte koca
+    /// snapshot'i bosuna tasirdi.
+    /// </summary>
+    Task<string?> GetLatestManifestJsonAsync(int bookId, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Verilen yayinin (bookId + version) IsDeleted=false satirlarinin
     /// ContentId'lerini doner - tombstone diff'inin sol kumesi: bir sonraki
     /// publish, "onceki yayinda hayatta olup simdiki snapshot'ta olmayan"

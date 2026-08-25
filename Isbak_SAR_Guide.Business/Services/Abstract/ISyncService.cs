@@ -5,7 +5,16 @@ namespace Isbak_SAR_Guide.Business.Services.Abstract;
 
 public interface ISyncService
 {
-    Task<Result<SyncManifestDto>> GetManifestAsync(int bookId, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Son yayinin ManifestJson'unu AYNEN doner (verbatim ham JSON).
+    /// Deserialize/re-serialize YASAK - web serializer'in encoder'i kanonik
+    /// formdan farkli (\uXXXX escape'leri geri getirir), round-trip baytlari
+    /// bozar ve istemcinin checksum dogrulamasini kirar.
+    /// Hata kodlari: kitap yoksa Sync.BookNotFound, kitap var ama hic
+    /// yayinlanmamissa Sync.NotPublished (ikisi de 404; mobil koda bakarak
+    /// "yanlis id" ile "icerik hazirlaniyor"u ayirt eder).
+    /// </summary>
+    Task<Result<string>> GetManifestAsync(int bookId, CancellationToken cancellationToken = default);
 
     Task<Result<SyncSnapshotDto>> GetSnapshotAsync(int bookId, CancellationToken cancellationToken = default);
 
