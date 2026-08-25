@@ -24,7 +24,9 @@ public class PublishedContent
     public int Version { get; set; }
 
     /// <summary>
-    /// Content + Blocks'un tam anlik goruntusu (jsonb).
+    /// Content + Blocks'un tam anlik goruntusu (json - bilerek jsonb degil:
+    /// Checksum = SHA256(PayloadJson) invariant'i bayt sadakati ister,
+    /// jsonb metni kanonikelestirdigi icin bunu bozar).
     /// </summary>
     public string PayloadJson { get; set; } = null!;
 

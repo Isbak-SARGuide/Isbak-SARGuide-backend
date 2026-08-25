@@ -8,7 +8,12 @@ public class PublishedContentConfiguration : IEntityTypeConfiguration<PublishedC
 {
     public void Configure(EntityTypeBuilder<PublishedContent> builder)
     {
-        builder.Property(pc => pc.PayloadJson).HasColumnType("jsonb").IsRequired();
+        // json, jsonb DEGIL - bilerek: jsonb metni kanonikelestirir (key'leri
+        // yeniden siralar, whitespace atar), Checksum = SHA256(PayloadJson)
+        // invariant'i ise bayt sadakati ister. json metni aynen saklar + yazim
+        // aninda gecerlilik dogrular. DataJson (draft, ContentBlock) jsonb
+        // kalir - o yapisal veri, uzerinde checksum sozu yok. (6.5 testi yakaladi)
+        builder.Property(pc => pc.PayloadJson).HasColumnType("json").IsRequired();
         builder.Property(pc => pc.Checksum).HasMaxLength(128).IsRequired();
 
         builder.HasOne(pc => pc.BookPublication)

@@ -801,6 +801,15 @@ ve deploy edilemeyen bir sistem kalır.
 > 3. **Deterministik sıralama DTO kurulurken C# tarafında garanti edilir:** Modules/Contents/Blocks
 >    serialize edilmeden önce `OrderBy(DisplayOrder).ThenBy(Id)`. Checksum idempotency'si (6.5) buna
 >    dayanır; garanti sorguda değil, serileştirmenin yanında durur ki sorgu değişse de bozulmasın.
+> 4. **`PayloadJson`/`ManifestJson` kolonları `json` (`jsonb` değil):** checksum invariant'ı
+>    (`Checksum = SHA256(PayloadJson)`, tombstone dahil) bayt sadakati gerektirir; `jsonb` metni
+>    kanonikleştirir (key sıralar, whitespace atar) ve invariant'ı DB'den geri okuyunca bozar.
+>    `json` metni aynen saklar + geçerlilik doğrular. 6.5 invariant testi yakaladı (2026-08-25).
+>    Draft tarafındaki `ContentBlock.DataJson` bilerek `jsonb` kalır — yapısal veri, checksum sözü yok.
+> 5. **Kanonik form = wire format:** `PropertyNamingPolicy = CamelCase` (5.0 wire sözleşmesiyle hizalı,
+>    Faz 4 verbatim geçişin ön şartı) + `UnsafeRelaxedJsonEscaping` (Türkçe karakterler `\uXXXX` değil
+>    UTF-8; bu JSON asla HTML'e ham gömülmez). Kanonik options **donmuştur** — her değişiklik
+>    yayınlanmış tüm checksum'ları geçersiz kılar.
 >
 > **Not — web okuyucu:** Kitapçık ileride halka açık web'de de yayınlanacak. Bu tasarımı değiştirmez:
 > web okuyucu, mobil gibi aynı immutable yayın tablolarından beslenen ikinci bir tüketicidir.

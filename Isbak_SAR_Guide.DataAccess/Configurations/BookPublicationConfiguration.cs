@@ -8,7 +8,10 @@ public class BookPublicationConfiguration : IEntityTypeConfiguration<BookPublica
 {
     public void Configure(EntityTypeBuilder<BookPublication> builder)
     {
-        builder.Property(p => p.ManifestJson).HasColumnType("jsonb").IsRequired();
+        // json, jsonb DEGIL - PublishedContentConfiguration'daki sebeple ayni:
+        // manifest Faz 4'te mobile AYNEN servis edilecek; dondurulan baytlarin
+        // degismeden cikmasi bayt sadakati ister, jsonb bunu vermez.
+        builder.Property(p => p.ManifestJson).HasColumnType("json").IsRequired();
         builder.Property(p => p.Checksum).HasMaxLength(128).IsRequired();
 
         // Immutable denetim kaydi - Book veya kullanici silinse bile yayin
