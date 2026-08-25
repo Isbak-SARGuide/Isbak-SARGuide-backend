@@ -33,8 +33,8 @@ public class SyncService(IUnitOfWork unitOfWork) : ISyncService
 
     public Task<Result<SyncChangesDto>> GetChangesAsync(int bookId, int fromVersion, CancellationToken cancellationToken = default)
     {
-        // STUB: gercek delta hesabi PublishedContent.Version uzerinden 7.3'te gelecek.
-        var changes = new SyncChangesDto(fromVersion, fromVersion, [], [], [], []);
+        // STUB: gercek delta hesabi PublishedContent.Version uzerinden 7.3-c'de gelecek.
+        var changes = new SyncChangesDto(fromVersion, fromVersion, [], [], [], [], []);
         return Task.FromResult(Result.Success(changes));
     }
 
