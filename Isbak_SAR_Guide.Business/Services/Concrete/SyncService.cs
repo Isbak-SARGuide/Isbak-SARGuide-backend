@@ -35,22 +35,8 @@ public class SyncService(IUnitOfWork unitOfWork) : ISyncService
             return Result.Failure<SyncManifestDto>(snapshotResult.Error!);
         }
 
-        var snapshot = snapshotResult.Value;
-
-        var media = snapshot.Contents
-            .SelectMany(c => c.Blocks)
-            .Select(b => b.Media)
-            .OfType<MediaSummaryDto>()
-            .DistinctBy(m => m.Id)
-            .ToList();
-
-        var manifest = new SyncManifestDto(
-            snapshot.Book.Id,
-            snapshot.Version,
-            DateTime.UtcNow, // Gercek PublishedAt Faz 3'te (BookPublication.PublishedAt) gelecek
-            snapshot.Contents.Count,
-            media,
-            SnapshotBuilder.ComputeChecksum(snapshot));
+        // STUB: gercek PublishedAt, Faz 4'te BookPublication.PublishedAt'ten okunacak.
+        var manifest = SnapshotBuilder.BuildManifest(snapshotResult.Value, DateTime.UtcNow);
 
         return Result.Success(manifest);
     }
