@@ -62,6 +62,30 @@ public static class SnapshotBuilder
                 .Select(BuildBlockDto)
                 .ToList());
 
+    /// <summary>
+    /// Snapshot'tan manifest uretir: media ozetleri (DistinctBy Id) +
+    /// snapshot checksum'i. publishedAt disaridan gelir - "gercek bir kez
+    /// hesaplanir, sonra akar": publish, ayni ani hem buraya hem
+    /// BookPublication.PublishedAt kolonuna gecirir.
+    /// </summary>
+    public static SyncManifestDto BuildManifest(SyncSnapshotDto snapshot, DateTime publishedAt)
+    {
+        var media = snapshot.Contents
+            .SelectMany(c => c.Blocks)
+            .Select(b => b.Media)
+            .OfType<MediaSummaryDto>()
+            .DistinctBy(m => m.Id)
+            .ToList();
+
+        return new SyncManifestDto(
+            snapshot.Book.Id,
+            snapshot.Version,
+            publishedAt,
+            snapshot.Contents.Count,
+            media,
+            ComputeChecksum(snapshot));
+    }
+
     public static string Serialize<T>(T value) =>
         JsonSerializer.Serialize(value, CanonicalOptions);
 
