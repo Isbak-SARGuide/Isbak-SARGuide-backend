@@ -3,7 +3,7 @@
 Kentsel arama-kurtarma el kitabı için ASP.NET Core REST API'sinin mimari kararları, iş kırılımı ve uygulama sırası.
 
 **Durum:** Faz 0-3 tamamlandı (M0, M1, M2, M3 — Publishing Engine) · Sıra Faz 4'te (Synchronization)
-**Son güncelleme:** 24 Ağustos 2026
+**Son güncelleme:** 25 Ağustos 2026
 
 ---
 
@@ -149,7 +149,7 @@ Yarım kalan indirme eski sürümü bozmamalı.
 ADMIN TARAFI (canlı, serbestçe düzenlenir)
 Book / Module / Content / ContentBlock / Media
                     │
-                    │  POST /api/v1/admin/books/{id}/publish
+                    │  POST /api/v1/books/{bookId}/publish  (Admin rolü)
                     │  (tek transaction, versiyon N → N+1)
                     ▼
 YAYIN TARAFI (immutable, mobil sadece burayı görür)
