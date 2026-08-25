@@ -18,6 +18,10 @@ public class UnitOfWork : IUnitOfWork
         Contents = new EfRepository<Content>(dbContext);
         ContentBlocks = new EfRepository<ContentBlock>(dbContext);
         Media = new EfRepository<Media>(dbContext);
+        // Ayni dbContext instance'i sart: BeginTransactionAsync o context'in
+        // baglantisinda transaction acar; farkli bir context kullansaydi
+        // Publications'in yazdiklari transaction'in disinda kalirdi.
+        Publications = new PublicationRepository(dbContext);
     }
 
     public IBookRepository Books { get; }
@@ -29,6 +33,8 @@ public class UnitOfWork : IUnitOfWork
     public IRepository<ContentBlock> ContentBlocks { get; }
 
     public IRepository<Media> Media { get; }
+
+    public IPublicationRepository Publications { get; }
 
     public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) =>
         _dbContext.SaveChangesAsync(cancellationToken);
