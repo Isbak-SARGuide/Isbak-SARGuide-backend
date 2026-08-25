@@ -28,6 +28,14 @@ public interface IPublicationRepository
     Task<string?> GetLatestManifestJsonAsync(int bookId, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Son yayinin SnapshotJson'unu doner; hic yayin yoksa null.
+    /// GetLatestManifestJsonAsync'in aynasi: projection bilerek -
+    /// ManifestJson'i (ve diger kolonlari) HIC cekmez, SELECT "SnapshotJson"
+    /// ... LIMIT 1 olarak iner.
+    /// </summary>
+    Task<string?> GetLatestSnapshotJsonAsync(int bookId, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Verilen yayinin (bookId + version) IsDeleted=false satirlarinin
     /// ContentId'lerini doner - tombstone diff'inin sol kumesi: bir sonraki
     /// publish, "onceki yayinda hayatta olup simdiki snapshot'ta olmayan"

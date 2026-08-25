@@ -1,58 +1,56 @@
 using Isbak_SAR_Guide.Business.Common;
 using Isbak_SAR_Guide.Business.DTOs.Sync;
-using Isbak_SAR_Guide.Business.Mapping;
 using Isbak_SAR_Guide.Business.Services.Abstract;
 using Isbak_SAR_Guide.DataAccess.Repositories.Abstract;
 
 namespace Isbak_SAR_Guide.Business.Services.Concrete;
 
 /// <summary>
-/// GetManifestAsync GERCEK (7.1): yayin tablosundan verbatim okur.
-/// GetSnapshotAsync/GetChangesAsync henuz STUB (5.0'dan): draft veriden
-/// calisir, 7.2/7.3'te gercek okumalarla degisecek. Karisik donem bilerek
-/// bu feature branch'ine hapsedilmistir - 7.1-7.3 tek PR olarak iner,
-/// develop/main hep tutarli kalir.
+/// Manifest ve snapshot yayin tablolarindan VERBATIM okunur (7.1/7.2) -
+/// uretici publish, sync artik sadece okuyucu. Yalnizca GetChangesAsync
+/// stub'tir (7.3'e kadar). Karisik donem bilerek bu feature branch'ine
+/// hapsedilmistir - 7.1-7.3 tek PR olarak iner, develop/main hep tutarli.
 /// </summary>
 public class SyncService(IUnitOfWork unitOfWork) : ISyncService
 {
-    public async Task<Result<SyncSnapshotDto>> GetSnapshotAsync(int bookId, CancellationToken cancellationToken = default)
-    {
-        var book = await unitOfWork.Books.GetWithFullTreeAsync(bookId, cancellationToken);
-
-        if (book is null)
-        {
-            return Result.Failure<SyncSnapshotDto>(
-                Error.NotFound("Sync.BookNotFound", $"Id={bookId} olan kitap bulunamadı."));
-        }
-
-        return Result.Success(SnapshotBuilder.BuildSnapshot(book));
-    }
-
     public async Task<Result<string>> GetManifestAsync(int bookId, CancellationToken cancellationToken = default)
     {
         var manifestJson = await unitOfWork.Publications.GetLatestManifestJsonAsync(bookId, cancellationToken);
 
-        if (manifestJson is not null)
-        {
-            return Result.Success(manifestJson);
-        }
+        return manifestJson is not null
+            ? Result.Success(manifestJson)
+            : Result.Failure<string>(await ResolveNotFoundAsync(bookId, cancellationToken));
+    }
 
-        // Null'un iki sebebi var, tek ek PK sorgusuyla ayrilir (yalnizca bu
-        // yolda - happy path etkilenmez): yanlis id (konfigurasyon hatasi) mi,
-        // henuz yayinlanmamis kitap (mesru bos durum - "icerik hazirlaniyor") mu?
-        var book = await unitOfWork.Books.FindByIdAsync(bookId, cancellationToken);
+    public async Task<Result<string>> GetSnapshotAsync(int bookId, CancellationToken cancellationToken = default)
+    {
+        var snapshotJson = await unitOfWork.Publications.GetLatestSnapshotJsonAsync(bookId, cancellationToken);
 
-        return book is null
-            ? Result.Failure<string>(
-                Error.NotFound("Sync.BookNotFound", $"Id={bookId} olan kitap bulunamadı."))
-            : Result.Failure<string>(
-                Error.NotFound("Sync.NotPublished", "Kitap henüz yayınlanmadı."));
+        return snapshotJson is not null
+            ? Result.Success(snapshotJson)
+            : Result.Failure<string>(await ResolveNotFoundAsync(bookId, cancellationToken));
     }
 
     public Task<Result<SyncChangesDto>> GetChangesAsync(int bookId, int fromVersion, CancellationToken cancellationToken = default)
     {
-        // STUB: gercek delta hesabi PublishedContent.Version uzerinden Faz 4'te gelecek.
+        // STUB: gercek delta hesabi PublishedContent.Version uzerinden 7.3'te gelecek.
         var changes = new SyncChangesDto(fromVersion, fromVersion, [], [], [], []);
         return Task.FromResult(Result.Success(changes));
+    }
+
+    /// <summary>
+    /// Yayin bulunamayinca iki durumu ayirir - tek ek PK sorgusuyla, yalnizca
+    /// bu yolda (happy path etkilenmez): yanlis id (konfigurasyon hatasi) mi,
+    /// henuz yayinlanmamis kitap (mesru "icerik hazirlaniyor" durumu) mu?
+    /// Kodlar TUM sync uclari icin ortak - kod, ucun degil gercegin adi;
+    /// bu yardimci ortak oldugu icin ayrisamaz da.
+    /// </summary>
+    private async Task<Error> ResolveNotFoundAsync(int bookId, CancellationToken cancellationToken)
+    {
+        var book = await unitOfWork.Books.FindByIdAsync(bookId, cancellationToken);
+
+        return book is null
+            ? Error.NotFound("Sync.BookNotFound", $"Id={bookId} olan kitap bulunamadı.")
+            : Error.NotFound("Sync.NotPublished", "Kitap henüz yayınlanmadı.");
     }
 }

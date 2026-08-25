@@ -16,7 +16,14 @@ public interface ISyncService
     /// </summary>
     Task<Result<string>> GetManifestAsync(int bookId, CancellationToken cancellationToken = default);
 
-    Task<Result<SyncSnapshotDto>> GetSnapshotAsync(int bookId, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Son yayinin SnapshotJson'unu AYNEN doner (verbatim ham JSON).
+    /// Deserialize/re-serialize YASAK - GetManifestAsync'teki sebeple ayni;
+    /// ayrica istemci SHA256(govde) == manifest.checksum dogrulamasi yapar,
+    /// tek bayt oynasa dogrulama kirilir. Hata kodlari manifest ile ORTAK:
+    /// Sync.BookNotFound / Sync.NotPublished (kod, ucun degil gercegin adi).
+    /// </summary>
+    Task<Result<string>> GetSnapshotAsync(int bookId, CancellationToken cancellationToken = default);
 
     Task<Result<SyncChangesDto>> GetChangesAsync(int bookId, int fromVersion, CancellationToken cancellationToken = default);
 }

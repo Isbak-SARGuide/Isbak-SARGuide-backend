@@ -28,7 +28,9 @@ public class SyncController(ISyncService syncService) : ControllerBase
     public async Task<IActionResult> GetSnapshot([FromQuery] int bookId, CancellationToken cancellationToken)
     {
         var result = await syncService.GetSnapshotAsync(bookId, cancellationToken);
-        return result.ToActionResult(this);
+        // Verbatim: SnapshotJson kolonu deserialize edilmeden aynen gecirilir -
+        // istemci SHA256(govde) == manifest.checksum dogrulamasi yapar.
+        return result.ToJsonContentResult(this);
     }
 
     [HttpGet("changes")]
