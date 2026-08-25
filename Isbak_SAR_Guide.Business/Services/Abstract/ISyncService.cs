@@ -25,5 +25,13 @@ public interface ISyncService
     /// </summary>
     Task<Result<string>> GetSnapshotAsync(int bookId, CancellationToken cancellationToken = default);
 
-    Task<Result<SyncChangesDto>> GetChangesAsync(int bookId, int fromVersion, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// fromVersion'dan bu yana DEGISEN icerigi doner (journal modeli, 7.3-a) -
+    /// verbatim envelope, HAM JSON. Degismeyen icerik hic yer almaz. Gecerlilik:
+    /// 0 &lt;= fromVersion &lt;= guncel versiyon; disari cikan her deger
+    /// Sync.InvalidFromVersion (400) doner - "tam senkronizasyon (snapshot)
+    /// yap" sinyali. Hata kodlari manifest/snapshot ile ORTAK
+    /// (Sync.BookNotFound / Sync.NotPublished).
+    /// </summary>
+    Task<Result<string>> GetChangesAsync(int bookId, int fromVersion, CancellationToken cancellationToken = default);
 }

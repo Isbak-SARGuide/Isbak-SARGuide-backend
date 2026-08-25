@@ -40,6 +40,7 @@ public class SyncController(ISyncService syncService) : ControllerBase
         CancellationToken cancellationToken)
     {
         var result = await syncService.GetChangesAsync(bookId, fromVersion, cancellationToken);
-        return result.ToActionResult(this);
+        // Verbatim zarf: envelope elle yazilir, content/modul/medya parcalari ham kopyalanir.
+        return result.ToJsonContentResult(this);
     }
 }

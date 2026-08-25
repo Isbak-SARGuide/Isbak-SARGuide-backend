@@ -19,6 +19,26 @@ public class PublicationRepository(Isbak_SAR_GuideDbContext dbContext) : IPublic
             .Where(p => p.BookId == bookId)
             .MaxAsync(p => (int?)p.Version, cancellationToken) ?? 0;
 
+    public async Task<string?> GetManifestJsonAsync(int bookId, int version, CancellationToken cancellationToken = default) =>
+        await _publications
+            .Where(p => p.BookId == bookId && p.Version == version)
+            .Select(p => p.ManifestJson)
+            .FirstOrDefaultAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<PublishedContentChange>> GetChangedRowsSinceAsync(int bookId, int fromVersion, CancellationToken cancellationToken = default)
+    {
+        var rows = dbContext.Set<PublishedContent>();
+
+        return await rows
+            .Where(pc => pc.BookId == bookId
+                && pc.Version > fromVersion
+                && pc.Version == rows
+                    .Where(inner => inner.BookId == bookId && inner.ContentId == pc.ContentId)
+                    .Max(inner => (int?)inner.Version))
+            .Select(pc => new PublishedContentChange(pc.ContentId, pc.PayloadJson, pc.IsDeleted))
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<string?> GetLatestManifestJsonAsync(int bookId, CancellationToken cancellationToken = default) =>
         await _publications
             .Where(p => p.BookId == bookId)

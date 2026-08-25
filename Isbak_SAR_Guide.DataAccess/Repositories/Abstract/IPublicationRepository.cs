@@ -18,6 +18,25 @@ public interface IPublicationRepository
     Task<int> GetLatestVersionAsync(int bookId, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Belirli bir versiyonun ManifestJson'unu doner; o versiyon yoksa null.
+    /// Delta'nin medya diff'i icin: fromVersion'daki manifest ile guncel
+    /// manifest karsilastirilir. Projection - diger kolonlar cekilmez.
+    /// </summary>
+    Task<string?> GetManifestJsonAsync(int bookId, int version, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Content basina EN SON durumu, YALNIZCA Version > fromVersion olan
+    /// satirlar arasindan doner (journal modeli, 7.3-a/c). Ayni korele-MAX
+    /// deseni ama disaridan bir filtre daha: outer satir hem (Version >
+    /// fromVersion) hem (o content'in TUM zamanlarindaki mutlak en yuksek
+    /// versiyonu) olmali. Bu iki kosul birlikte dogru sonucu garanti eder:
+    /// bir content'in son degisikligi fromVersion'dan eskiyse hic donmez
+    /// (zaten degismemis); yeniyse tek satir doner - o da mutlaka en son
+    /// durumdur (versiyonlar content basina hep artan sirada yazilir).
+    /// </summary>
+    Task<IReadOnlyList<PublishedContentChange>> GetChangedRowsSinceAsync(int bookId, int fromVersion, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Son yayinin ManifestJson'unu doner; hic yayin yoksa null. Projection
     /// bilerek: SnapshotJson'i (megabaytlik kolon) HIC cekmez - Select,
     /// FirstOrDefault'tan once SQL'e iner (SELECT "ManifestJson" ... LIMIT 1),
