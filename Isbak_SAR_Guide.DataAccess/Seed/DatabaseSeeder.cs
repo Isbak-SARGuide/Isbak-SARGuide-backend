@@ -140,172 +140,99 @@ public static class DatabaseSeeder
 
     private sealed record SeedModule(string Name, string Description, SeedContent[] Contents);
 
-    // NOT: Bu icerikler gercek USAR (Urban Search & Rescue) terminolojisine
-    // dayanir - admin panel demo'sunda ve sync testlerinde anlamli veri
-    // gormek icin "Content 1, Content 2..." yerine gercek basliklar kullanildi.
-    // Tam kapsamli icerik yazimi ilerleyen fazlarda admin panel uzerinden yapilacak.
+    // Gercek kitap icerigi (kentsel-arama-kurtarma-operasyonlari.pdf) - modul
+    // modul isleniyor. Kaynak PDF'in Icindekiler sayfa numaralari guvenilir
+    // DEGIL (TOC drift - orn. "Sinyaller ve Uyarilar" TOC'ta sayfa 5 diyor,
+    // gercekte sayfa 7'de basliyor); her modulun siniri metin okunarak
+    // dogrulandi, sayfa numarasina mekanik guvenilmedi.
+    //
+    // BSAFE (s.4-6): tek Content, resim yok (ilk gomulu resim s.10'da).
+    // Senaryo bazli gruplar ("Yangin durumunda;", "Rehin alinirsaniz;" gibi)
+    // Warning, genel kurallar Text olarak siniflandirildi.
     private static readonly SeedModule[] _moduleSeeds =
     [
         new(
-            "Enkaz Altında Arama Teknikleri",
-            "Çökme sonrası kayıp kişilerin tespiti için kullanılan sistematik arama yöntemleri.",
+            "BSAFE",
+            "Sahada kisisel guvenlik icin temel kurallar ve senaryo bazli davranis rehberi.",
             [
                 new(
-                    "Sesli ve Görsel Arama Yöntemi",
-                    "Elektronik ekipman olmadan uygulanabilen temel arama tekniği.",
+                    "BSAFE Güvenlik Kuralları",
+                    "Kişisel güvenlik ilkeleri ve özel durumlarda izlenecek davranış kuralları.",
                     [
                         new(ContentBlockType.Text,
-                            "Sesli arama, enkaz alanında belirli aralıklarla tam sessizlik sağlanarak " +
-                            "kayıp kişilerden gelebilecek ses veya vurma sinyallerinin dinlenmesi esasına dayanır."),
+                            "- Güvenliğinizden nihai olarak kendiniz sorumlusunuz.\n" +
+                            "- Güvenlik önlemleri makam, mevki ve yetki gözetmeksizin herkes için geçerlidir.\n" +
+                            "- Mayın veya patlayıcı olduğunu düşündüğünüz yerlerde hareketsiz kalın ve derhal yardım çağrısında bulunun.\n" +
+                            "- Diğer insanların kültürlerinin farkına vararak ve kendi kültürünüzü bilerek farkındalık oluşturabilirsiniz.\n" +
+                            "- Röportaj vermeye yetkiniz yoksa ve vereceğiniz bilgiler güvenlik riski oluşturacaksa sorulara yanıt vermekten kaçının.\n" +
+                            "- Üst düzey yetkili de olsanız taciz ve şiddet kuralları, cezaları sizler için de geçerlidir.\n" +
+                            "- Güvenlik riskini yönetmek için tehdidin olasılığını ve riskini en aza indirmek gerekmektedir."),
                         new(ContentBlockType.Warning,
-                            "Sesli arama sirasinda tum ekipman ve jeneratorler durdurulmalidir.",
-                            """{"severity":"high"}"""),
-                    ]),
-                new(
-                    "Arama Köpekleri ile Koordinasyon",
-                    "Köpek ekipleriyle çalışırken ekip güvenliği ve alan yönetimi.",
-                    [
+                            "Yangın durumlarında;\n" +
+                            "- Yangın söndürücü kullanmayı bilin.\n" +
+                            "- Yangın söndürücü türlerini tanıyın.\n" +
+                            "- Acil durum çıkışlarının boş olduğundan emin olun.\n" +
+                            "- Yangın tatbikatları yapın ve nereyi aramanız gerektiğini bilin."),
                         new(ContentBlockType.Text,
-                            "Arama köpeği enkaz üzerinde çalışırken alanda gereksiz personel " +
-                            "bulundurulmamalı, köpek eğitmeninin verdiği işaretler tüm ekiple paylaşılmalıdır."),
-                    ]),
-                new(
-                    "Elektronik Arama Cihazlarının Kullanımı",
-                    "Akustik ve optik arama cihazlarının saha kullanımı.",
-                    [
-                        new(ContentBlockType.Text,
-                            "Akustik dinleme cihazları enkaz içindeki minimal titreşimleri algılayarak " +
-                            "kayıp kişinin yaklaşık konumunu belirlemede kullanılır."),
-                    ]),
-                new(
-                    "Enkaz Katmanlarının Sınıflandırılması",
-                    "Farklı çökme tiplerinde oluşan boşluk ve katman yapıları.",
-                    [
-                        new(ContentBlockType.Table,
-                            null,
-                            """
-                            {"headers":["Çökme Tipi","Tipik Boşluk"],
-                             "rows":[["V-Şekli","Büyük, erişilebilir"],
-                                     ["Kayma Tipi","Dar, dikkatli giriş gerekir"],
-                                     ["Tam Çökme","Boşluk az, yüksek risk"]]}
-                            """),
-                    ]),
-            ]),
-        new(
-            "Bina Stabilite Değerlendirmesi",
-            "Müdahale öncesi yapının güvenlik açısından hızlı değerlendirilmesi.",
-            [
-                new(
-                    "Hızlı Yapısal Değerlendirme (Rapid Triage)",
-                    "Girişten önce yapılması gereken ilk gözlem adımları.",
-                    [
-                        new(ContentBlockType.Text,
-                            "Yapı dışarıdan gözlemlenerek çatlak yönü, eğim ve malzeme dökülmesi " +
-                            "gibi belirtiler değerlendirilir; bu değerlendirme giriş kararını belirler."),
-                    ]),
-                new(
-                    "Çökme Türleri ve Boşluk Analizi",
-                    "Yapısal çökme paternlerinin tanımlanması.",
-                    [
-                        new(ContentBlockType.Text,
-                            "Çökme türünün doğru tanımlanması, olası boşluk bölgelerinin ve " +
-                            "kayıp kişilerin bulunma ihtimalinin yüksek olduğu alanların öngörülmesini sağlar."),
-                    ]),
-                new(
-                    "Destekleme ve Payandalama Temelleri",
-                    "Güvenli çalışma alanı oluşturmak için temel destekleme yöntemleri.",
-                    [
-                        new(ContentBlockType.Text,
-                            "Destekleme, ekip enkaza girmeden önce kritik taşıyıcı elemanların " +
-                            "geçici olarak sabitlenmesi işlemidir."),
-                    ]),
-                new(
-                    "Giriş Öncesi Güvenlik Kontrol Listesi",
-                    "Enkaza girmeden önce doğrulanması gereken maddeler.",
-                    [
+                            "- Sosyal medya hesaplarınızdan nerede olduğunuza dair bilgiler paylaşmayın. " +
+                            "Evinizin boş olduğu manasına gelir ve hırsızlar için davetiye çıkarır."),
                         new(ContentBlockType.Warning,
-                            "Ekip lideri onayi olmadan yuksek riskli alanlara giris yapilmaz.",
-                            """{"severity":"critical"}"""),
-                    ]),
-            ]),
-        new(
-            "İlk Yardım ve Triyaj",
-            "Çoklu kayıp/yaralı durumlarında öncelik belirleme ve temel müdahale.",
-            [
-                new(
-                    "START Triyaj Yöntemi",
-                    "Hızlı sınıflandırma için kullanılan dört kategorili triyaj sistemi.",
-                    [
-                        new(ContentBlockType.Table,
-                            null,
-                            """
-                            {"headers":["Kategori","Renk","Aciklama"],
-                             "rows":[["Acil","Kırmızı","Hayati mudahale gerekli"],
-                                     ["Bekleyebilir","Sarı","Stabil ama izlem gerekli"],
-                                     ["Hafif","Yeşil","Kendi kendine hareket edebilir"],
-                                     ["Exitus","Siyah","Mudahale onceligi yok"]]}
-                            """),
-                    ]),
-                new(
-                    "Crush Sendromu Belirtileri ve Müdahale",
-                    "Uzun süreli sıkışmaya bağlı sistemik komplikasyonlar.",
-                    [
+                            "Asansörde rahatsız edilirseniz;\n" +
+                            "- Bulunduğunuz yeri terk edin, yapamıyorsanız acil durum düğmesine yakın olun.\n" +
+                            "- Cep telefonunuzda acil durum numaralarının kayıtlı olması bir hafifletme önlemidir."),
                         new(ContentBlockType.Text,
-                            "Crush sendromu, uzun sure enkaz altında sikisan doku hucrelerinin " +
-                            "kurtarma sonrasi kan dolasimina zararli maddeler salmasi sonucu olusur."),
-                    ]),
-                new(
-                    "Hipotermi ve Sıcak Çarpması Yönetimi",
-                    "Saha koşullarında vücut ısısı dengesizliklerine müdahale.",
-                    [
+                            "- Cinsel saldırı durumunda önceliğinizin hayatta kalmak olduğunu unutmayın."),
+                        new(ContentBlockType.Warning,
+                            "HIV/AIDS veya kan yoluyla bulaşan hastalıkları önlemek için;\n" +
+                            "- Kan, meni ve vajinal sıvılardan kaçının.\n" +
+                            "- Korunmasız cinsel ilişkiye girmeyin."),
                         new(ContentBlockType.Text,
-                            "Uzun sureli disari maruziyet, hem sicak hem soguk iklim kosullarinda " +
-                            "kurtarilan kisilerde ciddi risk olusturur."),
-                    ]),
-                new(
-                    "Temel Yaşam Desteği Uygulamaları",
-                    "Kurtarma sonrası ilk müdahale sırasında temel yaşam desteği adımları.",
-                    [
+                            "- Bulunduğunuz mahallede çok fazla güvenlik tedbirleri alınmışsa bu oranın tehlikeli bir yer olduğuna işarettir.\n" +
+                            "- Aracınızla seyir halinde iken, konu önemli bile olsa mesajlaşmayın. Telefonunuzu kullanmayın."),
+                        new(ContentBlockType.Warning,
+                            "Rehin alınırsanız;\n" +
+                            "- Ani hareketlerde bulunmayın. Sabırlı olun, iletişiminize önem verin ve onların dilini biliyorsanız o şekilde hitap edin."),
                         new(ContentBlockType.Text,
-                            "Solunum ve dolasimin degerlendirilmesi, kurtarilan kisiye yapilacak " +
-                            "ilk mudahalenin en oncelikli adimidir."),
-                    ]),
-            ]),
-        new(
-            "Ekip İçi İletişim ve Koordinasyon",
-            "Saha operasyonlarında ekipler arası bilgi akışı ve komuta zinciri.",
-            [
-                new(
-                    "Telsiz Haberleşme Protokolü",
-                    "Standart telsiz terminolojisi ve kanal disiplini.",
-                    [
+                            "- Otele döndüğünüzde oda kapınızın açık olduğunu fark ederseniz içeriye girmeyin ve yetkililerden yardım isteyip onlarla birlikte hareket edin.\n" +
+                            "- Sağlığınıza dikkat etmemek, tatil yapmamak, önemli veya gizli belgeleri gözetimsiz bırakmak, iş arkadaşlarınızın özel bilgilerini ifşa etmek, " +
+                            "stresi yönetememek ve gerektiğinde yardım istememek veya çok fazla risk almak sizi ve etrafınızdakileri tehlikeye düşürecektir."),
+                        new(ContentBlockType.Warning,
+                            "Havaalanı, tren veya otobüs terminalinde iseniz;\n" +
+                            "- Bagajınıza ve kişisel eşyalarınıza dikkat edin.\n" +
+                            "- Acil çıkışların nerede olduğunu bilin.\n" +
+                            "- Değerli eşyalarınızı her zaman yanınızda bulundurun.\n" +
+                            "- Uyanık ve sakin olun."),
                         new(ContentBlockType.Text,
-                            "Telsiz haberlesmesinde net, kisa ve standart terminoloji kullanilmasi " +
-                            "yanlis anlasilmalarin onune gecer."),
-                    ]),
-                new(
-                    "El İşaretleri ve Sessiz Komutlar",
-                    "Sesli arama sırasında kullanılan görsel komut sistemi.",
-                    [
+                            "- Konvoy halinde araçla seyir halinde iken kazaları önlemek için araçlar arasında takip mesafesi bırakın.\n" +
+                            "- Herhangi bir yerel yönetimden olduğunu söyleyen ve sizden gerek yaptığınız iş, gerek kimlik bilgileriniz gerekse " +
+                            "bulunduğunuz yere dair bilgiler isteyenlere paylaşımda bulunmayın.\n" +
+                            "- Tüm çabalarınıza rağmen aracınızı kaçırmak isteyenlere karşı direnmeyin, elleriniz görüş alanında olsun ve ani hareketler yapmayın."),
                         new(ContentBlockType.Text,
-                            "Sesli arama fazlarinda telsiz kullanimi kisitlandigindan, ekip " +
-                            "icinde standart el isaretleri kullanilir."),
-                    ]),
-                new(
-                    "Görev Dağılımı ve Sektör Sorumluluğu",
-                    "Geniş alanlarda sektör bazlı sorumluluk paylaşımı.",
-                    [
+                            "Bakmakla yükümlü olduğumuz kimseleri korumak için:\n" +
+                            "- Çocuksa; okul görevlilerinin, otobüs şoförlerinin ve diğer personellerin telefon numaralarını bilmeliyiz.\n" +
+                            "- Acil bir durumda ne yapmaları gerektiğini önceden bilmeliyiz.\n" +
+                            "- Senaryo ve tatbikatlarla durumu pekiştirmeliyiz.\n\n" +
+                            "- Takip edilirseniz panik yapmadan kalabalığa karışın. Araçla iseniz ana caddeye girip yönünüzü değiştirin, " +
+                            "en yakın ve güvenli bölgeye ilerleyin (karakol, hastane vb.).\n" +
+                            "- Patlayıcı görürseniz kesinlikle müdahale etmeyin ve ilgili birimlere bildirin.\n" +
+                            "- Kampa giderseniz; bölgenin yerel yöneticilerine orada olduğunuzu, kim olduğunuzu ve işinizle ilgili bilgiler verin.\n" +
+                            "- Gerekirse polis veya güvenliği hazır bulundurun."),
                         new(ContentBlockType.Text,
-                            "Saha, yonetilebilir sektorlere bolunerek her sektore bir ekip " +
-                            "lideri ve sorumluluk alani atanir."),
-                    ]),
-                new(
-                    "Vardiya Devir Teslim Prosedürü",
-                    "Uzun süreli operasyonlarda ekip değişimi sırasında bilgi aktarımı.",
-                    [
+                            "- Tehdit içeren mesaj veya arama alırsanız tüm söylenenleri dikkate alın ve güvenlik yetkililerine bildirin.\n" +
+                            "- Cinsel taciz kültürel farklılıktan açığa çıkar. Buna maruz kalmamak için müstehcen şakalar yapmayın.\n" +
+                            "- Kültürel farkındalığı göz önünde bulundurun.\n" +
+                            "- Çit, köpek, aydınlatma, alarm sistemi, harekete duyarlı sensör ve güvenlik personeli bulunan yapıların bulunduğu yerler, " +
+                            "oradaki yerli halkın güvenlik endişesinden ve zarar görebilirliği en aza indirgemek için aldığı ÖNLEME TEDBİRLERİ'dir. " +
+                            "Bu gibi yerlerin olduğu mahalleler GÜVENLİ DEĞİLDİR."),
                         new(ContentBlockType.Text,
-                            "Vardiya degisiminde alandaki durum, tespit edilen riskler ve " +
-                            "devam eden islemler yeni ekibe eksiksiz aktarilmalidir."),
+                            "- Yurt dışı seyahati öncesi ve sonrası mutlaka doktor kontrolünden geçin.\n" +
+                            "- Polis kontrol noktasına gelmeden önce hızınızı yavaşlatın, gerekirse durun. Araç içi aydınlatmalarını açın. " +
+                            "Ellerinizi dışardan görünecek şekilde konumlandırın. Sakin ve sabırlı olun. Sorulan sorulara kısa ve net cevaplar verin. " +
+                            "Aracınızda arama yapılacaksa mutlaka başında durun. Rüşvet teklif etmeyin.\n" +
+                            "- Aracınızın bakımını düzenli aralıklarla yaptırın.\n" +
+                            "- Aracınız kaçırılacaksa direnmeyin. Söylenenleri uygulayın, ani hareketlerden kaçının. Araçtan inerken kontağı kapatmayın.\n" +
+                            "- Tehlikeli bölgelerde iken mücevher veya pahalı saatler takmamak ÖNLEME TEDBİRİ'dir.\n" +
+                            "- Sıtma, zika gibi sivrisinekten bulaşacak hastalıklara karşı uzun kollu giyinmek, kovucu kullanmak gibi önleme tedbirleri almalıyız."),
                     ]),
             ]),
     ];
