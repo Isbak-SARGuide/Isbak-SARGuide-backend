@@ -188,7 +188,7 @@ ilk 2'si):
 | `version` | int | Bu snapshot'ın ait olduğu sürüm |
 | `book` | object | `id`, `title`, `slug`, `description`, `languageCode`, `version` |
 | `modules` | array | `id`, `bookId`, `name`, `description`, `displayOrder` |
-| `contents` | array | `id`, `moduleId`, `title`, `summary`, `displayOrder`, `blocks[]` |
+| `contents` | array | `id`, `moduleId`, `title`, `summary`, `displayOrder`, `blocks[]`, `variantGroupKey`, `variantLabel` |
 | `contents[].blocks` | array | `id`, `type` (§4), `text`, `dataJson`, `media`, `displayOrder` |
 
 **Notlar:**
@@ -196,6 +196,15 @@ ilk 2'si):
   şeklinde bir obje taşır (`id`, `url`, `checksum`, `size`); boşsa `null`.
 - Silinmiş content'ler bu listede **hiç yer almaz** — snapshot her zaman
   o anki hayatta-olan durumu temsil eder.
+- **`variantGroupKey` / `variantLabel` (v1.1, additive):** Çoğu content'te
+  ikisi de `null` — modülün "Konular" listesinde tekil bir satır olarak
+  gösterilir (örn. BSAFE'in 3 konusu). Bir konunun birden fazla varyantı
+  varsa (örn. temel düğümler: F8/F9/TH/ABK), o varyantların hepsi **aynı**
+  `variantGroupKey` değerini taşır ve mobil bunları **tek bir sekmeli
+  sayfada** birleştirmelidir — her sekmenin etiketi kendi `variantLabel`'ı,
+  sekme sırası kendi `displayOrder`'ıdır. Gruplama string ayrıştırmayla
+  (başlıktan) **değil**, bu iki alanla yapılmalı; `title` sadece görüntü
+  amaçlıdır ve değişebilir.
 
 ### 3.3 `GET /sync/changes?bookId={id}&fromVersion={n}`
 
@@ -514,3 +523,4 @@ süre paralel yaşamaya devam eder.
 | Sürüm | Tarih | Not |
 |---|---|---|
 | v1.0 | 2026-08-26 | İlk teslim — `manifest`, `snapshot`, `changes` (journal modeli, additive `modules` alanı dahil) |
+| v1.1 | 2026-08-26 | Additive: `contents[]`'e `variantGroupKey`/`variantLabel` eklendi — çok-varyantlı konuların (düğüm türleri gibi) mobilde string ayrıştırma yapılmadan sekmeli tek sayfada birleştirilebilmesi için (§3.2) |
