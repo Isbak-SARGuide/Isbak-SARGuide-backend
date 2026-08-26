@@ -2,7 +2,7 @@
 
 Kentsel arama-kurtarma el kitabı için ASP.NET Core REST API'sinin mimari kararları, iş kırılımı ve uygulama sırası.
 
-**Durum:** Faz 0-3 tamamlandı (M0, M1, M2, M3 — Publishing Engine) · Sıra Faz 4'te (Synchronization)
+**Durum:** Faz 0-4 tamamlandı (M0, M1, M2, M3, M4 — Synchronization) · Sıra Faz 5'te
 **Son güncelleme:** 25 Ağustos 2026
 
 ---
@@ -837,12 +837,12 @@ ve deploy edilemeyen bir sistem kalır.
 >    backend sözleşmesi yapısal ContentBlock listesi. Web'ciyle hizalanmalı (öneri: frontend block
 >    render eder; backend markdown'a çevirmez — iki format = drift).
 
-- [ ] 7.1 Manifest
-- [ ] 7.2 Snapshot
-- [ ] 7.3 Changes (delta)
-- [ ] 7.4 `SyncController`
-- [ ] 7.5 Delta test matrisi
-- [ ] 7.6 Sözleşme dokümanı v1.0
+- [x] 7.1 Manifest
+- [x] 7.2 Snapshot
+- [x] 7.3 Changes (delta) — 7.3-a: publish journal modeline geçti (Faz 3 tadilatı, satır tablosu artık degisiklik günlüğü); 7.3-b: sözleşmeye `Modules` eklendi; 7.3-c: gerçek delta motoru (`SyncChangesJsonWriter`, verbatim envelope)
+- [x] 7.4 `SyncController` — 7.1-7.3 ile birlikte gerçek okumalara bağlandı
+- [x] 7.5 Delta test matrisi — 15 senaryo, 7.3-c ile birlikte yazıldı
+- [x] 7.6 Sözleşme dokümanı v1.0 — `docs/Sync-Sozlesmesi-v1.md`, tüm örnekler gerçek API yanıtlarından
 
 ### PHASE 5-8 — CMS / Media / Auth / Release → M5-M8
 
