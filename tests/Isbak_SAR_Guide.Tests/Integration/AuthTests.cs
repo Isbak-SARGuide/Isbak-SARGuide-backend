@@ -15,7 +15,7 @@ public class AuthTests(ApiFactory factory)
         var client = factory.CreateClient();
 
         var response = await client.PostAsJsonAsync("/api/v1/auth/login", new { userName = "admin", password = "Admin!Dev123" });
-        
+
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
     }
 
@@ -41,6 +41,6 @@ public class AuthTests(ApiFactory factory)
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", loginResult!.AccessToken);
         var response = await client.GetAsync("api/v1/books");
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
-        
+
     }
 }

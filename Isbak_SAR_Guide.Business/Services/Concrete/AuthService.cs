@@ -26,7 +26,7 @@ public class AuthService(
             accessToken.ExpiresAtUtc,
             user.UserName!,
             user.FullName,
-            roles.ToList()));  
+            roles.ToList()));
 
 
     }

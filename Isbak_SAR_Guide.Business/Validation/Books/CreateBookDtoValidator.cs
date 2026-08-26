@@ -1,5 +1,5 @@
-using Isbak_SAR_Guide.Business.DTOs.Books;
 using FluentValidation;
+using Isbak_SAR_Guide.Business.DTOs.Books;
 
 namespace Isbak_SAR_Guide.Business.Validation.Books;
 

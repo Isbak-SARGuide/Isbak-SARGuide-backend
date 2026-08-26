@@ -1,9 +1,9 @@
+using FluentValidation;
 using Isbak_SAR_Guide.Business.Common;
 using Isbak_SAR_Guide.Business.DTOs.Books;
 using Isbak_SAR_Guide.Business.Services.Abstract;
 using Isbak_SAR_Guide.DataAccess.Repositories.Abstract;
 using Isbak_SAR_Guide.Entities.Content;
-using FluentValidation;
 using Mapster;
 
 namespace Isbak_SAR_Guide.Business.Services.Concrete;
@@ -61,7 +61,8 @@ public class BookService(
         if (book is null)
         {
             return Result.Failure<BookDto>(Error.NotFound("Book.NotFound", $"Id={id} olan kitap güncellenemedi."));
-        };
+        }
+        ;
         dto.Adapt(book);
         await unitOfWork.SaveChangesAsync(cancellationToken);
         return Result.Success(book.Adapt<BookDto>());
@@ -70,10 +71,10 @@ public class BookService(
     public async Task<Result> DeleteAsync(int id, CancellationToken cancellationToken = default)
     {
         var book = await unitOfWork.Books.FindByIdAsync(id, cancellationToken);
-        
+
         if (book is null)
         {
-                return Result.Failure(Error.NotFound("Book.NotFound", $"Id={id} olan kitap bulunamadı."));
+            return Result.Failure(Error.NotFound("Book.NotFound", $"Id={id} olan kitap bulunamadı."));
 
         }
         unitOfWork.Books.Remove(book);

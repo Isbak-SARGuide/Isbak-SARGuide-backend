@@ -1,5 +1,5 @@
-using Isbak_SAR_Guide.API.Middleware;
 using Asp.Versioning;
+using Isbak_SAR_Guide.API.Middleware;
 using Scalar.AspNetCore;
 using Serilog;
 

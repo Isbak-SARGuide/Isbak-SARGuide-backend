@@ -1,7 +1,7 @@
+using FluentValidation;
 using Isbak_SAR_Guide.Business.Services.Abstract;
 using Isbak_SAR_Guide.Business.Services.Concrete;
 using Isbak_SAR_Guide.Business.Validation.Books;
-using FluentValidation;
 
 namespace Microsoft.Extensions.DependencyInjection;
 

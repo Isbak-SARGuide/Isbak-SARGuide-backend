@@ -1,5 +1,5 @@
-using Isbak_SAR_Guide.Business.DTOs.Auth;
 using FluentValidation;
+using Isbak_SAR_Guide.Business.DTOs.Auth;
 
 namespace Isbak_SAR_Guide.Business.Validation.Auth;
 
