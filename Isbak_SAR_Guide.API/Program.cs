@@ -58,10 +58,14 @@ app.UseExceptionHandler();
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
-    app.MapScalarApiReference();
+    // Fallback policy her endpoint'i kilitler (deny-by-default) - MapOpenApi ve
+    // Scalar'in urettigi uclar da buna dahil. API dokumani Development'ta bilerek
+    // anonim; bu blok production'da hic calismadigi icin oraya sizma riski yok.
+    app.MapOpenApi().AllowAnonymous();
+    app.MapScalarApiReference().AllowAnonymous();
 
     await app.Services.SeedDatabaseAsync();
+    await app.Services.PublishSeedBookAsync();
 }
 
 app.UseHttpsRedirection();

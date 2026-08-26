@@ -114,6 +114,7 @@ public class PublicationRepositoryTests(ApiFactory factory)
         BookId = bookId,
         Version = version,
         ManifestJson = "{}",
+        SnapshotJson = "{}",
         Checksum = "test-checksum",
         PublishedAt = DateTime.UtcNow,
         PublishedById = publishedById,

@@ -3,6 +3,7 @@ using System;
 using Isbak_SAR_Guide.DataAccess.Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Isbak_SAR_Guide.DataAccess.Migrations
 {
     [DbContext(typeof(Isbak_SAR_GuideDbContext))]
-    partial class Isbak_SAR_GuideDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260825125531_AddSnapshotJsonToBookPublication")]
+    partial class AddSnapshotJsonToBookPublication
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

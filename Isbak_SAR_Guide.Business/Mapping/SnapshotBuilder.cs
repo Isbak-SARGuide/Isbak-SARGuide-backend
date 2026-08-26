@@ -77,12 +77,13 @@ public static class SnapshotBuilder
                 .ToList());
 
     /// <summary>
-    /// Snapshot'tan manifest uretir: media ozetleri (DistinctBy Id) +
-    /// snapshot checksum'i. publishedAt disaridan gelir - "gercek bir kez
-    /// hesaplanir, sonra akar": publish, ayni ani hem buraya hem
-    /// BookPublication.PublishedAt kolonuna gecirir.
+    /// Snapshot'tan manifest uretir: media ozetleri (DistinctBy Id). publishedAt
+    /// ve checksum disaridan gelir - "gercek bir kez hesaplanir, sonra akar":
+    /// publish ayni ani hem buraya hem PublishedAt kolonuna, ayni checksum'i
+    /// hem buraya hem Checksum kolonuna gecirir. Checksum'i icerde hesaplamak
+    /// ikinci bir serialize demek olurdu (tek-serialize kurali).
     /// </summary>
-    public static SyncManifestDto BuildManifest(SyncSnapshotDto snapshot, DateTime publishedAt)
+    public static SyncManifestDto BuildManifest(SyncSnapshotDto snapshot, DateTime publishedAt, string checksum)
     {
         var media = snapshot.Contents
             .SelectMany(c => c.Blocks)
@@ -97,7 +98,7 @@ public static class SnapshotBuilder
             publishedAt,
             snapshot.Contents.Count,
             media,
-            ComputeChecksum(snapshot));
+            checksum);
     }
 
     public static string Serialize<T>(T value) =>

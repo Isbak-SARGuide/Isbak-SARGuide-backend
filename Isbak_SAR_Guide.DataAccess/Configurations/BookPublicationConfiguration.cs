@@ -12,6 +12,10 @@ public class BookPublicationConfiguration : IEntityTypeConfiguration<BookPublica
         // manifest Faz 4'te mobile AYNEN servis edilecek; dondurulan baytlarin
         // degismeden cikmasi bayt sadakati ister, jsonb bunu vermez.
         builder.Property(p => p.ManifestJson).HasColumnType("json").IsRequired();
+
+        // json, jsonb degil - PayloadJson'daki gerekcenin aynisi (bayt sadakati:
+        // Checksum = SHA256(SnapshotJson), jsonb metni kanonikelestirip bozardi).
+        builder.Property(p => p.SnapshotJson).HasColumnType("json").IsRequired();
         builder.Property(p => p.Checksum).HasMaxLength(128).IsRequired();
 
         // Immutable denetim kaydi - Book veya kullanici silinse bile yayin

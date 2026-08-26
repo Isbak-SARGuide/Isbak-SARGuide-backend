@@ -2,8 +2,8 @@
 
 Kentsel arama-kurtarma el kitabı için ASP.NET Core REST API'sinin mimari kararları, iş kırılımı ve uygulama sırası.
 
-**Durum:** Faz 0-3 tamamlandı (M0, M1, M2, M3 — Publishing Engine) · Sıra Faz 4'te (Synchronization)
-**Son güncelleme:** 24 Ağustos 2026
+**Durum:** Faz 0-4 tamamlandı (M0, M1, M2, M3, M4 — Synchronization) · Sıra Faz 5'te
+**Son güncelleme:** 25 Ağustos 2026
 
 ---
 
@@ -149,7 +149,7 @@ Yarım kalan indirme eski sürümü bozmamalı.
 ADMIN TARAFI (canlı, serbestçe düzenlenir)
 Book / Module / Content / ContentBlock / Media
                     │
-                    │  POST /api/v1/admin/books/{id}/publish
+                    │  POST /api/v1/books/{bookId}/publish  (Admin rolü)
                     │  (tek transaction, versiyon N → N+1)
                     ▼
 YAYIN TARAFI (immutable, mobil sadece burayı görür)
@@ -829,16 +829,20 @@ ve deploy edilemeyen bir sistem kalır.
 > 2. **`GetSnapshot`/TOC kaynağı sorunu:** Yayın tablolarında modül ağacı ve kitap metadata'sı
 >    şu an DONDURULMUYOR (sadece content payload'ları + manifest var). 7.2 tam paketi ve web TOC'u
 >    bunlara muhtaç — Faz 4 tasarımında çözülmeli (aday: publish'te SnapshotJson kolonu da dondur).
+>    **✔ Çözüldü (2026-08-25):** `BookPublication.SnapshotJson` kolonu (`json`, NOT NULL) — tam kanonik
+>    snapshot publish'te dondurulur, `GetSnapshot` deserialize etmeden aynen döner. İnvariant genişledi:
+>    `Checksum = SHA256(SnapshotJson)`. Tek-serialize kuralı: `BuildManifest` checksum'ı parametre alır.
+>    Bilinçli veri tekrarı (satırlar delta'nın, snapshot ilk kurulumun kaynağı — immutable, drift edemez).
 > 3. **Web frontend sözleşme uyumsuzluğu:** Mock, içerik gövdesini tek markdown string tutuyor;
 >    backend sözleşmesi yapısal ContentBlock listesi. Web'ciyle hizalanmalı (öneri: frontend block
 >    render eder; backend markdown'a çevirmez — iki format = drift).
 
-- [ ] 7.1 Manifest
-- [ ] 7.2 Snapshot
-- [ ] 7.3 Changes (delta)
-- [ ] 7.4 `SyncController`
-- [ ] 7.5 Delta test matrisi
-- [ ] 7.6 Sözleşme dokümanı v1.0
+- [x] 7.1 Manifest
+- [x] 7.2 Snapshot
+- [x] 7.3 Changes (delta) — 7.3-a: publish journal modeline geçti (Faz 3 tadilatı, satır tablosu artık degisiklik günlüğü); 7.3-b: sözleşmeye `Modules` eklendi; 7.3-c: gerçek delta motoru (`SyncChangesJsonWriter`, verbatim envelope)
+- [x] 7.4 `SyncController` — 7.1-7.3 ile birlikte gerçek okumalara bağlandı
+- [x] 7.5 Delta test matrisi — 15 senaryo, 7.3-c ile birlikte yazıldı
+- [x] 7.6 Sözleşme dokümanı v1.0 — `docs/Sync-Sozlesmesi-v1.md`, tüm örnekler gerçek API yanıtlarından
 
 ### PHASE 5-8 — CMS / Media / Auth / Release → M5-M8
 

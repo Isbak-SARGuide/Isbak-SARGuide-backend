@@ -19,14 +19,54 @@ public class PublicationRepository(Isbak_SAR_GuideDbContext dbContext) : IPublic
             .Where(p => p.BookId == bookId)
             .MaxAsync(p => (int?)p.Version, cancellationToken) ?? 0;
 
-    public async Task<IReadOnlyList<int>> GetActiveContentIdsAsync(int bookId, int version, CancellationToken cancellationToken = default) =>
-        // IsDeleted filtresi elle: PublishedContent'te bilerek HasQueryFilter
-        // yok (tombstone'lar delta feed'inde gorunmek zorunda) - global
-        // filtre burada kurtarmaz, kurtarmamali da.
-        await dbContext.Set<PublishedContent>()
-            .Where(pc => pc.BookId == bookId && pc.Version == version && !pc.IsDeleted)
-            .Select(pc => pc.ContentId)
+    public async Task<string?> GetManifestJsonAsync(int bookId, int version, CancellationToken cancellationToken = default) =>
+        await _publications
+            .Where(p => p.BookId == bookId && p.Version == version)
+            .Select(p => p.ManifestJson)
+            .FirstOrDefaultAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<PublishedContentChange>> GetChangedRowsSinceAsync(int bookId, int fromVersion, CancellationToken cancellationToken = default)
+    {
+        var rows = dbContext.Set<PublishedContent>();
+
+        return await rows
+            .Where(pc => pc.BookId == bookId
+                && pc.Version > fromVersion
+                && pc.Version == rows
+                    .Where(inner => inner.BookId == bookId && inner.ContentId == pc.ContentId)
+                    .Max(inner => (int?)inner.Version))
+            .Select(pc => new PublishedContentChange(pc.ContentId, pc.PayloadJson, pc.IsDeleted))
             .ToListAsync(cancellationToken);
+    }
+
+    public async Task<string?> GetLatestManifestJsonAsync(int bookId, CancellationToken cancellationToken = default) =>
+        await _publications
+            .Where(p => p.BookId == bookId)
+            .OrderByDescending(p => p.Version)
+            .Select(p => p.ManifestJson)
+            .FirstOrDefaultAsync(cancellationToken);
+
+    public async Task<string?> GetLatestSnapshotJsonAsync(int bookId, CancellationToken cancellationToken = default) =>
+        await _publications
+            .Where(p => p.BookId == bookId)
+            .OrderByDescending(p => p.Version)
+            .Select(p => p.SnapshotJson)
+            .FirstOrDefaultAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<PublishedContentState>> GetLatestContentStatesAsync(int bookId, CancellationToken cancellationToken = default)
+    {
+        var rows = dbContext.Set<PublishedContent>();
+
+        // Greatest-per-group: content basina en yuksek versiyonlu satir.
+        // Korele MAX alt sorgusu - EF guvenilir cevirir; Postgres DISTINCT ON
+        // icin raw SQL'e inmeyi gerektirecek bir performans kanitimiz yok.
+        return await rows
+            .Where(pc => pc.BookId == bookId && pc.Version == rows
+                .Where(inner => inner.BookId == bookId && inner.ContentId == pc.ContentId)
+                .Max(inner => (int?)inner.Version))
+            .Select(pc => new PublishedContentState(pc.ContentId, pc.Checksum, pc.IsDeleted))
+            .ToListAsync(cancellationToken);
+    }
 
     public async Task AddAsync(BookPublication publication, CancellationToken cancellationToken = default) =>
         await _publications.AddAsync(publication, cancellationToken);

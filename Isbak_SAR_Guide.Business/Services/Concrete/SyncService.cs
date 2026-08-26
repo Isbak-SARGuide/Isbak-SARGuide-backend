@@ -1,5 +1,5 @@
+using System.Text.Json;
 using Isbak_SAR_Guide.Business.Common;
-using Isbak_SAR_Guide.Business.DTOs.Sync;
 using Isbak_SAR_Guide.Business.Mapping;
 using Isbak_SAR_Guide.Business.Services.Abstract;
 using Isbak_SAR_Guide.DataAccess.Repositories.Abstract;
@@ -7,44 +7,150 @@ using Isbak_SAR_Guide.DataAccess.Repositories.Abstract;
 namespace Isbak_SAR_Guide.Business.Services.Concrete;
 
 /// <summary>
-/// STUB (5.0): draft veriden calisir, gercek yayin/versiyon sistemi (Faz 3/4)
-/// gelmeden mobil gelistiricinin sozlesme uzerinde ilerleyebilmesi icin.
-/// GetChangesAsync bu yuzden her zaman "degisiklik yok" doner.
+/// Manifest, snapshot ve degisiklikler (delta) yayin tablolarindan VERBATIM
+/// okunur (7.1/7.2/7.3) - uretici publish, sync sadece okuyucu. Delta,
+/// envelope'u elle yazan SyncChangesJsonWriter uzerinden uretilir; content
+/// parcalari, modul listesi ve eklenen medya HAM KOPYADIR (WriteRawValue) -
+/// donmus baytlara hicbir deserialize/re-serialize adimi dokunmaz.
 /// </summary>
 public class SyncService(IUnitOfWork unitOfWork) : ISyncService
 {
-    public async Task<Result<SyncSnapshotDto>> GetSnapshotAsync(int bookId, CancellationToken cancellationToken = default)
+    private static readonly Error InvalidFromVersionError = Error.Validation(
+        "Sync.InvalidFromVersion", "Geçersiz sürüm numarası; tam senkronizasyon (snapshot) gerekli.");
+
+    public async Task<Result<string>> GetManifestAsync(int bookId, CancellationToken cancellationToken = default)
     {
-        var book = await unitOfWork.Books.GetWithFullTreeAsync(bookId, cancellationToken);
+        var manifestJson = await unitOfWork.Publications.GetLatestManifestJsonAsync(bookId, cancellationToken);
 
-        if (book is null)
-        {
-            return Result.Failure<SyncSnapshotDto>(
-                Error.NotFound("Sync.BookNotFound", $"Id={bookId} olan kitap bulunamadı."));
-        }
-
-        return Result.Success(SnapshotBuilder.BuildSnapshot(book));
+        return manifestJson is not null
+            ? Result.Success(manifestJson)
+            : Result.Failure<string>(await ResolveNotFoundAsync(bookId, cancellationToken));
     }
 
-    public async Task<Result<SyncManifestDto>> GetManifestAsync(int bookId, CancellationToken cancellationToken = default)
+    public async Task<Result<string>> GetSnapshotAsync(int bookId, CancellationToken cancellationToken = default)
     {
-        var snapshotResult = await GetSnapshotAsync(bookId, cancellationToken);
+        var snapshotJson = await unitOfWork.Publications.GetLatestSnapshotJsonAsync(bookId, cancellationToken);
 
-        if (snapshotResult.IsFailure)
-        {
-            return Result.Failure<SyncManifestDto>(snapshotResult.Error!);
-        }
-
-        // STUB: gercek PublishedAt, Faz 4'te BookPublication.PublishedAt'ten okunacak.
-        var manifest = SnapshotBuilder.BuildManifest(snapshotResult.Value, DateTime.UtcNow);
-
-        return Result.Success(manifest);
+        return snapshotJson is not null
+            ? Result.Success(snapshotJson)
+            : Result.Failure<string>(await ResolveNotFoundAsync(bookId, cancellationToken));
     }
 
-    public Task<Result<SyncChangesDto>> GetChangesAsync(int bookId, int fromVersion, CancellationToken cancellationToken = default)
+    public async Task<Result<string>> GetChangesAsync(int bookId, int fromVersion, CancellationToken cancellationToken = default)
     {
-        // STUB: gercek delta hesabi PublishedContent.Version uzerinden Faz 4'te gelecek.
-        var changes = new SyncChangesDto(fromVersion, fromVersion, [], [], [], []);
-        return Task.FromResult(Result.Success(changes));
+        var currentVersion = await unitOfWork.Publications.GetLatestVersionAsync(bookId, cancellationToken);
+
+        if (currentVersion == 0)
+        {
+            return Result.Failure<string>(await ResolveNotFoundAsync(bookId, cancellationToken));
+        }
+
+        if (fromVersion < 0 || fromVersion > currentVersion)
+        {
+            return Result.Failure<string>(InvalidFromVersionError);
+        }
+
+        string? previousManifestJson = null;
+
+        if (fromVersion > 0)
+        {
+            previousManifestJson = await unitOfWork.Publications.GetManifestJsonAsync(bookId, fromVersion, cancellationToken);
+
+            if (previousManifestJson is null)
+            {
+                // Defensive: immutable + bosluksuz versiyonlamada teorik
+                // olarak imkansiz ama sessizce yanlis tahmin yerine
+                // durustce 400 doner (fromVersion=0'da bu dal calismaz -
+                // "hic yayin yok" orada mesru bos kume anlamina gelir).
+                return Result.Failure<string>(InvalidFromVersionError);
+            }
+        }
+
+        // Guvenli null-forgiving: currentVersion > 0, ayni tablonun
+        // MAX(Version)'undan geliyor - en az bir yayin satiri var demektir.
+        var currentSnapshotJson = (await unitOfWork.Publications.GetLatestSnapshotJsonAsync(bookId, cancellationToken))!;
+        var currentManifestJson = (await unitOfWork.Publications.GetLatestManifestJsonAsync(bookId, cancellationToken))!;
+
+        var modulesRawJson = ExtractModulesRawJson(currentSnapshotJson);
+        var (addedMedia, removedMediaIds) = ComputeMediaDiff(previousManifestJson, currentManifestJson);
+
+        // fromVersion == currentVersion icin ozel dal YOK: sorgu matematigi
+        // hallediyor - Version > currentVersion hicbir satir bulamaz (bos
+        // degisiklik), previousManifestJson == currentManifestJson oldugu
+        // icin medya diff'i de kendiliginden bos cikar.
+        var changedRows = await unitOfWork.Publications.GetChangedRowsSinceAsync(bookId, fromVersion, cancellationToken);
+
+        var upsertedPayloads = changedRows.Where(r => !r.IsDeleted).Select(r => r.PayloadJson).ToList();
+        var deletedContentIds = changedRows.Where(r => r.IsDeleted).Select(r => r.ContentId).ToList();
+
+        var json = SyncChangesJsonWriter.Write(
+            fromVersion, currentVersion, upsertedPayloads, deletedContentIds, modulesRawJson, addedMedia, removedMediaIds);
+
+        return Result.Success(json);
+    }
+
+    /// <summary>
+    /// Yayin bulunamayinca iki durumu ayirir - tek ek PK sorgusuyla, yalnizca
+    /// bu yolda (happy path etkilenmez): yanlis id (konfigurasyon hatasi) mi,
+    /// henuz yayinlanmamis kitap (mesru "icerik hazirlaniyor" durumu) mu?
+    /// Kodlar TUM sync uclari icin ortak - kod, ucun degil gercegin adi;
+    /// bu yardimci ortak oldugu icin ayrisamaz da.
+    /// </summary>
+    private async Task<Error> ResolveNotFoundAsync(int bookId, CancellationToken cancellationToken)
+    {
+        var book = await unitOfWork.Books.FindByIdAsync(bookId, cancellationToken);
+
+        return book is null
+            ? Error.NotFound("Sync.BookNotFound", $"Id={bookId} olan kitap bulunamadı.")
+            : Error.NotFound("Sync.NotPublished", "Kitap henüz yayınlanmadı.");
+    }
+
+    private static string ExtractModulesRawJson(string snapshotJson)
+    {
+        using var document = JsonDocument.Parse(snapshotJson);
+        return document.RootElement.GetProperty("modules").GetRawText();
+    }
+
+    /// <summary>
+    /// Iki donmus manifest'in "media" dizilerini karsilastirir: yeni'de olup
+    /// eskide olmayan veya checksum'i degisen -> added (guncel manifest'ten
+    /// ham kopya); eskide olup yenide olmayan -> removed. previousManifestJson
+    /// null ise (fromVersion=0) eski kume bos sayilir - tum medya "added" olur.
+    /// </summary>
+    private static (List<string> Added, List<int> RemovedIds) ComputeMediaDiff(
+        string? previousManifestJson, string currentManifestJson)
+    {
+        var previousMedia = previousManifestJson is null
+            ? new Dictionary<int, (string Checksum, string RawText)>()
+            : ParseMediaById(previousManifestJson);
+        var currentMedia = ParseMediaById(currentManifestJson);
+
+        var added = currentMedia
+            .Where(entry => !previousMedia.TryGetValue(entry.Key, out var previous) || previous.Checksum != entry.Value.Checksum)
+            .OrderBy(entry => entry.Key)
+            .Select(entry => entry.Value.RawText)
+            .ToList();
+
+        var removedIds = previousMedia.Keys
+            .Where(id => !currentMedia.ContainsKey(id))
+            .OrderBy(id => id)
+            .ToList();
+
+        return (added, removedIds);
+    }
+
+    private static Dictionary<int, (string Checksum, string RawText)> ParseMediaById(string manifestJson)
+    {
+        using var document = JsonDocument.Parse(manifestJson);
+        var result = new Dictionary<int, (string, string)>();
+
+        foreach (var item in document.RootElement.GetProperty("media").EnumerateArray())
+        {
+            var id = item.GetProperty("id").GetInt32();
+            var checksum = item.GetProperty("checksum").GetString()!;
+            result[id] = (checksum, item.GetRawText());
+        }
+
+        return result;
     }
 }
