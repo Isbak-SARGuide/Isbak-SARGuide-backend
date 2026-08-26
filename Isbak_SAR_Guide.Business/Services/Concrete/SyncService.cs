@@ -15,7 +15,7 @@ namespace Isbak_SAR_Guide.Business.Services.Concrete;
 /// </summary>
 public class SyncService(IUnitOfWork unitOfWork) : ISyncService
 {
-    private static readonly Error InvalidFromVersionError = Error.Validation(
+    private static readonly Error _invalidFromVersionError = Error.Validation(
         "Sync.InvalidFromVersion", "Geçersiz sürüm numarası; tam senkronizasyon (snapshot) gerekli.");
 
     public async Task<Result<string>> GetManifestAsync(int bookId, CancellationToken cancellationToken = default)
@@ -47,7 +47,7 @@ public class SyncService(IUnitOfWork unitOfWork) : ISyncService
 
         if (fromVersion < 0 || fromVersion > currentVersion)
         {
-            return Result.Failure<string>(InvalidFromVersionError);
+            return Result.Failure<string>(_invalidFromVersionError);
         }
 
         string? previousManifestJson = null;
@@ -62,7 +62,7 @@ public class SyncService(IUnitOfWork unitOfWork) : ISyncService
                 // olarak imkansiz ama sessizce yanlis tahmin yerine
                 // durustce 400 doner (fromVersion=0'da bu dal calismaz -
                 // "hic yayin yok" orada mesru bos kume anlamina gelir).
-                return Result.Failure<string>(InvalidFromVersionError);
+                return Result.Failure<string>(_invalidFromVersionError);
             }
         }
 

@@ -14,7 +14,7 @@ namespace Microsoft.Extensions.DependencyInjection;
 /// </summary>
 public static class SeedPublisherExtensions
 {
-    private const string SeedBookSlug = "kentsel-arama-kurtarma-el-kitabi";
+    private const string _seedBookSlug = "kentsel-arama-kurtarma-el-kitabi";
 
     /// <summary>
     /// Development ortaminda, seed kitabi hic yayinlanmamissa bir kez publish
@@ -29,7 +29,7 @@ public static class SeedPublisherExtensions
         var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
 
         var seedBook = (await unitOfWork.Books.FindAllAsync())
-            .SingleOrDefault(b => b.Slug == SeedBookSlug);
+            .SingleOrDefault(b => b.Slug == _seedBookSlug);
 
         if (seedBook is null)
         {

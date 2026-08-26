@@ -33,7 +33,7 @@ public static class SnapshotBuilder
     /// (UTF-8) yazilir. Bu JSON hicbir zaman HTML icine ham gomulmez (API-only);
     /// gomulecek olursa bu karar yeniden degerlendirilmeli.
     /// </summary>
-    private static readonly JsonSerializerOptions CanonicalOptions = new()
+    private static readonly JsonSerializerOptions _canonicalOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
@@ -102,7 +102,7 @@ public static class SnapshotBuilder
     }
 
     public static string Serialize<T>(T value) =>
-        JsonSerializer.Serialize(value, CanonicalOptions);
+        JsonSerializer.Serialize(value, _canonicalOptions);
 
     /// <summary>
     /// Kanonik JSON'un SHA-256 ozeti (hex). Iceride Serialize'i cagirir -

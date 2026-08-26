@@ -91,7 +91,7 @@ public static class DatabaseSeeder
         };
 
         var moduleOrder = 0;
-        foreach (var moduleSeed in ModuleSeeds)
+        foreach (var moduleSeed in _moduleSeeds)
         {
             var module = new Module
             {
@@ -144,7 +144,7 @@ public static class DatabaseSeeder
     // dayanir - admin panel demo'sunda ve sync testlerinde anlamli veri
     // gormek icin "Content 1, Content 2..." yerine gercek basliklar kullanildi.
     // Tam kapsamli icerik yazimi ilerleyen fazlarda admin panel uzerinden yapilacak.
-    private static readonly SeedModule[] ModuleSeeds =
+    private static readonly SeedModule[] _moduleSeeds =
     [
         new(
             "Enkaz Altında Arama Teknikleri",

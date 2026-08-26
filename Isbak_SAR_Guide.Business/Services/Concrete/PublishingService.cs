@@ -16,7 +16,7 @@ public class PublishingService(IUnitOfWork unitOfWork) : IPublishingService
     /// kolonu tasiyor - son bilinen payload'i tasimak hem bayt israfi hem
     /// anlam bozuklugu olurdu. Bos obje, jsonb NOT NULL kisitini da karsilar.
     /// </summary>
-    private const string TombstonePayload = "{}";
+    private const string _tombstonePayload = "{}";
 
     private readonly IUnitOfWork _unitOfWork = unitOfWork;
 
@@ -124,8 +124,8 @@ public class PublishingService(IUnitOfWork unitOfWork) : IPublishingService
                 BookId = bookId,
                 ContentId = state.ContentId,
                 Version = newVersion, // pazarliksiz: eski numarayla deltada kimse goremezdi
-                PayloadJson = TombstonePayload,
-                Checksum = SnapshotBuilder.ComputeChecksum(TombstonePayload),
+                PayloadJson = _tombstonePayload,
+                Checksum = SnapshotBuilder.ComputeChecksum(_tombstonePayload),
                 IsDeleted = true,
             });
         }

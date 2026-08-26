@@ -14,9 +14,9 @@ namespace Isbak_SAR_Guide.Business.Mapping;
 /// </summary>
 public static class SyncChangesJsonWriter
 {
-    // CanonicalOptions'taki encoder ile ayni - zarfin kendisinde kacan
+    // _canonicalOptions'taki encoder ile ayni - zarfin kendisinde kacan
     // karakter olmasa da tutarlilik ve gelecekteki string alanlar icin.
-    private static readonly JsonWriterOptions EnvelopeOptions = new()
+    private static readonly JsonWriterOptions _envelopOptions = new()
     {
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
     };
@@ -32,7 +32,7 @@ public static class SyncChangesJsonWriter
     {
         using var stream = new MemoryStream();
 
-        using (var writer = new Utf8JsonWriter(stream, EnvelopeOptions))
+        using (var writer = new Utf8JsonWriter(stream, _envelopOptions))
         {
             writer.WriteStartObject();
 
