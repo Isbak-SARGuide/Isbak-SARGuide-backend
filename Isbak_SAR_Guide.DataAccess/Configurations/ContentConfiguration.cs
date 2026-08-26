@@ -16,7 +16,10 @@ public class ContentConfiguration : IEntityTypeConfiguration<Content>
             .HasForeignKey(c => c.ModuleId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        builder.HasIndex(c => new { c.ModuleId, c.DisplayOrder });
+        // Unique + partial: ModuleConfiguration'daki ayni gerekce.
+        builder.HasIndex(c => new { c.ModuleId, c.DisplayOrder })
+            .IsUnique()
+            .HasFilter("\"IsDeleted\" = false");
 
         builder.HasQueryFilter(c => !c.IsDeleted);
     }

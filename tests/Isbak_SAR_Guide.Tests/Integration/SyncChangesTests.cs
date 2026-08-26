@@ -362,7 +362,13 @@ public class SyncChangesTests(ApiFactory factory)
         var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
         var book = await unitOfWork.Books.GetWithFullTreeAsync(bookId);
         var module = book!.Modules.Single();
-        module.Contents.Add(new Content { Title = title, DisplayOrder = module.Contents.Count + 1 });
+        // "Contents.Count + 1" onceki silmelerden sonra yanlis: silinen
+        // content'ler goruntude kaybolur ama DisplayOrder'i canli kalan
+        // kardesinde hala dolu olabilir (orn. A silinince Count=1 olur ama
+        // B zaten DisplayOrder=2'yi tutuyordur). Max+1 bosluklardan bagimsiz
+        // her zaman kullanilmamis bir deger uretir.
+        var nextOrder = module.Contents.Count == 0 ? 1 : module.Contents.Max(c => c.DisplayOrder) + 1;
+        module.Contents.Add(new Content { Title = title, DisplayOrder = nextOrder });
         await unitOfWork.SaveChangesAsync();
     }
 
