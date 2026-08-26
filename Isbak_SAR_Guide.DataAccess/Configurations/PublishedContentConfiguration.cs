@@ -8,6 +8,10 @@ public class PublishedContentConfiguration : IEntityTypeConfiguration<PublishedC
 {
     public void Configure(EntityTypeBuilder<PublishedContent> builder)
     {
+        // Version=0/negatif hicbir yayinin anlami degil - BookPublication'daki
+        // ayni kisitin karsiligi.
+        builder.ToTable(t => t.HasCheckConstraint("CK_PublishedContents_Version", "\"Version\" > 0"));
+
         // json, jsonb DEGIL - bilerek: jsonb metni kanonikelestirir (key'leri
         // yeniden siralar, whitespace atar), Checksum = SHA256(PayloadJson)
         // invariant'i ise bayt sadakati ister. json metni aynen saklar + yazim

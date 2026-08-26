@@ -6,4 +6,6 @@ public sealed record SyncContentDto(
     string Title,
     string? Summary,
     int DisplayOrder,
-    IReadOnlyList<SyncContentBlockDto> Blocks);
+    IReadOnlyList<SyncContentBlockDto> Blocks,
+    string? VariantGroupKey,
+    string? VariantLabel);

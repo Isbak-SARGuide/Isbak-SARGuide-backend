@@ -74,7 +74,9 @@ public static class SnapshotBuilder
             content.Blocks
                 .OrderBy(b => b.DisplayOrder).ThenBy(b => b.Id)
                 .Select(BuildBlockDto)
-                .ToList());
+                .ToList(),
+            content.VariantGroupKey,
+            content.VariantLabel);
 
     /// <summary>
     /// Snapshot'tan manifest uretir: media ozetleri (DistinctBy Id). publishedAt
