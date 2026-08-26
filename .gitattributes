@@ -1,0 +1,8 @@
+# Repo tek bir platformda saglikli calisan bir satir-sonu politikasina sahip
+# olmali - Windows'ta lokal autocrlf'in maskeledigi ama Linux CI'da (dotnet
+# format --verify-no-changes, .editorconfig end_of_line=lf) her satiri hataya
+# ceviren fark buradan geliyordu. LF kanonik: CI Linux'ta calisiyor ve repo
+# zaten LF saklıyordu (autocrlf=true commit ederken CRLF'i LF'ye ceviriyordu,
+# sadece checkout'ta gizliyordu). Bu dosya, gelistiricinin lokal autocrlf
+# ayarindan bagimsiz olarak checkout/commit'te LF'i garanti eder.
+* text=auto eol=lf
