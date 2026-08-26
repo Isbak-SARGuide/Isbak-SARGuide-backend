@@ -498,3 +498,9 @@ efbundle*
 # AI kod asistani dosyalari - repo disinda kalsin, sadece yerel
 CLAUDE.md
 .claude/
+
+# Kaynak materyal / gecici varliklar - buyuk ikili dosyalar, kaynak kod
+# degil. Icerik import script'leri lokal calisir, repo'ya girmez.
+*.pdf
+WhatsApp Image*.jpeg
+WhatsApp Image*.jpg
