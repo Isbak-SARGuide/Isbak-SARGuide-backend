@@ -1,9 +1,9 @@
-# Arama-Kurtarma Backend — Yol Haritası
+# Isbak_SAR_Guide Backend — Yol Haritası
 
 Kentsel arama-kurtarma el kitabı için ASP.NET Core REST API'sinin mimari kararları, iş kırılımı ve uygulama sırası.
 
-**Durum:** Planlandı · Faz 0 başlıyor
-**Son güncelleme:** 21 Ağustos 2026
+**Durum:** Faz 0-4 tamamlandı (M0, M1, M2, M3, M4 — Synchronization) · Sıra Faz 5'te
+**Son güncelleme:** 25 Ağustos 2026
 
 ---
 
@@ -52,17 +52,42 @@ düzeltilen hata bir sonraki sürümde geri döner.
 ### 2.1 Katman sorumlulukları
 
 ```
-AramaKurtarma.API          HTTP. İnce controller, middleware, DI wiring, auth config.
+Isbak_SAR_Guide.API          HTTP. İnce controller, middleware, DI wiring, auth config.
         ↓ (sadece Business'ı tanır)
-AramaKurtarma.Business     İş kuralları. Service, DTO, validation, mapping, Result.
+Isbak_SAR_Guide.Business     İş kuralları. Service, DTO, validation, mapping, Result.
         ↓ (sadece DataAccess soyutlamalarını tanır)
-AramaKurtarma.DataAccess   Kalıcılık. DbContext, EF config, Repository, UnitOfWork, migration.
+Isbak_SAR_Guide.DataAccess   Kalıcılık. DbContext, EF config, Repository, UnitOfWork, migration.
         ↓
-AramaKurtarma.Entities     POCO entity + enum. Hiçbir şeye bağımlı değil.
+Isbak_SAR_Guide.Entities     POCO entity + enum. Hiçbir şeye bağımlı değil.
 ```
 
 **Kural:** API projesi `DataAccess`'i doğrudan referans almaz. Her katman kendi DI kaydını
 `AddDataAccess()` / `AddBusiness()` extension metoduyla yapar. (Dependency Inversion'ın pratik karşılığı.)
+
+**Klasör yapısı (24 Ağustos 2026'da güncellendi — Abstract/Concrete ayrımına geçildi):**
+
+```
+Isbak_SAR_Guide.Business
+├── DTOs/{Feature}              CreateBookDto, LoginDto, ...
+├── Validation/{Feature}        FluentValidation validator'ları
+├── Services
+│   ├── Abstract                IBookService, IAuthService, ITokenService
+│   └── Concrete                BookService, TokenService
+├── Common                      Error, Result, JwtOptions
+└── ServiceRegistration.cs
+
+Isbak_SAR_Guide.DataAccess
+├── Context / Configurations / Migrations / Seed
+└── Repositories
+    ├── Abstract                IRepository<T>, IUnitOfWork
+    └── Concrete                EfRepository<T>, UnitOfWork
+```
+
+Gerekçe: interface ve implementasyonun nerede olduğu klasör isminden belli oluyor,
+yeni katılan biri arama yapmak zorunda kalmıyor. Sınır: her private/yardımcı metot
+interface'e çıkmıyor — sadece başka katmanın tükettiği gerçek soyutlamalar
+(`IBookService`, `IRepository<T>` gibi) Abstract'a gider. `Entities` katmanı bu
+ayrımın dışında bırakıldı (§2.3'teki mega-hiyerarşi kararıyla tutarlı).
 
 ### 2.2 Kullanılacak pattern'ler
 
@@ -74,6 +99,7 @@ AramaKurtarma.Entities     POCO entity + enum. Hiçbir şeye bağımlı değil.
 | Options Pattern | `JwtOptions`, `StorageOptions` — magic string yok |
 | Strategy (hafif) | `IStorageService` → `LocalFileStorageService` / ileride `MinioStorageService` |
 | Middleware | Global exception handling, request logging |
+| Abstract/Concrete klasör ayrımı | Interface ve implementasyon ayrı klasörde; okunabilirlik ve keşfedilebilirlik için (Business/Services, DataAccess/Repositories) |
 
 ### 2.3 Bilinçli olarak KULLANILMAYACAKLAR
 
@@ -123,7 +149,7 @@ Yarım kalan indirme eski sürümü bozmamalı.
 ADMIN TARAFI (canlı, serbestçe düzenlenir)
 Book / Module / Content / ContentBlock / Media
                     │
-                    │  POST /api/v1/admin/books/{id}/publish
+                    │  POST /api/v1/books/{bookId}/publish  (Admin rolü)
                     │  (tek transaction, versiyon N → N+1)
                     ▼
 YAYIN TARAFI (immutable, mobil sadece burayı görür)
@@ -711,53 +737,112 @@ ve deploy edilemeyen bir sistem kalır.
 ### PHASE 0 — Foundation & Green Build → M0
 
 - [x] 1.1 Git init + `.gitignore` + `obj`/`bin` temizliği
-- [ ] 1.6 `global.json` + GitHub Actions CI + remote → ilk push (**CI kırmızı beklenir**)
-- [ ] 1.2 `ApplicationUser` + `Class1.cs` temizliği + `Directory.Build.props` + `.editorconfig` (**CI yeşile döner**)
-- [ ] 1.3 NuGet paketleri + .NET 10 uyum doğrulaması
-- [ ] 1.4 Test projesi iskeleti
-- [ ] 1.5 `docker compose up` + PG18 bağlantı doğrulaması
+- [x] 1.6 `global.json` + GitHub Actions CI + remote → ilk push (CI kırmızı görüldü)
+- [x] 1.2 `ApplicationUser` + `Class1.cs` temizliği + `Directory.Build.props` + `.editorconfig` (CI yeşile döndü — PR #1)
+- [x] 1.3 NuGet paketleri + .NET 10 uyum doğrulaması → **Risk #8 kapandı**
+- [x] 1.4 Test projesi (`tests/Isbak_SAR_Guide.Tests`) + ilk 2 test geçti
+- [x] 1.5 `docker compose up` + PG18 bağlantı doğrulaması
 
-### PHASE 1 — Domain, Persistence & Seed → M1
+**Faz 0 kurulan altyapı:**
 
-- [ ] 2.1 `BaseEntity` + audit/soft-delete arayüzleri
-- [ ] 2.2 İçerik entity'lerini tamamla
-- [ ] 2.3 `BookPublication` + `PublishedContent`
-- [ ] 2.4 EF Configuration + index + jsonb
-- [ ] 2.5 `DbContext`
-- [ ] 2.6 İlk migration
-- [ ] 2.7 Seed
+| Karar | Seçim | Not |
+|---|---|---|
+| SDK kilidi | `global.json` → 10.0.400, `rollForward: latestFeature` | Yerel/CI sürüm kayması önlendi |
+| Ortak csproj ayarları | `Directory.Build.props` | `TreatWarningsAsErrors` açık |
+| Mapping | Mapster 10.0.12 | |
+| Validation | FluentValidation 12.1.1 | |
+| Logging | Serilog.AspNetCore 10.0.0 | |
+| API versiyonlama | Asp.Versioning.Mvc.ApiExplorer 10.2.1 | |
+| OpenAPI UI | Scalar.AspNetCore 2.17.1 | `Microsoft.AspNetCore.OpenApi` ile birlikte; Swagger UI klasik alternatif |
+| Test | xUnit 2.9.3 + Shouldly + NSubstitute + Testcontainers.PostgreSql | |
+| Identity | `ApplicationUser : IdentityUser`, `Id` = string/GUID, giriş `UserName` ile | `Microsoft.Extensions.Identity.Stores` — EF Core sürüklemiyor |
+
+> **Kural dosyasından iki sapma:** (1) FluentAssertions yerine **Shouldly** — v8+ ticari lisans gerektiriyor
+> (nuget sayfasından doğrula). (2) Moq yerine **NSubstitute** — Moq 4.20 SponsorLink olayı sonrası.
+> Her ikisi de tek satırla geri alınabilir.
+
+### PHASE 1 — Domain, Persistence & Seed → M1 ✅ Tamamlandı
+
+- [x] 2.1 `BaseEntity` + soft-delete alanları (`IsDeleted`, `DeletedAt`)
+- [x] 2.2 İçerik entity'leri tamamlandı (`Slug`, `LanguageCode`, `Checksum`, `DataJson`)
+- [x] 2.3 `BookPublication` + `PublishedContent` (immutable, `BaseEntity`'den türemiyor)
+- [x] 2.4 6 `IEntityTypeConfiguration<T>` + jsonb + index'ler — Risk #6 canlı yakalanıp `IsRequired(false)` ile düzeltildi
+- [x] 2.5 `DbContext` + `SaveChanges` override'ında merkezi audit damgalama
+- [x] 2.6 İlk migration → Postgres'e uygulandı (14 tablo doğrulandı)
+- [x] 2.7 Seed: roller (Admin/Editor), admin kullanıcı, 1 kitap / 4 modül / 16 içerik / 17 blok
 
 ### PHASE 2 — Walking Skeleton + Contract Stub → M2
 
-- [ ] 3.1 DI kompozisyonu
-- [ ] 3.2 `Result<T>`
-- [ ] 3.3 ProblemDetails + Result→ActionResult
-- [ ] 3.4 Serilog
-- [ ] 3.5 Swagger + versiyonlama + CORS
-- [ ] 6.1 Auth çekirdeği
-- [ ] 4.1 Repository + UnitOfWork
-- [ ] 4.2 Book DTO + Mapster + Validation
-- [ ] 4.3 `BookService`
-- [ ] 4.4 `BooksController`
-- [ ] 4.5 Entegrasyon test harness'ı
-- [ ] 5.0 Sync contract stub
+- [x] 3.1 DI kompozisyonu (`AddDataAccess`/`AddBusiness`, katman sızıntısı düzeltildi)
+- [x] 3.2 `Result<T>` + `Error`
+- [x] 3.3 `GlobalExceptionHandler` (IExceptionHandler) + `ResultExtensions.ToActionResult()`
+- [x] 3.4 Serilog
+- [x] 3.5 API versioning (Asp.Versioning) + Scalar UI + CORS
+- [x] 6.1 Auth çekirdeği — 5 canlı HTTP testiyle doğrulandı (401 → login → 200 → yanlış şifre → olmayan kullanıcı, enumeration koruması dahil)
+- [x] 4.1 `IRepository<T>` + `EfRepository<T>` + `IUnitOfWork`
+- [x] 4.2 Book DTO (`Dtos/`) + Mapster + Validation (`Validators/`)
+- [x] 4.3 `BookService` (validation dahil)
+- [x] 4.4 `BooksController` — 8 canlı HTTP testiyle doğrulandı (CRUD + validation + soft-delete)
+- [x] 4.5 Entegrasyon test harness'ı — Testcontainers + `WebApplicationFactory`, 6/6 test geçti (unit + smoke + auth akışı)
+- [x] 5.0 Sync contract stub — `manifest`/`snapshot`/`changes` (`[AllowAnonymous]`), gerçek seed verisiyle 4 canlı testle doğrulandı; `changes` bilerek stub (Faz 4'te gerçek delta)
 
 ### PHASE 3 — Publishing Engine → M3
 
-- [ ] 6.2 Snapshot tasarımı
-- [ ] 6.3 `IPublishingService`
-- [ ] 6.4 Tombstone
-- [ ] 6.5 Publish senaryo testleri
-- [ ] 6.6 Publish endpoint
+- [x] 6.2 Snapshot tasarımı
+
+> **6.2 tasarım kararları (2026-08-25):**
+> 1. **`PublishedContent.PayloadJson` = `SyncContentDto` JSON'ı, aynen.** Publish anında her content
+>    (Blocks + Media özeti dahil) 5.0'da donmuş `SyncContentDto` şemasıyla serialize edilip yazılır.
+>    Faz 4'te snapshot/delta bu kolonu deserialize etmeden doğrudan mobile geçirir; ikinci bir şema
+>    ve dönüşüm katmanı yok (YAGNI). `ModuleId` DTO'da zaten mevcut.
+> 2. **`BookPublication.ManifestJson` publish transaction'ında dondurulur.** Versiyon, `PublishedAt`,
+>    içerik sayısı, medya listesi ve checksum publish anında hesaplanıp yazılır. Yayın gerçekten
+>    immutable: admin draft'ı sonra değiştirse bile yayınlanmış manifest değişmez. Sync sadece okur.
+> 3. **Deterministik sıralama DTO kurulurken C# tarafında garanti edilir:** Modules/Contents/Blocks
+>    serialize edilmeden önce `OrderBy(DisplayOrder).ThenBy(Id)`. Checksum idempotency'si (6.5) buna
+>    dayanır; garanti sorguda değil, serileştirmenin yanında durur ki sorgu değişse de bozulmasın.
+> 4. **`PayloadJson`/`ManifestJson` kolonları `json` (`jsonb` değil):** checksum invariant'ı
+>    (`Checksum = SHA256(PayloadJson)`, tombstone dahil) bayt sadakati gerektirir; `jsonb` metni
+>    kanonikleştirir (key sıralar, whitespace atar) ve invariant'ı DB'den geri okuyunca bozar.
+>    `json` metni aynen saklar + geçerlilik doğrular. 6.5 invariant testi yakaladı (2026-08-25).
+>    Draft tarafındaki `ContentBlock.DataJson` bilerek `jsonb` kalır — yapısal veri, checksum sözü yok.
+> 5. **Kanonik form = wire format:** `PropertyNamingPolicy = CamelCase` (5.0 wire sözleşmesiyle hizalı,
+>    Faz 4 verbatim geçişin ön şartı) + `UnsafeRelaxedJsonEscaping` (Türkçe karakterler `\uXXXX` değil
+>    UTF-8; bu JSON asla HTML'e ham gömülmez). Kanonik options **donmuştur** — her değişiklik
+>    yayınlanmış tüm checksum'ları geçersiz kılar.
+>
+> **Not — web okuyucu:** Kitapçık ileride halka açık web'de de yayınlanacak. Bu tasarımı değiştirmez:
+> web okuyucu, mobil gibi aynı immutable yayın tablolarından beslenen ikinci bir tüketicidir.
+> Gerekirse ileriki fazlarda ayrı bir public web read API görevi açılır (backlog).
+
+- [x] 6.3 `IPublishingService`
+- [x] 6.4 Tombstone
+- [x] 6.5 Publish senaryo testleri
+- [x] 6.6 Publish endpoint
 
 ### PHASE 4 — Synchronization → M4
 
-- [ ] 7.1 Manifest
-- [ ] 7.2 Snapshot
-- [ ] 7.3 Changes (delta)
-- [ ] 7.4 `SyncController`
-- [ ] 7.5 Delta test matrisi
-- [ ] 7.6 Sözleşme dokümanı v1.0
+> **Faz 4 öncesi tasarım notları (2026-08-25 — web/mobil ilk tasarımlar incelendi):**
+> 1. **Public web read API — yeni görev bloğu gerekiyor.** Son kullanıcı kitabı web'de de okuyacak.
+>    Web, sync endpoint'lerini KULLANMAZ (tam paket indirmek web için israf); kendi per-resource
+>    uçlarını alır (TOC + içerik detayı), ama aynı yayın tablolarından okur — asla draft'tan.
+> 2. **`GetSnapshot`/TOC kaynağı sorunu:** Yayın tablolarında modül ağacı ve kitap metadata'sı
+>    şu an DONDURULMUYOR (sadece content payload'ları + manifest var). 7.2 tam paketi ve web TOC'u
+>    bunlara muhtaç — Faz 4 tasarımında çözülmeli (aday: publish'te SnapshotJson kolonu da dondur).
+>    **✔ Çözüldü (2026-08-25):** `BookPublication.SnapshotJson` kolonu (`json`, NOT NULL) — tam kanonik
+>    snapshot publish'te dondurulur, `GetSnapshot` deserialize etmeden aynen döner. İnvariant genişledi:
+>    `Checksum = SHA256(SnapshotJson)`. Tek-serialize kuralı: `BuildManifest` checksum'ı parametre alır.
+>    Bilinçli veri tekrarı (satırlar delta'nın, snapshot ilk kurulumun kaynağı — immutable, drift edemez).
+> 3. **Web frontend sözleşme uyumsuzluğu:** Mock, içerik gövdesini tek markdown string tutuyor;
+>    backend sözleşmesi yapısal ContentBlock listesi. Web'ciyle hizalanmalı (öneri: frontend block
+>    render eder; backend markdown'a çevirmez — iki format = drift).
+
+- [x] 7.1 Manifest
+- [x] 7.2 Snapshot
+- [x] 7.3 Changes (delta) — 7.3-a: publish journal modeline geçti (Faz 3 tadilatı, satır tablosu artık degisiklik günlüğü); 7.3-b: sözleşmeye `Modules` eklendi; 7.3-c: gerçek delta motoru (`SyncChangesJsonWriter`, verbatim envelope)
+- [x] 7.4 `SyncController` — 7.1-7.3 ile birlikte gerçek okumalara bağlandı
+- [x] 7.5 Delta test matrisi — 15 senaryo, 7.3-c ile birlikte yazıldı
+- [x] 7.6 Sözleşme dokümanı v1.0 — `docs/Sync-Sozlesmesi-v1.md`, tüm örnekler gerçek API yanıtlarından
 
 ### PHASE 5-8 — CMS / Media / Auth / Release → M5-M8
 
