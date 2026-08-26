@@ -3,6 +3,7 @@ using Isbak_SAR_Guide.Entities.Identity;
 using Shouldly;
 
 namespace Isbak_SAR_Guide.Tests.Unit;
+
 public class ApplicationUserTests
 {
     [Fact]
