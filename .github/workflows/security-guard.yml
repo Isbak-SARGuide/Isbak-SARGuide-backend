@@ -1,16 +1,23 @@
-name: Main Guard
+name: Security Guard
 
-# main'e giden HER PR icin ek sertlestirme katmani. Build+test zaten
-# ci.yml'de var ve main'i de kapsiyor (pull_request: branches: [main, develop])
-# - burada TEKRAR calistirmiyoruz, CI dakikasi israf olur ve iki ayri yerde
-# "gecti mi" sorusu sormaya gerek kalmaz. Bu workflow SADECE ci.yml'in
-# kapsamadigi guvenlik/stil kontrollerini ekler.
+# HEM develop HEM main icin - dogrulamayi main'e ertelemiyoruz. Bir secret ya
+# da acikli paket develop'a girdigi an risktir; main'e mergelenene kadar
+# (haftalarca) yakalanmadan kalmasi yanlis olur. Ucu kontrol de hizli/stabil,
+# develop'ta "hafif kalsin" gerekcesi (agir/karasiz test'ler icin gecerli
+# olan bir gerekce) burada uygulanmaz.
+#
+# Build+test zaten ci.yml'de var ve ayni branch'leri kapsiyor - burada TEKRAR
+# calistirmiyoruz, CI dakikasi israf olur. Bu workflow SADECE ci.yml'in
+# kapsamadigi guvenlik/stil kontrollerini ekler. push tetikleyicisi ci.yml
+# ile ayni gerekceyle var: PR'i bypass eden dogrudan push da dogrulansin.
 on:
+  push:
+    branches: [ main, develop ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, develop ]
 
 concurrency:
-  group: main-guard-${{ github.ref }}
+  group: security-guard-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
