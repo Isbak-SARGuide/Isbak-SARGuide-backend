@@ -65,6 +65,7 @@ if (app.Environment.IsDevelopment())
     app.MapScalarApiReference().AllowAnonymous();
 
     await app.Services.SeedDatabaseAsync();
+    await app.Services.PublishSeedBookAsync();
 }
 
 app.UseHttpsRedirection();

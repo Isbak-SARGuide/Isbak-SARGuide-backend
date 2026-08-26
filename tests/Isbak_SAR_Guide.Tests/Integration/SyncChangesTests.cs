@@ -261,8 +261,12 @@ public class SyncChangesTests(ApiFactory factory)
     [Fact]
     public async Task GetChanges_BookNeverPublished_ReturnsNotPublished()
     {
-        // Seed kitap (id 1) hic publish edilmez (test kurali).
-        var result = await GetChangesResultAsync(bookId: 1, fromVersion: 0);
+        // Kendi kitabini yarat, publish ETME. (Seed kitap artik startup'ta
+        // otomatik publish ediliyor - bkz. SeedPublisherExtensions - bu yuzden
+        // "hic yayinlanmamis kitap" fixture'i olarak kullanilamaz.)
+        var bookId = await CreateBookAsync("Modül", "A");
+
+        var result = await GetChangesResultAsync(bookId, fromVersion: 0);
 
         result.IsFailure.ShouldBeTrue();
         result.Error!.Type.ShouldBe(ErrorType.NotFound);

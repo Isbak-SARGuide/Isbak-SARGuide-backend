@@ -55,11 +55,14 @@ public class SyncSnapshotTests(ApiFactory factory)
     [Fact]
     public async Task GetSnapshot_BookNeverPublished_Returns404WithNotPublishedCode()
     {
-        // Arrange - seed kitap (id 1) hic publish edilmez (test kurali).
+        // Arrange - kendi kitabini yarat, publish ETME. (Seed kitap artik
+        // startup'ta otomatik publish ediliyor - bkz. SeedPublisherExtensions -
+        // bu yuzden "hic yayinlanmamis kitap" fixture'i olarak kullanilamaz.)
+        var bookId = await CreateBookAsync();
         var client = factory.CreateClient();
 
         // Act
-        var response = await client.GetAsync("/api/v1/sync/snapshot?bookId=1");
+        var response = await client.GetAsync($"/api/v1/sync/snapshot?bookId={bookId}");
 
         // Assert - manifest ile AYNI kod: kod, ucun degil gercegin adi.
         response.StatusCode.ShouldBe(HttpStatusCode.NotFound);

@@ -53,12 +53,14 @@ public class SyncManifestTests(ApiFactory factory)
     [Fact]
     public async Task GetManifest_BookNeverPublished_Returns404WithNotPublishedCode()
     {
-        // Arrange - seed kitap (id 1) hic publish edilmez (test kurali) -
-        // "kitap var ama yayin yok" durumunun hazir temsilcisi.
+        // Arrange - kendi kitabini yarat, publish ETME. (Seed kitap artik
+        // startup'ta otomatik publish ediliyor - bkz. SeedPublisherExtensions -
+        // bu yuzden "hic yayinlanmamis kitap" fixture'i olarak kullanilamaz.)
+        var bookId = await CreateBookAsync();
         var client = factory.CreateClient();
 
         // Act
-        var response = await client.GetAsync("/api/v1/sync/manifest?bookId=1");
+        var response = await client.GetAsync($"/api/v1/sync/manifest?bookId={bookId}");
 
         // Assert - 404 ama kod ayirt edici: mobil "icerik hazirlaniyor" gosterir.
         response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
