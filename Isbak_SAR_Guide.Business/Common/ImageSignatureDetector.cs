@@ -17,24 +17,24 @@ public static class ImageSignatureDetector
     /// </summary>
     public static Signature? Detect(ReadOnlySpan<byte> header)
     {
-        if (header.Length >= 8 && header[..8].SequenceEqual(Png))
+        if (header.Length >= 8 && header[..8].SequenceEqual(_png))
         {
             return new Signature("image/png", ".png");
         }
 
-        if (header.Length >= 3 && header[..3].SequenceEqual(Jpeg))
+        if (header.Length >= 3 && header[..3].SequenceEqual(_jpeg))
         {
             return new Signature("image/jpeg", ".jpg");
         }
 
-        if (header.Length >= 6 && (header[..6].SequenceEqual(Gif87A) || header[..6].SequenceEqual(Gif89A)))
+        if (header.Length >= 6 && (header[..6].SequenceEqual(_gif87A) || header[..6].SequenceEqual(_gif89A)))
         {
             return new Signature("image/gif", ".gif");
         }
 
         if (header.Length >= 12
-            && header[..4].SequenceEqual(RiffPrefix)
-            && header[8..12].SequenceEqual(WebpPrefix))
+            && header[..4].SequenceEqual(_riffPrefix)
+            && header[8..12].SequenceEqual(_webpPrefix))
         {
             return new Signature("image/webp", ".webp");
         }
@@ -123,12 +123,12 @@ public static class ImageSignatureDetector
         return null;
     }
 
-    private static readonly byte[] Png = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
-    private static readonly byte[] Jpeg = [0xFF, 0xD8, 0xFF];
-    private static readonly byte[] Gif87A = "GIF87a"u8.ToArray();
-    private static readonly byte[] Gif89A = "GIF89a"u8.ToArray();
-    private static readonly byte[] RiffPrefix = "RIFF"u8.ToArray();
-    private static readonly byte[] WebpPrefix = "WEBP"u8.ToArray();
+    private static readonly byte[] _png = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+    private static readonly byte[] _jpeg = [0xFF, 0xD8, 0xFF];
+    private static readonly byte[] _gif87A = "GIF87a"u8.ToArray();
+    private static readonly byte[] _gif89A = "GIF89a"u8.ToArray();
+    private static readonly byte[] _riffPrefix = "RIFF"u8.ToArray();
+    private static readonly byte[] _webpPrefix = "WEBP"u8.ToArray();
 
     private static uint ReadUInt32BigEndian(ReadOnlySpan<byte> bytes) =>
         (uint)((bytes[0] << 24) | (bytes[1] << 16) | (bytes[2] << 8) | bytes[3]);
