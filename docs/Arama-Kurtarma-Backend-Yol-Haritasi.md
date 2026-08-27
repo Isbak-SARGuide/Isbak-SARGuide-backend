@@ -2,8 +2,9 @@
 
 Kentsel arama-kurtarma el kitabı için ASP.NET Core REST API'sinin mimari kararları, iş kırılımı ve uygulama sırası.
 
-**Durum:** Faz 0-4 tamamlandı (M0, M1, M2, M3, M4 — Synchronization) · Sıra Faz 5'te
-**Son güncelleme:** 25 Ağustos 2026
+**Durum:** Faz 0-7 tamamlandı (M0-M4 kritik yol + M5 CMS + M6 Media + M7 Auth, paralel dallar
+dahil) · Faz 8 (Release Readiness — 11.1-11.4, M8) sırada
+**Son güncelleme:** 27 Ağustos 2026
 
 ---
 
@@ -846,10 +847,17 @@ ve deploy edilemeyen bir sistem kalır.
 
 ### PHASE 5-8 — CMS / Media / Auth / Release → M5-M8
 
-- [ ] 8.1-8.6 CMS Completion
-- [ ] 10.1-10.6 Media Pipeline
-- [ ] 9.1-9.4 Auth Feature Set
+- [x] 8.1-8.6 CMS Completion — Module/Content/ContentBlock CRUD + reorder (`ReorderHelper`) + paging (`PagedResult<T>`), `feature/phase5-cms-completion` (PR #9)
+- [x] 10.1-10.6 Media Pipeline — `IStorageService`/`LocalFileStorageService`, magic-byte upload validation, dedup, orphan cleanup, `feature/phase6-media-pipeline` (PR #10)
+- [x] 9.1-9.4 Auth Feature Set — refresh token rotation + reuse detection, Admin-provisions-Editor, lockout, login rate limiting, `feature/phase7-auth-feature-set` (PR #11)
 - [ ] 11.1-11.4 Release Readiness
+
+> Ara adım (Faz 8 öncesi, `fix/architecture-review-findings`, PR #12): 5 paralel uzman ajan +
+> graphify bağımlılık grafiğiyle mimari inceleme — katmanlama temiz çıktı, 9 gerçek bulgu
+> düzeltildi (UserService rol-atama rollback'i, Media orphan-file riski, `AddBusiness()`'ın
+> JwtOptions için kendi kendine yeterli olması, 12x doğrulama-hata tekrarının
+> `ValidationResultExtensions`'a çıkarılması, `PublishAsync` bölünmesi, yarış-durumu `catch`
+> bloklarına loglama). Detay: CLAUDE.md ilgili bölümleri.
 
 ### PHASE 9 — Hardening → M9
 
