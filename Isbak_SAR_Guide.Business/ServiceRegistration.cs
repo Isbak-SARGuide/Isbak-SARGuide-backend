@@ -20,6 +20,7 @@ public static class BusinessServiceCollectionExtensions
         services.AddScoped<IPublishingService, PublishingService>();
         services.AddScoped<IModuleService, ModuleService>();
         services.AddScoped<IContentService, ContentService>();
+        services.AddScoped<IContentBlockService, ContentBlockService>();
 
         return services;
     }

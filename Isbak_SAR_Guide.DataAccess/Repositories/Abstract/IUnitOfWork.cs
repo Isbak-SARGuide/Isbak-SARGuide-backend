@@ -11,7 +11,7 @@ public interface IUnitOfWork
 
     IContentRepository Contents { get; }
 
-    IRepository<ContentBlock> ContentBlocks { get; }
+    IContentBlockRepository ContentBlocks { get; }
 
     IRepository<Media> Media { get; }
 
