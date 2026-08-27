@@ -1,4 +1,5 @@
 using Isbak_SAR_Guide.DataAccess.Context;
+using Isbak_SAR_Guide.DataAccess.HealthChecks;
 using Isbak_SAR_Guide.DataAccess.Repositories.Abstract;
 using Isbak_SAR_Guide.DataAccess.Repositories.Concrete;
 using Isbak_SAR_Guide.Entities.Identity;
@@ -38,6 +39,13 @@ public static class DataAccessServiceCollectionExtensions
             .AddEntityFrameworkStores<Isbak_SAR_GuideDbContext>();
 
         services.AddScoped<IUnitOfWork, UnitOfWork>();
+
+        // "ready" tag: Program.cs /health/ready sadece bu etiketli kontrolleri
+        // calistirir. /health (liveness) hicbir tag filtrelemez - "surec ayakta
+        // mi" sorusu DB'ye bagli olmamali (DB cokse bile process'in kendisi
+        // yasiyor olabilir, orkestratorun bunu ayirt etmesi gerekir).
+        services.AddHealthChecks()
+            .AddCheck<DatabaseHealthCheck>("database", tags: ["ready"]);
 
         return services;
     }

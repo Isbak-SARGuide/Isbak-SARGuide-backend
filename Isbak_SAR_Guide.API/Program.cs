@@ -2,6 +2,7 @@ using System.Threading.RateLimiting;
 using Asp.Versioning;
 using Isbak_SAR_Guide.API.Middleware;
 using Isbak_SAR_Guide.Business.Common;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Options;
@@ -35,6 +36,10 @@ builder.Services
     });
 
 builder.Services.AddOpenApi();
+
+// Statik medya (PNG/JPG) zaten sikistirilmis - sadece JSON gövdeleri icin acik.
+// EnableForHttps: sync/API JSON trafigi HTTPS uzerinden gidiyor, orada da sikistirma istiyoruz.
+builder.Services.AddResponseCompression(options => options.EnableForHttps = true);
 
 builder.Services.AddCors(options =>
 {
@@ -108,7 +113,16 @@ if (app.Environment.IsDevelopment())
     await app.Services.PublishSeedBookAsync();
 }
 
+if (!app.Environment.IsDevelopment())
+{
+    // HSTS'i Development'ta acmiyoruz - dev sertifikasi tarayicida STS olarak
+    // kalicilastigi icin sonradan http'ye donmek istendiginde sorun cikartir.
+    app.UseHsts();
+}
+
 app.UseHttpsRedirection();
+app.UseResponseCompression();
+app.UseSecurityHeaders();
 
 // Medya dosyalarini web koku ("") altinda servis eder: StorageOptions.BasePath
 // fiziksel kok, Media.StoragePath (orn. "media/2026/08/<guid>.png") bu koke
@@ -132,5 +146,20 @@ app.UseAuthorization();
 app.UseRateLimiter();
 
 app.MapControllers();
+
+// Fallback policy her endpoint'i deny-by-default yaptigi icin health check'ler
+// de AllowAnonymous olmadan 401 doner - orkestrasyon/monitoring araclari token
+// tasimaz. "/health": liveness, hicbir dependency check'i calistirmaz (Predicate
+// false) - sadece process'in istek karsiladigini kanitlar. "/health/ready":
+// readiness, "ready" tag'li check'leri (su an sadece Postgres) calistirir.
+app.MapHealthChecks("/health", new HealthCheckOptions
+{
+    Predicate = _ => false,
+}).AllowAnonymous();
+
+app.MapHealthChecks("/health/ready", new HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("ready"),
+}).AllowAnonymous();
 
 app.Run();
