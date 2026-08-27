@@ -41,6 +41,32 @@ public class MediaServiceTests(ApiFactory factory)
     }
 
     [Fact]
+    public async Task UploadAsync_WithValidJpeg_DetectsTypeAndReadsDimensions()
+    {
+        var bytes = ImageSignatureDetectorTests.BuildMinimalJpeg(640, 480);
+
+        var result = await UploadAsync(bytes, "foto.jpg");
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.ContentType.ShouldBe("image/jpeg");
+        result.Value.Width.ShouldBe(640);
+        result.Value.Height.ShouldBe(480);
+    }
+
+    [Fact]
+    public async Task UploadAsync_WithValidGif_DetectsTypeAndReadsDimensions()
+    {
+        var bytes = ImageSignatureDetectorTests.BuildMinimalGif(64, 32);
+
+        var result = await UploadAsync(bytes, "animasyon.gif");
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.ContentType.ShouldBe("image/gif");
+        result.Value.Width.ShouldBe(64);
+        result.Value.Height.ShouldBe(32);
+    }
+
+    [Fact]
     public async Task UploadAsync_WithNonImageBytes_ReturnsValidationError()
     {
         byte[] bytes = [0x01, 0x02, 0x03, 0x04, 0x05];

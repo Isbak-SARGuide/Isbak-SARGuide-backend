@@ -123,6 +123,64 @@ public class ImageSignatureDetectorTests
         dimensions.Value.Height.ShouldBe(768);
     }
 
+    [Fact]
+    public void TryReadJpegDimensions_SkipsNonSofSegmentsBeforeFindingSof0()
+    {
+        // SOI + bir APP0/JFIF segmenti (SOF DEGIL, atlanmali) + SOF0.
+        // Tarama dongusunun "bu marker SOF degil, uzunluguna gore atla"
+        // dalini gercekten calistirir - tek-segmentli mutlu yol bunu kapsamaz.
+        List<byte> bytes = [0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x04, 0x4A, 0x46];
+        bytes.AddRange(BuildMinimalJpeg(200, 100)[2..]); // SOI'siz SOF0 segmenti ekle
+
+        var dimensions = ImageSignatureDetector.TryReadJpegDimensions([.. bytes]);
+
+        dimensions.ShouldNotBeNull();
+        dimensions!.Value.Width.ShouldBe(200);
+        dimensions.Value.Height.ShouldBe(100);
+    }
+
+    [Fact]
+    public void TryReadJpegDimensions_NoSofMarkerPresent_ReturnsNull()
+    {
+        byte[] bytes = [0xFF, 0xD8, 0xFF, 0xD9]; // sadece SOI + EOI
+
+        var dimensions = ImageSignatureDetector.TryReadJpegDimensions(bytes);
+
+        dimensions.ShouldBeNull();
+    }
+
+    [Fact]
+    public void TryReadJpegDimensions_TruncatedAfterSofMarker_ReturnsNull()
+    {
+        // SOF0 marker'i basliyor ama yukseklik/genislik baytlarindan once govde kesiliyor.
+        byte[] bytes = [0xFF, 0xD8, 0xFF, 0xC0, 0x00, 0x08, 0x08];
+
+        var dimensions = ImageSignatureDetector.TryReadJpegDimensions(bytes);
+
+        dimensions.ShouldBeNull();
+    }
+
+    [Theory]
+    [InlineData(new byte[] { 0x89, 0x50, 0x4E })] // PNG imzasindan kisa
+    [InlineData(new byte[] { 0xFF, 0xD8 })] // JPEG imzasindan kisa
+    [InlineData(new byte[] { 0x47, 0x49 })] // GIF imzasindan kisa
+    public void Detect_TruncatedHeader_ReturnsNull(byte[] tooShort)
+    {
+        var signature = ImageSignatureDetector.Detect(tooShort);
+
+        signature.ShouldBeNull();
+    }
+
+    [Fact]
+    public void TryReadGifDimensions_TruncatedContent_ReturnsNull()
+    {
+        byte[] tooShort = "GIF89a"u8.ToArray();
+
+        var dimensions = ImageSignatureDetector.TryReadGifDimensions(tooShort);
+
+        dimensions.ShouldBeNull();
+    }
+
     // ---- Yardımcılar: gercek bir imaj kutuphanesi olmadan, sadece
     // dedektorun okudugu alanlari dolduran minimal/gecersiz-govdeli dosyalar ----
 
@@ -142,7 +200,7 @@ public class ImageSignatureDetectorTests
         return bytes;
     }
 
-    private static byte[] BuildMinimalGif(int width, int height)
+    internal static byte[] BuildMinimalGif(int width, int height)
     {
         var bytes = new byte[10];
         "GIF89a"u8.ToArray().CopyTo(bytes, 0);
@@ -153,7 +211,7 @@ public class ImageSignatureDetectorTests
         return bytes;
     }
 
-    private static byte[] BuildMinimalJpeg(int width, int height)
+    internal static byte[] BuildMinimalJpeg(int width, int height)
     {
         // SOI + SOF0 segmenti (marker 0xC0): uzunluk(2) + hassasiyet(1) +
         // yukseklik(2) + genislik(2) + bilesen sayisi(1) - yukseklik genislikten
