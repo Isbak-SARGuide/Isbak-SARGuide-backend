@@ -20,8 +20,7 @@ public class UserService(
         var validationResult = await createValidator.ValidateAsync(dto, cancellationToken);
         if (!validationResult.IsValid)
         {
-            var message = string.Join("; ", validationResult.Errors.Select(e => e.ErrorMessage));
-            return Result.Failure<UserDto>(Error.Validation("User.ValidationFailed", message));
+            return Result.Failure<UserDto>(validationResult.ToValidationError("User.ValidationFailed"));
         }
 
         if (await userManager.FindByNameAsync(dto.UserName) is not null)
@@ -44,7 +43,16 @@ public class UserService(
             return Result.Failure<UserDto>(Error.Validation("User.CreateFailed", message));
         }
 
-        await userManager.AddToRoleAsync(user, dto.Role);
+        var roleResult = await userManager.AddToRoleAsync(user, dto.Role);
+        if (!roleResult.Succeeded)
+        {
+            // Yari-olusmus (rolsuz) bir hesap birakmak yerine geri al - aksi
+            // halde Admin "kullanici olustu" sanip rolsuz bir hesabin var
+            // olduğunu asla ogrenmezdi (Faz 8 mimari incelemesinde bulundu).
+            await userManager.DeleteAsync(user);
+            var message = string.Join("; ", roleResult.Errors.Select(e => e.Description));
+            return Result.Failure<UserDto>(Error.Validation("User.RoleAssignmentFailed", message));
+        }
 
         return Result.Success(new UserDto(user.Id, user.UserName!, user.FullName, [dto.Role]));
     }
