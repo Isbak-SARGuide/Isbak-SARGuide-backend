@@ -9,7 +9,7 @@ public interface IUnitOfWork
 
     IModuleRepository Modules { get; }
 
-    IRepository<Content> Contents { get; }
+    IContentRepository Contents { get; }
 
     IRepository<ContentBlock> ContentBlocks { get; }
 

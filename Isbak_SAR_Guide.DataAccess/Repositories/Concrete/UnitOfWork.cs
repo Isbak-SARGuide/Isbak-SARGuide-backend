@@ -15,7 +15,7 @@ public class UnitOfWork : IUnitOfWork
 
         Books = new BookRepository(dbContext);
         Modules = new ModuleRepository(dbContext);
-        Contents = new EfRepository<Content>(dbContext);
+        Contents = new ContentRepository(dbContext);
         ContentBlocks = new EfRepository<ContentBlock>(dbContext);
         Media = new EfRepository<Media>(dbContext);
         // Ayni dbContext instance'i sart: BeginTransactionAsync o context'in
@@ -28,7 +28,7 @@ public class UnitOfWork : IUnitOfWork
 
     public IModuleRepository Modules { get; }
 
-    public IRepository<Content> Contents { get; }
+    public IContentRepository Contents { get; }
 
     public IRepository<ContentBlock> ContentBlocks { get; }
 
