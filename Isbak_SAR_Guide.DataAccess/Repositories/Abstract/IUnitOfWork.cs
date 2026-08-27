@@ -7,11 +7,11 @@ public interface IUnitOfWork
 {
     IBookRepository Books { get; }
 
-    IRepository<Module> Modules { get; }
+    IModuleRepository Modules { get; }
 
-    IRepository<Content> Contents { get; }
+    IContentRepository Contents { get; }
 
-    IRepository<ContentBlock> ContentBlocks { get; }
+    IContentBlockRepository ContentBlocks { get; }
 
     IRepository<Media> Media { get; }
 
