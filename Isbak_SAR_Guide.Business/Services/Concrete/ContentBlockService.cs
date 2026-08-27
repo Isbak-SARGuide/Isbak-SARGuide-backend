@@ -6,6 +6,7 @@ using Isbak_SAR_Guide.Business.Services.Abstract;
 using Isbak_SAR_Guide.DataAccess.Repositories.Abstract;
 using Isbak_SAR_Guide.Entities.Content;
 using Mapster;
+using Microsoft.Extensions.Logging;
 
 namespace Isbak_SAR_Guide.Business.Services.Concrete;
 
@@ -13,7 +14,8 @@ public class ContentBlockService(
     IUnitOfWork unitOfWork,
     IValidator<CreateContentBlockDto> createValidator,
     IValidator<UpdateContentBlockDto> updateValidator,
-    IValidator<ReorderDto> reorderValidator) : IContentBlockService
+    IValidator<ReorderDto> reorderValidator,
+    ILogger<ContentBlockService> logger) : IContentBlockService
 {
     public async Task<Result<PagedResult<ContentBlockDto>>> GetPagedAsync(
         int contentId, int page, int pageSize, CancellationToken cancellationToken = default)
@@ -45,8 +47,7 @@ public class ContentBlockService(
         var validationResult = await createValidator.ValidateAsync(dto, cancellationToken);
         if (!validationResult.IsValid)
         {
-            var message = string.Join("; ", validationResult.Errors.Select(e => e.ErrorMessage));
-            return Result.Failure<ContentBlockDto>(Error.Validation("ContentBlock.ValidationFailed", message));
+            return Result.Failure<ContentBlockDto>(validationResult.ToValidationError("ContentBlock.ValidationFailed"));
         }
 
         var content = await unitOfWork.Contents.FindByIdAsync(contentId, cancellationToken);
@@ -82,8 +83,7 @@ public class ContentBlockService(
         var validationResult = await updateValidator.ValidateAsync(dto, cancellationToken);
         if (!validationResult.IsValid)
         {
-            var message = string.Join("; ", validationResult.Errors.Select(e => e.ErrorMessage));
-            return Result.Failure<ContentBlockDto>(Error.Validation("ContentBlock.ValidationFailed", message));
+            return Result.Failure<ContentBlockDto>(validationResult.ToValidationError("ContentBlock.ValidationFailed"));
         }
 
         var block = await unitOfWork.ContentBlocks.FindByIdAsync(id, cancellationToken);
@@ -126,8 +126,7 @@ public class ContentBlockService(
         var validationResult = await reorderValidator.ValidateAsync(dto, cancellationToken);
         if (!validationResult.IsValid)
         {
-            var message = string.Join("; ", validationResult.Errors.Select(e => e.ErrorMessage));
-            return Result.Failure(Error.Validation("ContentBlock.ReorderValidationFailed", message));
+            return Result.Failure(validationResult.ToValidationError("ContentBlock.ReorderValidationFailed"));
         }
 
         var content = await unitOfWork.Contents.FindByIdAsync(contentId, cancellationToken);
@@ -140,6 +139,7 @@ public class ContentBlockService(
 
         return await ReorderHelper.ApplyAsync(
             unitOfWork,
+            logger,
             siblings,
             dto.OrderedIds,
             getId: b => b.Id,

@@ -22,8 +22,9 @@ public interface IUnitOfWork
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Faz 3 (Publishing) icin: bir transaction icinde birden fazla
-    /// SaveChanges cagrisini atomik yapmak gerektiginde kullanilir.
+    /// Bir transaction icinde birden fazla SaveChanges cagrisini atomik yapmak
+    /// gerektiginde kullanilir - once PublishingService (Faz 3), sonra
+    /// ReorderHelper'in iki fazli Module/Content/ContentBlock reorder'i (Faz 5).
     /// </summary>
     Task<IDbContextTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default);
 }

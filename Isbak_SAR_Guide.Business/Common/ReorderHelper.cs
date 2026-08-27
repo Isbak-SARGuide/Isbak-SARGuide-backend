@@ -1,6 +1,7 @@
 using Isbak_SAR_Guide.DataAccess.Common;
 using Isbak_SAR_Guide.DataAccess.Repositories.Abstract;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace Isbak_SAR_Guide.Business.Common;
 
@@ -17,6 +18,7 @@ internal static class ReorderHelper
 {
     public static async Task<Result> ApplyAsync<T>(
         IUnitOfWork unitOfWork,
+        ILogger logger,
         IReadOnlyList<T> siblings,
         IReadOnlyList<int> orderedIds,
         Func<T, int> getId,
@@ -65,6 +67,7 @@ internal static class ReorderHelper
         }
         catch (DbUpdateException ex) when (DbErrors.IsUniqueViolation(ex))
         {
+            logger.LogInformation(ex, "Eszamanli reorder yarisi - {ConflictCode}.", conflictError.Code);
             return Result.Failure(conflictError);
         }
     }

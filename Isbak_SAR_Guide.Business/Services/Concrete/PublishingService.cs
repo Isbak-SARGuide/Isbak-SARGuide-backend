@@ -1,15 +1,17 @@
 using Isbak_SAR_Guide.Business.Common;
 using Isbak_SAR_Guide.Business.DTOs.Publishing;
+using Isbak_SAR_Guide.Business.DTOs.Sync;
 using Isbak_SAR_Guide.Business.Mapping;
 using Isbak_SAR_Guide.Business.Services.Abstract;
 using Isbak_SAR_Guide.DataAccess.Common;
 using Isbak_SAR_Guide.DataAccess.Repositories.Abstract;
 using Isbak_SAR_Guide.Entities.Content;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace Isbak_SAR_Guide.Business.Services.Concrete;
 
-public class PublishingService(IUnitOfWork unitOfWork) : IPublishingService
+public class PublishingService(IUnitOfWork unitOfWork, ILogger<PublishingService> logger) : IPublishingService
 {
     /// <summary>
     /// Tombstone satirinin payload'i: icerik artik yok, kimligi ContentId
@@ -50,7 +52,58 @@ public class PublishingService(IUnitOfWork unitOfWork) : IPublishingService
         book.Version = newVersion;
 
         var snapshot = SnapshotBuilder.BuildSnapshot(book);
+        var publication = BuildPublicationShell(bookId, newVersion, snapshot, publishedAt, publishedById);
 
+        // Journal modeli (7.3-a): satir tablosu tam kopya DEGIL, degisiklik
+        // gunlugu - tam durum SnapshotJson'da. Her yayinda tum content'leri
+        // yeniden yazmak deltayi tam indirmeye esitlerdi. Content basina en
+        // son durum tek sorguyla gelir; hem "degisti mi?" kontrolu hem
+        // tombstone diff'i bundan beslenir.
+        var latestStates = await _unitOfWork.Publications
+            .GetLatestContentStatesAsync(bookId, cancellationToken);
+
+        AppendChangedContents(publication, snapshot, latestStates, bookId, newVersion);
+        AppendTombstones(publication, snapshot, latestStates, bookId, newVersion);
+
+        await _unitOfWork.Publications.AddAsync(publication, cancellationToken);
+
+        // Dar try: sadece yazma/commit adimi. Baska bir satirin exception'i
+        // yanlislikla Conflict kiligina girmesin. "when" filtresi sayesinde
+        // unique ihlali OLMAYAN DbUpdateException hic yakalanmaz, oldugu gibi
+        // global handler'a akar (bilmedigin hatayi yutma).
+        try
+        {
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (DbErrors.IsUniqueViolation(ex))
+        {
+            // Iki eszamanli publish ayni versiyonu yazmaya kalkti - beklenen
+            // bir yaris, exception degil Result doner. Bellekteki book.Version
+            // bump'i sorun degil: context scoped, istek sonunda oluyor.
+            logger.LogInformation(ex, "Kitap {BookId} icin eszamanli yayin yarisi - versiyon {Version} zaten yazilmis.", bookId, newVersion);
+            return Result.Failure<PublishResultDto>(
+                Error.Conflict(
+                    "Publishing.VersionConflict",
+                    "Aynı anda başka bir yayın yapıldı, lütfen tekrar deneyin."));
+        }
+
+        return Result.Success(new PublishResultDto(
+            publication.Id, // EF, insert'te uretilen id'yi SaveChanges sonrasi geri doldurur
+            bookId,
+            newVersion,
+            snapshot.Contents.Count,
+            publication.Checksum,
+            publishedAt));
+    }
+
+    /// <summary>
+    /// Snapshot'i bir kez serilestirip checksum'ini hesaplar, manifest'i uretir
+    /// ve bos (henuz PublishedContents eklenmemis) BookPublication kabugunu doner.
+    /// </summary>
+    private static BookPublication BuildPublicationShell(
+        int bookId, int newVersion, SyncSnapshotDto snapshot, DateTime publishedAt, string publishedById)
+    {
         // Tek-serialize kurali: snapshot BIR KEZ serialize edilir; ayni baytlar
         // hem SnapshotJson kolonuna hem checksum'a gider. Baska hicbir yerde
         // yeniden serialize edilmez - invariant: Checksum = SHA256(SnapshotJson).
@@ -61,7 +114,7 @@ public class PublishingService(IUnitOfWork unitOfWork) : IPublishingService
         // snapshot.Contents'te olmadigi icin sayim bilerek boyle dogru.
         var manifest = SnapshotBuilder.BuildManifest(snapshot, publishedAt, snapshotChecksum);
 
-        var publication = new BookPublication
+        return new BookPublication
         {
             BookId = bookId,
             Version = newVersion,
@@ -71,14 +124,12 @@ public class PublishingService(IUnitOfWork unitOfWork) : IPublishingService
             PublishedAt = publishedAt,
             PublishedById = publishedById,
         };
+    }
 
-        // Journal modeli (7.3-a): satir tablosu tam kopya DEGIL, degisiklik
-        // gunlugu - tam durum SnapshotJson'da. Her yayinda tum content'leri
-        // yeniden yazmak deltayi tam indirmeye esitlerdi. Content basina en
-        // son durum tek sorguyla gelir; hem "degisti mi?" kontrolu hem
-        // tombstone diff'i bundan beslenir.
-        var latestStates = await _unitOfWork.Publications
-            .GetLatestContentStatesAsync(bookId, cancellationToken);
+    /// <summary>Yeni veya son yayindan beri degisen (checksum farkli/dirilen) her content icin bir PublishedContent satiri ekler.</summary>
+    private static void AppendChangedContents(
+        BookPublication publication, SyncSnapshotDto snapshot, IReadOnlyList<PublishedContentState> latestStates, int bookId, int newVersion)
+    {
         var stateByContentId = latestStates.ToDictionary(s => s.ContentId);
 
         foreach (var contentDto in snapshot.Contents)
@@ -109,7 +160,12 @@ public class PublishingService(IUnitOfWork unitOfWork) : IPublishingService
                 IsDeleted = false,
             });
         }
+    }
 
+    /// <summary>Son durumu "hayatta" olup bu snapshot'ta artik olmayan her content icin bir kerelik tombstone satiri ekler.</summary>
+    private static void AppendTombstones(
+        BookPublication publication, SyncSnapshotDto snapshot, IReadOnlyList<PublishedContentState> latestStates, int bookId, int newVersion)
+    {
         // Tombstone (6.4): son durumu "hayatta" olup bu snapshot'ta olmayan
         // content'ler. Bir kez yazilir - delta Version > from araligini
         // taradigi icin ondan eski her istemci tombstone'u er ya da gec gorur;
@@ -129,35 +185,5 @@ public class PublishingService(IUnitOfWork unitOfWork) : IPublishingService
                 IsDeleted = true,
             });
         }
-
-        await _unitOfWork.Publications.AddAsync(publication, cancellationToken);
-
-        // Dar try: sadece yazma/commit adimi. Baska bir satirin exception'i
-        // yanlislikla Conflict kiligina girmesin. "when" filtresi sayesinde
-        // unique ihlali OLMAYAN DbUpdateException hic yakalanmaz, oldugu gibi
-        // global handler'a akar (bilmedigin hatayi yutma).
-        try
-        {
-            await _unitOfWork.SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
-        }
-        catch (DbUpdateException ex) when (DbErrors.IsUniqueViolation(ex))
-        {
-            // Iki eszamanli publish ayni versiyonu yazmaya kalkti - beklenen
-            // bir yaris, exception degil Result doner. Bellekteki book.Version
-            // bump'i sorun degil: context scoped, istek sonunda oluyor.
-            return Result.Failure<PublishResultDto>(
-                Error.Conflict(
-                    "Publishing.VersionConflict",
-                    "Aynı anda başka bir yayın yapıldı, lütfen tekrar deneyin."));
-        }
-
-        return Result.Success(new PublishResultDto(
-            publication.Id, // EF, insert'te uretilen id'yi SaveChanges sonrasi geri doldurur
-            bookId,
-            newVersion,
-            snapshot.Contents.Count,
-            publication.Checksum,
-            publishedAt));
     }
 }

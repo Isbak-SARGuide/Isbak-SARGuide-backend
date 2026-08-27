@@ -6,6 +6,7 @@ using Isbak_SAR_Guide.Business.Services.Abstract;
 using Isbak_SAR_Guide.DataAccess.Repositories.Abstract;
 using Isbak_SAR_Guide.Entities.Content;
 using Mapster;
+using Microsoft.Extensions.Logging;
 
 namespace Isbak_SAR_Guide.Business.Services.Concrete;
 
@@ -13,7 +14,8 @@ public class ContentService(
     IUnitOfWork unitOfWork,
     IValidator<CreateContentDto> createValidator,
     IValidator<UpdateContentDto> updateValidator,
-    IValidator<ReorderDto> reorderValidator) : IContentService
+    IValidator<ReorderDto> reorderValidator,
+    ILogger<ContentService> logger) : IContentService
 {
     public async Task<Result<PagedResult<ContentDto>>> GetPagedAsync(
         int moduleId, int page, int pageSize, bool? isPublished, CancellationToken cancellationToken = default)
@@ -45,8 +47,7 @@ public class ContentService(
         var validationResult = await createValidator.ValidateAsync(dto, cancellationToken);
         if (!validationResult.IsValid)
         {
-            var message = string.Join("; ", validationResult.Errors.Select(e => e.ErrorMessage));
-            return Result.Failure<ContentDto>(Error.Validation("Content.ValidationFailed", message));
+            return Result.Failure<ContentDto>(validationResult.ToValidationError("Content.ValidationFailed"));
         }
 
         var module = await unitOfWork.Modules.FindByIdAsync(moduleId, cancellationToken);
@@ -73,8 +74,7 @@ public class ContentService(
         var validationResult = await updateValidator.ValidateAsync(dto, cancellationToken);
         if (!validationResult.IsValid)
         {
-            var message = string.Join("; ", validationResult.Errors.Select(e => e.ErrorMessage));
-            return Result.Failure<ContentDto>(Error.Validation("Content.ValidationFailed", message));
+            return Result.Failure<ContentDto>(validationResult.ToValidationError("Content.ValidationFailed"));
         }
 
         var content = await unitOfWork.Contents.FindByIdAsync(id, cancellationToken);
@@ -108,8 +108,7 @@ public class ContentService(
         var validationResult = await reorderValidator.ValidateAsync(dto, cancellationToken);
         if (!validationResult.IsValid)
         {
-            var message = string.Join("; ", validationResult.Errors.Select(e => e.ErrorMessage));
-            return Result.Failure(Error.Validation("Content.ReorderValidationFailed", message));
+            return Result.Failure(validationResult.ToValidationError("Content.ReorderValidationFailed"));
         }
 
         var module = await unitOfWork.Modules.FindByIdAsync(moduleId, cancellationToken);
@@ -122,6 +121,7 @@ public class ContentService(
 
         return await ReorderHelper.ApplyAsync(
             unitOfWork,
+            logger,
             siblings,
             dto.OrderedIds,
             getId: c => c.Id,
