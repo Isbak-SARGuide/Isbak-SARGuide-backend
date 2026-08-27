@@ -15,7 +15,6 @@ builder.Host.UseSerilog((context, services, configuration) => configuration
     .Enrich.FromLogContext()
     .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}"));
 
-// Add services to the container.
 builder.Services.AddControllers();
 
 builder.Services
@@ -97,7 +96,6 @@ var app = builder.Build();
 
 app.UseExceptionHandler();
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     // Fallback policy her endpoint'i kilitler (deny-by-default) - MapOpenApi ve

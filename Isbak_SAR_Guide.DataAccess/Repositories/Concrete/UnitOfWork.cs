@@ -20,7 +20,8 @@ public class UnitOfWork : IUnitOfWork
         Media = new MediaRepository(dbContext);
         // Ayni dbContext instance'i sart: BeginTransactionAsync o context'in
         // baglantisinda transaction acar; farkli bir context kullansaydi
-        // Publications'in yazdiklari transaction'in disinda kalirdi.
+        // Publications'in (ve ReorderHelper'in Modules/Contents/ContentBlocks'a
+        // yazdiklarinin) transaction'in disinda kalirdi.
         Publications = new PublicationRepository(dbContext);
         RefreshTokens = new RefreshTokenRepository(dbContext);
     }

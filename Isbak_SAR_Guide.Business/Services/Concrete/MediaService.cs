@@ -7,6 +7,7 @@ using Isbak_SAR_Guide.DataAccess.Repositories.Abstract;
 using Isbak_SAR_Guide.Entities.Content.Enums;
 using Mapster;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace Isbak_SAR_Guide.Business.Services.Concrete;
@@ -14,7 +15,8 @@ namespace Isbak_SAR_Guide.Business.Services.Concrete;
 public class MediaService(
     IUnitOfWork unitOfWork,
     IStorageService storageService,
-    IOptions<StorageOptions> storageOptions) : IMediaService
+    IOptions<StorageOptions> storageOptions,
+    ILogger<MediaService> logger) : IMediaService
 {
     public async Task<Result<MediaDto>> UploadAsync(
         Stream content, string declaredFileName, long declaredLength, CancellationToken cancellationToken = default)
@@ -99,9 +101,30 @@ public class MediaService(
             // Eszamanli ayni-dosya yuklemesi yarisi: baska bir istek bizden once
             // ayni checksum'i yazdi. Kendi kopyamizi temizleyip kazanani donuyoruz
             // - gercek dedup, yarista bile.
+            logger.LogInformation(ex, "Checksum {Checksum} icin eszamanli yukleme yarisi - kazanan satir kullaniliyor.", checksum);
             await storageService.DeleteAsync(relativePath, cancellationToken);
+
             var winner = await unitOfWork.Media.FindByChecksumAsync(checksum, cancellationToken);
-            return Result.Success(winner!.Adapt<MediaDto>());
+            if (winner is null)
+            {
+                // Dar pencere: kazanan satir bu iki sorgu arasinda soft-delete'lendi.
+                // winner! ile devam etmek NullReferenceException'a, orijinal
+                // DbUpdateException'i gizleyerek dusmek olurdu - acikca reddet.
+                return Result.Failure<MediaDto>(Error.Unexpected(
+                    "Media.ConcurrentUploadUnresolved", "Eşzamanlı yükleme çözümlenemedi, lütfen tekrar deneyin."));
+            }
+
+            return Result.Success(winner.Adapt<MediaDto>());
+        }
+        catch
+        {
+            // Unique-ihlali DISI herhangi bir DB hatasi: dosya diske yazildi ama
+            // satir hic olusmadi. Temizlemezsek CleanupOrphansAsync bunu asla
+            // bulamaz - o sadece VAR OLAN Media satirlarini tarar (Faz 8 mimari
+            // incelemesinde bulundu). Orijinal exception korunur, sadece yeniden
+            // firlatilir - global handler yakalar.
+            await storageService.DeleteAsync(relativePath, cancellationToken);
+            throw;
         }
 
         return Result.Success(media.Adapt<MediaDto>());

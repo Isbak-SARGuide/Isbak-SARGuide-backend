@@ -6,6 +6,7 @@ using Isbak_SAR_Guide.Business.Services.Abstract;
 using Isbak_SAR_Guide.DataAccess.Repositories.Abstract;
 using Isbak_SAR_Guide.Entities.Content;
 using Mapster;
+using Microsoft.Extensions.Logging;
 
 namespace Isbak_SAR_Guide.Business.Services.Concrete;
 
@@ -13,7 +14,8 @@ public class ModuleService(
     IUnitOfWork unitOfWork,
     IValidator<CreateModuleDto> createValidator,
     IValidator<UpdateModuleDto> updateValidator,
-    IValidator<ReorderDto> reorderValidator) : IModuleService
+    IValidator<ReorderDto> reorderValidator,
+    ILogger<ModuleService> logger) : IModuleService
 {
     public async Task<Result<PagedResult<ModuleDto>>> GetPagedAsync(
         int bookId, int page, int pageSize, bool? isPublished, CancellationToken cancellationToken = default)
@@ -45,8 +47,7 @@ public class ModuleService(
         var validationResult = await createValidator.ValidateAsync(dto, cancellationToken);
         if (!validationResult.IsValid)
         {
-            var message = string.Join("; ", validationResult.Errors.Select(e => e.ErrorMessage));
-            return Result.Failure<ModuleDto>(Error.Validation("Module.ValidationFailed", message));
+            return Result.Failure<ModuleDto>(validationResult.ToValidationError("Module.ValidationFailed"));
         }
 
         var book = await unitOfWork.Books.FindByIdAsync(bookId, cancellationToken);
@@ -73,8 +74,7 @@ public class ModuleService(
         var validationResult = await updateValidator.ValidateAsync(dto, cancellationToken);
         if (!validationResult.IsValid)
         {
-            var message = string.Join("; ", validationResult.Errors.Select(e => e.ErrorMessage));
-            return Result.Failure<ModuleDto>(Error.Validation("Module.ValidationFailed", message));
+            return Result.Failure<ModuleDto>(validationResult.ToValidationError("Module.ValidationFailed"));
         }
 
         var module = await unitOfWork.Modules.FindByIdAsync(id, cancellationToken);
@@ -108,8 +108,7 @@ public class ModuleService(
         var validationResult = await reorderValidator.ValidateAsync(dto, cancellationToken);
         if (!validationResult.IsValid)
         {
-            var message = string.Join("; ", validationResult.Errors.Select(e => e.ErrorMessage));
-            return Result.Failure(Error.Validation("Module.ReorderValidationFailed", message));
+            return Result.Failure(validationResult.ToValidationError("Module.ReorderValidationFailed"));
         }
 
         var book = await unitOfWork.Books.FindByIdAsync(bookId, cancellationToken);
@@ -122,6 +121,7 @@ public class ModuleService(
 
         return await ReorderHelper.ApplyAsync(
             unitOfWork,
+            logger,
             siblings,
             dto.OrderedIds,
             getId: m => m.Id,
