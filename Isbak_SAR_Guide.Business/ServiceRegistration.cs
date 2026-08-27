@@ -30,6 +30,7 @@ public static class BusinessServiceCollectionExtensions
         services.AddScoped<IContentBlockService, ContentBlockService>();
         services.AddScoped<IStorageService, LocalFileStorageService>();
         services.AddScoped<IMediaService, MediaService>();
+        services.AddScoped<IUserService, UserService>();
 
         return services;
     }
