@@ -504,3 +504,7 @@ CLAUDE.md
 *.pdf
 WhatsApp Image*.jpeg
 WhatsApp Image*.jpg
+
+# graphify - kod tabanindan uretilen bilgi grafigi (graph.json/html, cache,
+# manifest). Turetilmis/yerel arac ciktisi, repo'ya girmez.
+/graphify-out/
