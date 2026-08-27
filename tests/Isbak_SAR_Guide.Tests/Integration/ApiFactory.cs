@@ -53,6 +53,16 @@ public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
             // Program.cs'teki PostConfigure'dan SONRA calisir (kayit sirasi) -
             // gercek ContentRootPath'e cozulmus degeri temp klasorle ezer.
             services.PostConfigure<StorageOptions>(options => options.BasePath = _storageTempPath);
+
+            // Faz 9.3: gercek limit (appsettings: 5/dk) paylasilan TestServer'da
+            // TUM testlerin login/refresh cagrilarini AYNI partition'a toplar
+            // (RemoteIpAddress in-memory sunucuda null'a duser) - gercek deger
+            // kalsaydi bu dosyanin disindaki testler bile 429'a duserdi. 429
+            // uretiminin kendisi bilerek otomatik testte degil, manuel curl ile
+            // dogrulandi (roadmap'teki diger fazlarla ayni disiplin) - ayri bir
+            // Postgres+host ayaga kaldirmak framework kodunu test etmek icin
+            // orantisiz olurdu.
+            services.PostConfigure<LoginRateLimitOptions>(options => options.PermitLimit = 100_000);
         });
     }
 
