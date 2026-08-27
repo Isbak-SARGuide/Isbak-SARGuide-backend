@@ -1,5 +1,8 @@
 using Asp.Versioning;
 using Isbak_SAR_Guide.API.Middleware;
+using Isbak_SAR_Guide.Business.Common;
+using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.Options;
 using Scalar.AspNetCore;
 using Serilog;
 
@@ -49,7 +52,14 @@ builder.Services.AddApiAuthentication(builder.Configuration);
 
 builder.Services
     .AddDataAccess(builder.Configuration)
-    .AddBusiness();
+    .AddBusiness(builder.Configuration);
+
+// StorageOptions.BasePath appsettings'te goreli yazilir ("../storage") -
+// process CWD'sine degil ContentRootPath'e gore mutlak yola burada bir kez
+// cevrilir. Process CWD'ye guvenmek testlerde (WebApplicationFactory farkli
+// bir CWD'den calisabilir) yanlis klasore yazar/okur.
+builder.Services.PostConfigure<StorageOptions>(options =>
+    options.BasePath = Path.GetFullPath(Path.Combine(builder.Environment.ContentRootPath, options.BasePath)));
 
 var app = builder.Build();
 
@@ -69,6 +79,21 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+// Medya dosyalarini web koku ("") altinda servis eder: StorageOptions.BasePath
+// fiziksel kok, Media.StoragePath (orn. "media/2026/08/<guid>.png") bu koke
+// GORELI - tek "/" eklemek dogru URL'i verir (SnapshotBuilder.BuildBlockDto).
+// UseAuthentication/UseAuthorization'DAN ONCE: mobil/web okuyucu anonim,
+// fallback policy'nin buraya hic ugramaması gerekiyor (Sync gibi).
+var storageOptions = app.Services.GetRequiredService<IOptions<StorageOptions>>().Value;
+var storageAbsolutePath = Path.GetFullPath(storageOptions.BasePath);
+Directory.CreateDirectory(storageAbsolutePath);
+
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(storageAbsolutePath),
+    RequestPath = "",
+});
 
 app.UseCors();
 

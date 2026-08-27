@@ -13,7 +13,7 @@ public interface IUnitOfWork
 
     IContentBlockRepository ContentBlocks { get; }
 
-    IRepository<Media> Media { get; }
+    IMediaRepository Media { get; }
 
     IPublicationRepository Publications { get; }
 

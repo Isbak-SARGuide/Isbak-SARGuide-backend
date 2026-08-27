@@ -16,4 +16,13 @@ public interface IContentBlockRepository : IRepository<ContentBlock>
 
     /// <summary>Reorder'in sibling-set dogrulamasi icin - IModuleRepository'deki gerekce ayni.</summary>
     Task<IReadOnlyList<ContentBlock>> FindAllByContentIdAsync(int contentId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Faz 6: bir Media'yi silmeden once hala kullanimda mi diye kontrol icin.
+    /// Soft-delete interceptor'i FK'daki OnDelete(SetNull)'i tetiklemez (gercek
+    /// DELETE degil UPDATE yapar) - bu yuzden MediaService bu kontrolu acikca
+    /// yapmali, aksi halde bir ContentBlock gorunmez bir Media'ya sahipmis gibi
+    /// tutarsiz kalabilir.
+    /// </summary>
+    Task<bool> AnyWithMediaIdAsync(int mediaId, CancellationToken cancellationToken = default);
 }
