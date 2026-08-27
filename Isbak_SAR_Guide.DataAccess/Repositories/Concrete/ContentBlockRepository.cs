@@ -32,4 +32,7 @@ public class ContentBlockRepository(Isbak_SAR_GuideDbContext dbContext)
             .Where(b => b.ContentId == contentId)
             .OrderBy(b => b.DisplayOrder)
             .ToListAsync(cancellationToken);
+
+    public async Task<bool> AnyWithMediaIdAsync(int mediaId, CancellationToken cancellationToken = default) =>
+        await DbSet.AnyAsync(b => b.MediaId == mediaId, cancellationToken);
 }
