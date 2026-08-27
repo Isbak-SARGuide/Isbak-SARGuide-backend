@@ -20,6 +20,15 @@ public static class BusinessServiceCollectionExtensions
         _ = storageSection.Get<StorageOptions>()
             ?? throw new InvalidOperationException("'Storage' konfigurasyon bolumu eksik.");
 
+        // JwtOptions burada bagli: TokenService bu katmanda ve IOptions<JwtOptions>
+        // istiyor. Eskiden sadece API'deki AddApiAuthentication() bagliyordu -
+        // AddBusiness() o zaman tek basina cagrildiginda TokenService'in bagimliligi
+        // sessizce cozulmuyordu (varsayilan/bos bir JwtOptions ile calisirdi).
+        var jwtSection = configuration.GetSection(JwtOptions.SectionName);
+        services.Configure<JwtOptions>(jwtSection);
+        _ = jwtSection.Get<JwtOptions>()
+            ?? throw new InvalidOperationException("'Jwt' konfigurasyon bolumu eksik.");
+
         services.AddScoped<IBookService, BookService>();
         services.AddScoped<ITokenService, TokenService>();
         services.AddScoped<IAuthService, AuthService>();

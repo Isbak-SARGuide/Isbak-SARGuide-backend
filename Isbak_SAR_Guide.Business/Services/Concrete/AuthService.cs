@@ -52,7 +52,12 @@ public class AuthService(
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         return Result.Success(new LoginResponseDto(
-            accessToken.Token, accessToken.ExpiresAtUtc, user.UserName!, user.FullName, roles.ToList(), refreshToken.Token));
+            AccessToken: accessToken.Token,
+            ExpiresAtUtc: accessToken.ExpiresAtUtc,
+            UserName: user.UserName!,
+            FullName: user.FullName,
+            Roles: roles.ToList(),
+            RefreshToken: refreshToken.Token));
     }
 
     public async Task<Result<LoginResponseDto>> RefreshAsync(RefreshTokenRequestDto dto, CancellationToken cancellationToken = default)
@@ -93,7 +98,12 @@ public class AuthService(
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         return Result.Success(new LoginResponseDto(
-            accessToken.Token, accessToken.ExpiresAtUtc, user.UserName!, user.FullName, roles.ToList(), newRefreshToken.Token));
+            AccessToken: accessToken.Token,
+            ExpiresAtUtc: accessToken.ExpiresAtUtc,
+            UserName: user.UserName!,
+            FullName: user.FullName,
+            Roles: roles.ToList(),
+            RefreshToken: newRefreshToken.Token));
     }
 
     public async Task<Result> RevokeAsync(RefreshTokenRequestDto dto, CancellationToken cancellationToken = default)
