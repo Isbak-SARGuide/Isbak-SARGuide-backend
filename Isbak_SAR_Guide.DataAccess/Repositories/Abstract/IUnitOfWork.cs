@@ -7,7 +7,7 @@ public interface IUnitOfWork
 {
     IBookRepository Books { get; }
 
-    IRepository<Module> Modules { get; }
+    IModuleRepository Modules { get; }
 
     IRepository<Content> Contents { get; }
 

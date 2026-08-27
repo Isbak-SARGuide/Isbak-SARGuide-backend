@@ -14,7 +14,7 @@ public class UnitOfWork : IUnitOfWork
         _dbContext = dbContext;
 
         Books = new BookRepository(dbContext);
-        Modules = new EfRepository<Module>(dbContext);
+        Modules = new ModuleRepository(dbContext);
         Contents = new EfRepository<Content>(dbContext);
         ContentBlocks = new EfRepository<ContentBlock>(dbContext);
         Media = new EfRepository<Media>(dbContext);
@@ -26,7 +26,7 @@ public class UnitOfWork : IUnitOfWork
 
     public IBookRepository Books { get; }
 
-    public IRepository<Module> Modules { get; }
+    public IModuleRepository Modules { get; }
 
     public IRepository<Content> Contents { get; }
 

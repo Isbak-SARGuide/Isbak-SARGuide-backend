@@ -18,6 +18,7 @@ public static class BusinessServiceCollectionExtensions
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<ISyncService, SyncService>();
         services.AddScoped<IPublishingService, PublishingService>();
+        services.AddScoped<IModuleService, ModuleService>();
 
         return services;
     }
