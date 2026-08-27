@@ -9,4 +9,5 @@ public sealed record LoginResponseDto(
     DateTime ExpiresAtUtc,
     string UserName,
     string FullName,
-    IReadOnlyList<string> Roles);
+    IReadOnlyList<string> Roles,
+    string RefreshToken);

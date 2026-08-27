@@ -24,7 +24,16 @@ public static class DataAccessServiceCollectionExtensions
         // baglanir. AddIdentityCore (AddIdentity DEGIL) - cookie auth semasi
         // kaydetmiyoruz, JWT semasi API katmaninda ayrica kaydedilecek (6.1).
         services
-            .AddIdentityCore<ApplicationUser>()
+            .AddIdentityCore<ApplicationUser>(options =>
+            {
+                // Faz 9.3: 5 basarisiz denemeden sonra 15 dakika kilit. Sadece
+                // burada AYARLAMAK yetmez - AuthService.LoginAsync bunu
+                // AccessFailedAsync/IsLockedOutAsync ile acikca tetiklemeli
+                // (UserManager.CheckPasswordAsync tek basina kilit izlemez).
+                options.Lockout.MaxFailedAccessAttempts = 5;
+                options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
+                options.Lockout.AllowedForNewUsers = true;
+            })
             .AddRoles<IdentityRole>()
             .AddEntityFrameworkStores<Isbak_SAR_GuideDbContext>();
 

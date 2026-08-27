@@ -1,5 +1,6 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text;
 using Isbak_SAR_Guide.Business.Common;
 using Isbak_SAR_Guide.Business.Services.Abstract;
@@ -45,4 +46,16 @@ public sealed class TokenService(IOptions<JwtOptions> jwtOptions) : ITokenServic
 
         return new AccessToken(encoded, expiresAtUtc);
     }
+
+    public RefreshTokenResult GenerateRefreshToken()
+    {
+        // Kriptografik olarak guclu, tahmin edilemez rastgelelik - JWT gibi
+        // yapilandirilmis/decode edilebilir degil, salt bir opak sir.
+        var token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
+        var expiresAtUtc = DateTime.UtcNow.AddDays(_options.RefreshTokenExpiryDays);
+        return new RefreshTokenResult(token, expiresAtUtc);
+    }
+
+    public string HashRefreshToken(string token) =>
+        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
 }

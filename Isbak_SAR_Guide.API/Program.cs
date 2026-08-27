@@ -1,6 +1,8 @@
+using System.Threading.RateLimiting;
 using Asp.Versioning;
 using Isbak_SAR_Guide.API.Middleware;
 using Isbak_SAR_Guide.Business.Common;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Options;
 using Scalar.AspNetCore;
@@ -49,6 +51,36 @@ builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();
 
 builder.Services.AddApiAuthentication(builder.Configuration);
+
+// Faz 9.3: sadece kimlik-dogrulama uclari (login/refresh) icin - IP basina
+// dakikada N deneme. Global rate limiting bilerek kapsam disi (roadmap Faz 9
+// Hardening - "Anonim sync endpoint'i tek risk", auth farkli/daha acil bir yuzey).
+builder.Services.Configure<LoginRateLimitOptions>(builder.Configuration.GetSection(LoginRateLimitOptions.SectionName));
+
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    // Deger IOptions'tan istek-zamaninda okunur (Program.cs baslarken bir kez
+    // degil) - ApiFactory testlerde PostConfigure<LoginRateLimitOptions> ile
+    // bunu cok yuksek bir sayiyla ezer (StorageOptions'taki desenle ayni,
+    // bkz. tests/.../ApiFactory.cs). Program baslarken tek seferlik okusaydik
+    // test-zamanli PostConfigure'un araya girecegi bir an olmazdi.
+    options.AddPolicy("login", httpContext =>
+    {
+        var rateLimitOptions = httpContext.RequestServices
+            .GetRequiredService<IOptions<LoginRateLimitOptions>>().Value;
+
+        return RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = rateLimitOptions.PermitLimit,
+                Window = TimeSpan.FromSeconds(rateLimitOptions.WindowSeconds),
+                QueueLimit = 0,
+            });
+    });
+});
 
 builder.Services
     .AddDataAccess(builder.Configuration)
@@ -99,6 +131,7 @@ app.UseCors();
 
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 
 app.MapControllers();
 

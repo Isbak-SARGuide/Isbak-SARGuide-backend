@@ -22,6 +22,7 @@ public class UnitOfWork : IUnitOfWork
         // baglantisinda transaction acar; farkli bir context kullansaydi
         // Publications'in yazdiklari transaction'in disinda kalirdi.
         Publications = new PublicationRepository(dbContext);
+        RefreshTokens = new RefreshTokenRepository(dbContext);
     }
 
     public IBookRepository Books { get; }
@@ -35,6 +36,8 @@ public class UnitOfWork : IUnitOfWork
     public IMediaRepository Media { get; }
 
     public IPublicationRepository Publications { get; }
+
+    public IRefreshTokenRepository RefreshTokens { get; }
 
     public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) =>
         _dbContext.SaveChangesAsync(cancellationToken);

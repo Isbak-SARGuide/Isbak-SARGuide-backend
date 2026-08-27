@@ -17,6 +17,8 @@ public interface IUnitOfWork
 
     IPublicationRepository Publications { get; }
 
+    IRefreshTokenRepository RefreshTokens { get; }
+
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
