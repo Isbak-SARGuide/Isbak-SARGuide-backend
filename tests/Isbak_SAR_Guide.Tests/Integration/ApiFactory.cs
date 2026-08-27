@@ -1,3 +1,4 @@
+using Isbak_SAR_Guide.Business.Common;
 using Isbak_SAR_Guide.DataAccess.Context;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -28,6 +29,11 @@ public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         .WithPassword("postgres")
         .Build();
 
+    // Faz 6 (Media): testler gercek dosya yazar (LocalFileStorageService) -
+    // repo'nun gercek storage/ klasorunu kirletmemek icin izole bir temp
+    // klasore yonlendirilir, DisposeAsync'te silinir.
+    private readonly string _storageTempPath = Path.Combine(Path.GetTempPath(), $"isbak-sar-guide-tests-{Guid.NewGuid():N}");
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         // Seed (DatabaseSeeder) sadece Development ortaminda calisiyor (Program.cs) -
@@ -43,6 +49,10 @@ public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 
             services.AddDbContext<Isbak_SAR_GuideDbContext>(options =>
                 options.UseNpgsql(_postgres.GetConnectionString()));
+
+            // Program.cs'teki PostConfigure'dan SONRA calisir (kayit sirasi) -
+            // gercek ContentRootPath'e cozulmus degeri temp klasorle ezer.
+            services.PostConfigure<StorageOptions>(options => options.BasePath = _storageTempPath);
         });
     }
 
@@ -71,6 +81,12 @@ public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     async Task IAsyncLifetime.DisposeAsync()
     {
         await _postgres.StopAsync();
+
+        if (Directory.Exists(_storageTempPath))
+        {
+            Directory.Delete(_storageTempPath, recursive: true);
+        }
+
         await base.DisposeAsync();
     }
 }
