@@ -2,9 +2,11 @@ using FluentValidation;
 using Isbak_SAR_Guide.Business.Common;
 using Isbak_SAR_Guide.Business.DTOs.Books;
 using Isbak_SAR_Guide.Business.Services.Abstract;
+using Isbak_SAR_Guide.DataAccess.Common;
 using Isbak_SAR_Guide.DataAccess.Repositories.Abstract;
 using Isbak_SAR_Guide.Entities.Content;
 using Mapster;
+using Microsoft.EntityFrameworkCore;
 
 namespace Isbak_SAR_Guide.Business.Services.Concrete;
 
@@ -41,8 +43,15 @@ public class BookService(
 
         var book = dto.Adapt<Book>();
 
-        await unitOfWork.Books.AddAsync(book, cancellationToken);
-        await unitOfWork.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await unitOfWork.Books.AddAsync(book, cancellationToken);
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (DbErrors.IsUniqueViolation(ex))
+        {
+            return Result.Failure<BookDto>(Error.Conflict("Book.SlugConflict", $"'{dto.Slug}' slug'ı zaten kullanılıyor."));
+        }
 
         return Result.Success(book.Adapt<BookDto>());
     }
@@ -60,9 +69,18 @@ public class BookService(
         {
             return Result.Failure<BookDto>(Error.NotFound("Book.NotFound", $"Id={id} olan kitap güncellenemedi."));
         }
-        ;
+
         dto.Adapt(book);
-        await unitOfWork.SaveChangesAsync(cancellationToken);
+
+        try
+        {
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (DbErrors.IsUniqueViolation(ex))
+        {
+            return Result.Failure<BookDto>(Error.Conflict("Book.SlugConflict", $"'{dto.Slug}' slug'ı zaten kullanılıyor."));
+        }
+
         return Result.Success(book.Adapt<BookDto>());
     }
 
