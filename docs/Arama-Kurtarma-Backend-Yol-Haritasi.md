@@ -872,7 +872,16 @@ ve deploy edilemeyen bir sistem kalır.
       Cache eklemek şu an spekülatif optimizasyon olurdu (roadmap'in kendi YAGNI
       gerekçesiyle tutarlı) — ölçüm rakamları değişirse (çok daha büyük bir kitap/çok
       daha yüksek trafik) yeniden değerlendirilebilir.
-- [ ] 12.3 `AsNoTracking` / projeksiyon denetimi, N+1 avı
+- [x] 12.3 `AsNoTracking` / projeksiyon denetimi, N+1 avı — N+1 bulunmadı
+      (`GetWithFullTreeAsync` zaten tum agaci tek sorguda Include/ThenInclude ile
+      eager-load ediyor, `SnapshotBuilder` sadece bellek-ici mapping yapiyor).
+      `AsNoTracking()` sadece salt-okunur oldugu tek tek dogrulanan sorgulara
+      eklendi (`FindAllAsync`, `GetPagedAsync`'ler, sibling `FindAllByXAsync`'ler,
+      Media dedup/orphan sorgulari) — `FindByIdAsync`, `RefreshTokenRepository.
+      FindByTokenHashAsync` (dogrudan property mutation) ve `GetWithFullTreeAsync`
+      (Book kok'u Version bump ile mutate ediliyor) bilinçli olarak tracked
+      birakildi. `PublicationRepository`'nin manifest/snapshot/changes sorgulari
+      zaten `Select()` projeksiyonu ile örtük olarak tracking-disi. 139 test yeşil.
 - [ ] 12.5 Coverage denetimi + eksik test tamamlama
 - [ ] 12.6 Rollback / restore endpoint'i
 - [x] 12.8 Global rate limiting — `GlobalRateLimitOptions` (300/60s varsayılan, IP başına),
