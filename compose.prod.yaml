@@ -1,0 +1,66 @@
+# Prod-benzeri stack: Postgres + API imaji. compose.yaml (yerel gelistirme,
+# sadece Postgres) ile ayni servis adini bilerek kullanmiyoruz - "postgres"
+# burada da ayni, boylece iki dosyayi birlikte kullanmak (compose -f
+# compose.yaml -f compose.prod.yaml) da anlamli kalir, ama compose.prod.yaml
+# tek basina da eksiksiz calisir.
+#
+# Sirlar (Jwt__SecretKey, DB sifresi) BURADA YOK - ".env" dosyasindan (repo'ya
+# girmez, bkz. .gitignore) veya konteyner orkestrasyonunun kendi secret
+# mekanizmasindan okunur. docs/Deployment.md tum degiskenleri listeler.
+services:
+  postgres:
+    image: postgres:18
+    container_name: isbak-sar-guide-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-isbak_sar_guide}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD zorunlu}
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-isbak_sar_guide}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: isbak-sar-guide-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__DefaultConnection: >-
+        Host=postgres;Port=5432;Database=${POSTGRES_DB:-isbak_sar_guide};
+        Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD zorunlu}
+      Jwt__Issuer: ${JWT_ISSUER:?JWT_ISSUER zorunlu}
+      Jwt__Audience: ${JWT_AUDIENCE:?JWT_AUDIENCE zorunlu}
+      Jwt__SecretKey: ${JWT_SECRET_KEY:?JWT_SECRET_KEY zorunlu (en az 32 karakter)}
+      Jwt__ExpiryMinutes: ${JWT_EXPIRY_MINUTES:-60}
+      Jwt__RefreshTokenExpiryDays: ${JWT_REFRESH_TOKEN_EXPIRY_DAYS:-14}
+      Storage__BasePath: /storage
+      Storage__MaxFileSizeBytes: ${STORAGE_MAX_FILE_SIZE_BYTES:-20971520}
+      Storage__OrphanGraceHours: ${STORAGE_ORPHAN_GRACE_HOURS:-24}
+      Cors__AllowedOrigins__0: ${CORS_ALLOWED_ORIGIN_0:?CORS_ALLOWED_ORIGIN_0 zorunlu}
+      RateLimiting__Login__PermitLimit: ${LOGIN_RATE_LIMIT_PERMIT:-5}
+      RateLimiting__Login__WindowSeconds: ${LOGIN_RATE_LIMIT_WINDOW_SECONDS:-60}
+    ports:
+      - "8080:8080"
+    volumes:
+      - api_storage:/storage
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+volumes:
+  postgres_data:
+  api_storage:

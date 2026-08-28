@@ -1,0 +1,15 @@
+# gitleaks varsayilan kural setini AYNEN kullan, sadece bilinen yanlis
+# pozitiflere ozel bir allowlist ekle. Kurallarin kendisini degistirmiyoruz -
+# gercek bir secret turu icin korumayi zayiflatmak istemiyoruz.
+[extend]
+useDefault = true
+
+# .env.example bir SABLON dosyasidir (bkz. docs/Deployment.md) - degerleri
+# ya bos ya da varsayilan, gercek secret ICEREMEZ (kod incelemesiyle
+# garanti edilir, CI degil). "generic-api-key" kurali JWT_SECRET_KEY=
+# (bos deger) satirini komsu satirla birlikte eslesme olarak isaretliyor -
+# bilinen bir yanlis pozitif, gercek bir sizinti degil.
+[allowlist]
+paths = [
+  '''\.env\.example$''',
+]

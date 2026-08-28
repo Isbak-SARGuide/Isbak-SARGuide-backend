@@ -1,0 +1,16 @@
+**/bin/
+**/obj/
+**/.vs/
+**/.vscode/
+**/.idea/
+.git/
+.github/
+storage/
+graphify-out/
+*.pdf
+docs/
+tests/
+CLAUDE.md
+compose.yaml
+compose.prod.yaml
+README.md
