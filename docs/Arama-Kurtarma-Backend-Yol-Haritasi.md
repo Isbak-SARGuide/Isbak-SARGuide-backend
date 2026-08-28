@@ -896,7 +896,17 @@ ve deploy edilemeyen bir sistem kalır.
       (tek global beklenmedik-hata yakalama noktası) ve `LoginDtoValidator` da hiç
       test edilmiyordu — ikisi için de doğrudan unit test eklendi (`tests/.../Unit/`).
       156/156 test yeşil (139 mevcut + 17 yeni).
-- [ ] 12.6 Rollback / restore endpoint'i
+- [x] 12.6 Rollback / restore endpoint'i — `POST /api/v1/books/{bookId}/rollback`
+      (Admin-only, `{toVersion}`). Publication modeli immutable oldugu icin "rollback"
+      eski bir satiri degistirmek degil, o versiyonun zaten saklanmis `SnapshotJson`'ini
+      YENI bir versiyon olarak tekrar yayinlamak (git revert deseni) — CMS draft agacina
+      hic dokunmuyor, sadece mobilin gordugu yayin gecmisini etkiliyor. `PublishAsync`'in
+      paylasilan statik yardimcilarini (`BuildPublicationShell`/`AppendChangedContents`/
+      `AppendTombstones`) degistirmeden yeniden kullaniyor — `PublishAsync`'in kendisi
+      dokunulmadan %100 coverage'da kaldi. `toVersion >= mevcut en son versiyon` Validation,
+      var olmayan versiyon NotFound. Gercek seed kitaba (v16 → v15'e rollback → v17, 98
+      gercek content) karsi da dogrulandi — manifest/snapshot checksum invariant'i tutuyor,
+      draft agac degismedigi teyit edildi. 166/166 test yeşil (13 yeni).
 - [x] 12.8 Global rate limiting — `GlobalRateLimitOptions` (300/60s varsayılan, IP başına),
       TÜM endpoint'lere `AddRateLimiter`'ın `GlobalLimiter`'ı ile otomatik uygulanıyor
       (named "login" politikasının aksine opt-in gerekmez, ikisi TOPLANIR). `/health` ve
