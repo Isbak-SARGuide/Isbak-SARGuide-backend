@@ -63,6 +63,10 @@ public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
             // Postgres+host ayaga kaldirmak framework kodunu test etmek icin
             // orantisiz olurdu.
             services.PostConfigure<LoginRateLimitOptions>(options => options.PermitLimit = 100_000);
+
+            // Faz 12.8: global limiter da ayni sebeple (paylasilan TestServer,
+            // RemoteIpAddress null) cok yuksek bir limitle eziliyor.
+            services.PostConfigure<GlobalRateLimitOptions>(options => options.PermitLimit = 100_000);
         });
     }
 

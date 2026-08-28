@@ -50,6 +50,8 @@ services:
       Cors__AllowedOrigins__0: ${CORS_ALLOWED_ORIGIN_0:?CORS_ALLOWED_ORIGIN_0 zorunlu}
       RateLimiting__Login__PermitLimit: ${LOGIN_RATE_LIMIT_PERMIT:-5}
       RateLimiting__Login__WindowSeconds: ${LOGIN_RATE_LIMIT_WINDOW_SECONDS:-60}
+      RateLimiting__Global__PermitLimit: ${GLOBAL_RATE_LIMIT_PERMIT:-300}
+      RateLimiting__Global__WindowSeconds: ${GLOBAL_RATE_LIMIT_WINDOW_SECONDS:-60}
     ports:
       - "8080:8080"
     volumes:
