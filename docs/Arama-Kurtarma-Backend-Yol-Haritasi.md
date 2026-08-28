@@ -2,9 +2,11 @@
 
 Kentsel arama-kurtarma el kitabı için ASP.NET Core REST API'sinin mimari kararları, iş kırılımı ve uygulama sırası.
 
-**Durum:** Faz 0-7 tamamlandı (M0-M4 kritik yol + M5 CMS + M6 Media + M7 Auth, paralel dallar
-dahil) · Faz 8 (Release Readiness — 11.1-11.4, M8) sırada
-**Son güncelleme:** 27 Ağustos 2026
+**Durum:** Faz 0-8 tamamlandı (M0-M4 kritik yol + M5 CMS + M6 Media + M7 Auth + M8 Release
+Readiness — Dockerfile/compose.prod.yaml, health check'ler, güvenlik başlıkları, rate limiting
+hepsi kodda doğrulandı) · Sırada Faz 9/M9 Hardening (ETag, cache, rollback, coverage denetimi —
+**post-MVP**, MVP'nin kendisi tamam)
+**Son güncelleme:** 28 Ağustos 2026
 
 ---
 
@@ -657,9 +659,9 @@ Her milestone **durulabilir** ve **gösterilebilir** — yarım iş bırakmaz.
 | **M2** | **Walking Skeleton** | 22,0 sa | Swagger'dan login → token → Book CRUD; sync stub'ları canlı · **Mobil geliştirici başlayabilir** | ✅ |
 | **M3** | **Publish Works** | 29,0 sa | v1 yayınla → içeriği düzenle → mobil hâlâ v1 görüyor → v2 yayınla · **En büyük risk kapandı** | ✅ |
 | **M4** | **Sync Contract Live** | 35,5 sa | Gerçek delta; sözleşme dokümanı v1.0 teslim · **Kritik yol bitti** | ✅ |
-| **M5** | CMS Complete | 42,5 sa | Admin dashboard tüm içerik ağacını yönetiyor | ❌ |
-| **M6** | Media Live | 48,5 sa | Resim yükle → publish → mobil manifest'te checksum'lı URL | ❌ |
-| **M7** | Secured | 52,5 sa | Refresh token, roller, lockout; yetkisiz erişim testleri geçiyor | ❌ |
+| **M5** | CMS Complete | 42,5 sa | Admin dashboard tüm içerik ağacını yönetiyor | ✅ |
+| **M6** | Media Live | 48,5 sa | Resim yükle → publish → mobil manifest'te checksum'lı URL | ✅ |
+| **M7** | Secured | 52,5 sa | Refresh token, roller, lockout; yetkisiz erişim testleri geçiyor | ✅ |
 | **M8** | **MVP Deployable** | 56,0 sa | `docker compose up` ile prod imajı ayakta, health yeşil | ✅ |
 | **M9** | Hardened | 68,0 sa | ETag, cache, rollback, coverage, final review | ❌ |
 
@@ -850,7 +852,7 @@ ve deploy edilemeyen bir sistem kalır.
 - [x] 8.1-8.6 CMS Completion — Module/Content/ContentBlock CRUD + reorder (`ReorderHelper`) + paging (`PagedResult<T>`), `feature/phase5-cms-completion` (PR #9)
 - [x] 10.1-10.6 Media Pipeline — `IStorageService`/`LocalFileStorageService`, magic-byte upload validation, dedup, orphan cleanup, `feature/phase6-media-pipeline` (PR #10)
 - [x] 9.1-9.4 Auth Feature Set — refresh token rotation + reuse detection, Admin-provisions-Editor, lockout, login rate limiting, `feature/phase7-auth-feature-set` (PR #11)
-- [ ] 11.1-11.4 Release Readiness
+- [x] 11.1-11.4 Release Readiness — health check'ler (`/health` liveness, `/health/ready` readiness), güvenlik başlıkları (`Response.OnStarting` ile 500'lerde de garanti), HSTS, response compression, `Dockerfile`/`compose.prod.yaml`/`docs/Deployment.md`, ghcr.io CD, `feature/phase8-release-readiness` (PR #13) — gerçek `docker compose up` ile doğrulandı, review 2 gerçek bug buldu (storage yazma izni, container-içi curl eksikliği)
 
 > Ara adım (Faz 8 öncesi, `fix/architecture-review-findings`, PR #12): 5 paralel uzman ajan +
 > graphify bağımlılık grafiğiyle mimari inceleme — katmanlama temiz çıktı, 9 gerçek bulgu
@@ -861,4 +863,19 @@ ve deploy edilemeyen bir sistem kalır.
 
 ### PHASE 9 — Hardening → M9
 
-- [ ] 12.1-12.9 Hardening & Optimization
+- [x] 12.1 Payload boyut ölçümü — gerçek seed kitabına (Book id=1, v16, 97 content) karşı
+      ölçüldü: manifest 16,8 KB ham / ~6,1 KB gzip; tam snapshot 139,6 KB ham / ~42,8 KB
+      gzip; gerçekçi bir delta (v15→v16, tek publish sonrası) sadece 1,8 KB. Sunucu-içi
+      yanıt süresi 5-115 ms arası (çoğu <15ms). **Sonuç: 12.2 (cache) YAGNI — ölçüm
+      cache'i gerektirmiyor**, snapshot zaten küçük ve response compression (Faz 8) tek
+      başına yeterli; en gerçekçi mobil senaryo olan delta-sync zaten KB mertebesinde.
+      Cache eklemek şu an spekülatif optimizasyon olurdu (roadmap'in kendi YAGNI
+      gerekçesiyle tutarlı) — ölçüm rakamları değişirse (çok daha büyük bir kitap/çok
+      daha yüksek trafik) yeniden değerlendirilebilir.
+- [ ] 12.3 `AsNoTracking` / projeksiyon denetimi, N+1 avı
+- [ ] 12.5 Coverage denetimi + eksik test tamamlama
+- [ ] 12.6 Rollback / restore endpoint'i
+- [ ] 12.8 Global rate limiting
+- 12.2 (cache), 12.4 (ETag), 12.7 (WebP), 12.9 (Public read) — roadmap'in kendi ön
+      koşulları (ölçüm/mobil stabilite/lisans/müşteri talebi) karşılanmadığı için bu
+      fazda bilinçli olarak ERTELENDİ, görev-görev karar verildi.
