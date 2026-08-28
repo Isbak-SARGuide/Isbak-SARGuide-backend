@@ -97,6 +97,91 @@ public class PublishingService(IUnitOfWork unitOfWork, ILogger<PublishingService
             publishedAt));
     }
 
+    public async Task<Result<PublishResultDto>> RollbackAsync(
+        int bookId,
+        int toVersion,
+        string publishedById,
+        CancellationToken cancellationToken = default)
+    {
+        var book = await _unitOfWork.Books.FindByIdAsync(bookId, cancellationToken);
+        if (book is null)
+        {
+            return Result.Failure<PublishResultDto>(
+                Error.NotFound("Publishing.BookNotFound", $"Id={bookId} olan kitap bulunamadı."));
+        }
+
+        var oldSnapshotJson = await _unitOfWork.Publications.GetSnapshotJsonAsync(bookId, toVersion, cancellationToken);
+        if (oldSnapshotJson is null)
+        {
+            return Result.Failure<PublishResultDto>(
+                Error.NotFound("Publishing.VersionNotFound", $"Kitap {bookId} için versiyon {toVersion} bulunamadı."));
+        }
+
+        var publishedAt = DateTime.UtcNow;
+
+        await using var transaction = await _unitOfWork.BeginTransactionAsync(cancellationToken);
+
+        var latestVersion = await _unitOfWork.Publications.GetLatestVersionAsync(bookId, cancellationToken);
+
+        // Geriye gitme semantigi: hedef, mevcut en son versiyondan KESINLIKLE
+        // eski olmali. Ayni versiyona "rollback" bos bir yayin uretir (anlamsiz,
+        // yasak degil ama kafa karistirir); ileri versiyon zaten
+        // GetSnapshotJsonAsync'te NotFound olarak elenir - burada asil amac
+        // "mevcut = hedef" durumunu acikca reddetmek.
+        if (toVersion >= latestVersion)
+        {
+            return Result.Failure<PublishResultDto>(Error.Validation(
+                "Publishing.RollbackTargetNotOlder",
+                $"Hedef versiyon ({toVersion}) mevcut en son versiyondan ({latestVersion}) eski olmalı."));
+        }
+
+        var newVersion = latestVersion + 1;
+        book.Version = newVersion;
+
+        // Eski snapshot'in ICINDEKI versiyon numarasi hala eski (toVersion) -
+        // yeni bir yayin olarak yazildigi icin hem ust seviye Version hem
+        // Book.Version alani yeni numarayla degistirilir. Modules/Contents
+        // (dolayisiyla Blocks) OLDUGU GIBI kalir - geri alinan asil icerik bu.
+        var oldSnapshot = SnapshotBuilder.Deserialize<SyncSnapshotDto>(oldSnapshotJson);
+        var snapshot = oldSnapshot with
+        {
+            Version = newVersion,
+            Book = oldSnapshot.Book with { Version = newVersion },
+        };
+
+        var publication = BuildPublicationShell(bookId, newVersion, snapshot, publishedAt, publishedById);
+
+        var latestStates = await _unitOfWork.Publications
+            .GetLatestContentStatesAsync(bookId, cancellationToken);
+
+        AppendChangedContents(publication, snapshot, latestStates, bookId, newVersion);
+        AppendTombstones(publication, snapshot, latestStates, bookId, newVersion);
+
+        await _unitOfWork.Publications.AddAsync(publication, cancellationToken);
+
+        try
+        {
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (DbErrors.IsUniqueViolation(ex))
+        {
+            logger.LogInformation(ex, "Kitap {BookId} icin eszamanli rollback/publish yarisi - versiyon {Version} zaten yazilmis.", bookId, newVersion);
+            return Result.Failure<PublishResultDto>(
+                Error.Conflict(
+                    "Publishing.VersionConflict",
+                    "Aynı anda başka bir yayın yapıldı, lütfen tekrar deneyin."));
+        }
+
+        return Result.Success(new PublishResultDto(
+            publication.Id,
+            bookId,
+            newVersion,
+            snapshot.Contents.Count,
+            publication.Checksum,
+            publishedAt));
+    }
+
     /// <summary>
     /// Snapshot'i bir kez serilestirip checksum'ini hesaplar, manifest'i uretir
     /// ve bos (henuz PublishedContents eklenmemis) BookPublication kabugunu doner.

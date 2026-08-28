@@ -70,6 +70,74 @@ public class PublishingEndpointTests(ApiFactory factory)
         response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
     }
 
+    [Fact]
+    public async Task Rollback_WithoutToken_ReturnsUnauthorized()
+    {
+        // Arrange
+        var client = factory.CreateClient();
+        var bookId = await CreateBookAsync();
+
+        // Act - route mutlak override kullaniyor (bkz. PublishingController),
+        // bu test o override'in gercekten "/api/v1/books/{bookId}/rollback"a
+        // cozuldugunu de kanitlar (404 degil 401 donmesi routing'in calistigini gosterir).
+        var response = await client.PostAsJsonAsync($"/api/v1/books/{bookId}/rollback", new { toVersion = 1 });
+
+        // Assert
+        response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task Rollback_AsAdmin_ReturnsOkWithNewVersion()
+    {
+        // Arrange - v1 yayinla, sonra ayni kitabi tekrar yayinla (v2), v1'e don.
+        var client = factory.CreateClient();
+        var bookId = await CreateBookAsync();
+        await AuthenticateAsync(client, "admin", "Admin!Dev123");
+        await client.PostAsync($"/api/v1/books/{bookId}/publish", content: null); // v1
+        await client.PostAsync($"/api/v1/books/{bookId}/publish", content: null); // v2 (icerik ayni, yine de yeni versiyon)
+
+        // Act
+        var response = await client.PostAsJsonAsync($"/api/v1/books/{bookId}/rollback", new { toVersion = 1 });
+
+        // Assert
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var result = await response.Content.ReadFromJsonAsync<PublishResultDto>();
+        result!.Version.ShouldBe(3);
+        result.BookId.ShouldBe(bookId);
+    }
+
+    [Fact]
+    public async Task Rollback_ToCurrentVersion_ReturnsBadRequest()
+    {
+        // Arrange
+        var client = factory.CreateClient();
+        var bookId = await CreateBookAsync();
+        await AuthenticateAsync(client, "admin", "Admin!Dev123");
+        await client.PostAsync($"/api/v1/books/{bookId}/publish", content: null); // v1
+
+        // Act - v1 -> v1 gecerli bir hedef degil.
+        var response = await client.PostAsJsonAsync($"/api/v1/books/{bookId}/rollback", new { toVersion = 1 });
+
+        // Assert
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Rollback_AsEditor_ReturnsForbidden()
+    {
+        // Arrange - PublishingController sinif seviyesinde Admin-only, Rollback dahil.
+        var client = factory.CreateClient();
+        var bookId = await CreateBookAsync();
+        var (userName, password) = await CreateEditorUserAsync();
+        await AuthenticateAsync(client, userName, password);
+
+        // Act
+        var response = await client.PostAsJsonAsync($"/api/v1/books/{bookId}/rollback", new { toVersion = 1 });
+
+        // Assert
+        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+    }
+
     // ---- Yardimcilar ----
 
     private async Task<int> CreateBookAsync()

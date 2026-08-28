@@ -39,6 +39,12 @@ public class PublicationRepository(Isbak_SAR_GuideDbContext dbContext) : IPublic
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<string?> GetSnapshotJsonAsync(int bookId, int version, CancellationToken cancellationToken = default) =>
+        await _publications
+            .Where(p => p.BookId == bookId && p.Version == version)
+            .Select(p => p.SnapshotJson)
+            .FirstOrDefaultAsync(cancellationToken);
+
     public async Task<string?> GetLatestManifestJsonAsync(int bookId, CancellationToken cancellationToken = default) =>
         await _publications
             .Where(p => p.BookId == bookId)
