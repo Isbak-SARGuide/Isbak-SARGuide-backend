@@ -882,7 +882,20 @@ ve deploy edilemeyen bir sistem kalır.
       (Book kok'u Version bump ile mutate ediliyor) bilinçli olarak tracked
       birakildi. `PublicationRepository`'nin manifest/snapshot/changes sorgulari
       zaten `Select()` projeksiyonu ile örtük olarak tracking-disi. 139 test yeşil.
-- [ ] 12.5 Coverage denetimi + eksik test tamamlama
+- [x] 12.5 Coverage denetimi + eksik test tamamlama — `dotnet test --collect:"XPlat
+      Code Coverage"` (coverlet) çalıştırıldı, cobertura raporu ayrıştırıldı. Genel
+      satır oranı zaten %89,9 (migration/OpenAPI generated kod hariç tutulunca gerçek
+      resim netleşti) ama gerçek bir sıfır-kapsam bulundu: **`BookService`'in kendi
+      CRUD'u (Create/Update/Delete/GetById) hiçbir testte hiç çağrılmamış** — Module/
+      Content/ContentBlock testleri hep `unitOfWork.Books.AddAsync` ile doğrudan test
+      kitabı açıyor, `BookService`'i baypas ediyor. `BookServiceTests.cs` eklendi.
+      Bu testi yazarken gerçek bir bug ortaya çıktı: `BookService.CreateAsync`/
+      `UpdateAsync`'te `Book.Slug` unique index ihlali hiç yakalanmıyordu (Media/
+      PublishingService'teki aynı desenin aksine) — tekrar eden slug 500'e düşerdi,
+      düzeltildi (409 Conflict). Ayrıca `GlobalExceptionHandler.TryHandleAsync`
+      (tek global beklenmedik-hata yakalama noktası) ve `LoginDtoValidator` da hiç
+      test edilmiyordu — ikisi için de doğrudan unit test eklendi (`tests/.../Unit/`).
+      156/156 test yeşil (139 mevcut + 17 yeni).
 - [ ] 12.6 Rollback / restore endpoint'i
 - [x] 12.8 Global rate limiting — `GlobalRateLimitOptions` (300/60s varsayılan, IP başına),
       TÜM endpoint'lere `AddRateLimiter`'ın `GlobalLimiter`'ı ile otomatik uygulanıyor
