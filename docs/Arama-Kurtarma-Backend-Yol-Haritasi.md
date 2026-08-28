@@ -875,7 +875,13 @@ ve deploy edilemeyen bir sistem kalır.
 - [ ] 12.3 `AsNoTracking` / projeksiyon denetimi, N+1 avı
 - [ ] 12.5 Coverage denetimi + eksik test tamamlama
 - [ ] 12.6 Rollback / restore endpoint'i
-- [ ] 12.8 Global rate limiting
+- [x] 12.8 Global rate limiting — `GlobalRateLimitOptions` (300/60s varsayılan, IP başına),
+      TÜM endpoint'lere `AddRateLimiter`'ın `GlobalLimiter`'ı ile otomatik uygulanıyor
+      (named "login" politikasının aksine opt-in gerekmez, ikisi TOPLANIR). `/health` ve
+      `/health/ready` bilinçli olarak `DisableRateLimiting()` ile muaf — canlı doğrulamada
+      (PermitLimit=3 ile manuel test) muafiyet olmadan health check'in de 429 döndüğü
+      görüldü, bu orkestratörün uygulamayı "ölü" sanıp gereksiz yeniden başlatmasına yol
+      açardı. `compose.prod.yaml`/`.env.example`/`docs/Deployment.md`'ye işlendi.
 - 12.2 (cache), 12.4 (ETag), 12.7 (WebP), 12.9 (Public read) — roadmap'in kendi ön
       koşulları (ölçüm/mobil stabilite/lisans/müşteri talebi) karşılanmadığı için bu
       fazda bilinçli olarak ERTELENDİ, görev-görev karar verildi.
