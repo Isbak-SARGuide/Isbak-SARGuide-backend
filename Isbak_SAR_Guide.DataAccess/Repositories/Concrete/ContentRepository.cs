@@ -25,6 +25,7 @@ public class ContentRepository(Isbak_SAR_GuideDbContext dbContext)
         var totalCount = await query.CountAsync(cancellationToken);
 
         var items = await query
+            .AsNoTracking()
             .OrderBy(c => c.DisplayOrder)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
@@ -33,8 +34,12 @@ public class ContentRepository(Isbak_SAR_GuideDbContext dbContext)
         return (items, totalCount);
     }
 
+    // AsNoTracking: bkz. ModuleRepository.FindAllByBookIdAsync - ayni gerekce
+    // (salt-okunur Create hesabi ya da ReorderHelper'in acikca Update() ettigi
+    // reorder akisi).
     public async Task<IReadOnlyList<Content>> FindAllByModuleIdAsync(int moduleId, CancellationToken cancellationToken = default) =>
         await DbSet
+            .AsNoTracking()
             .Where(c => c.ModuleId == moduleId)
             .OrderBy(c => c.DisplayOrder)
             .ToListAsync(cancellationToken);
