@@ -7,6 +7,7 @@ using Isbak_SAR_Guide.DataAccess.Common;
 using Isbak_SAR_Guide.DataAccess.Repositories.Abstract;
 using Isbak_SAR_Guide.Entities.Content;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Logging;
 
 namespace Isbak_SAR_Guide.Business.Services.Concrete;
@@ -54,47 +55,7 @@ public class PublishingService(IUnitOfWork unitOfWork, ILogger<PublishingService
         var snapshot = SnapshotBuilder.BuildSnapshot(book);
         var publication = BuildPublicationShell(bookId, newVersion, snapshot, publishedAt, publishedById);
 
-        // Journal modeli (7.3-a): satir tablosu tam kopya DEGIL, degisiklik
-        // gunlugu - tam durum SnapshotJson'da. Her yayinda tum content'leri
-        // yeniden yazmak deltayi tam indirmeye esitlerdi. Content basina en
-        // son durum tek sorguyla gelir; hem "degisti mi?" kontrolu hem
-        // tombstone diff'i bundan beslenir.
-        var latestStates = await _unitOfWork.Publications
-            .GetLatestContentStatesAsync(bookId, cancellationToken);
-
-        AppendChangedContents(publication, snapshot, latestStates, bookId, newVersion);
-        AppendTombstones(publication, snapshot, latestStates, bookId, newVersion);
-
-        await _unitOfWork.Publications.AddAsync(publication, cancellationToken);
-
-        // Dar try: sadece yazma/commit adimi. Baska bir satirin exception'i
-        // yanlislikla Conflict kiligina girmesin. "when" filtresi sayesinde
-        // unique ihlali OLMAYAN DbUpdateException hic yakalanmaz, oldugu gibi
-        // global handler'a akar (bilmedigin hatayi yutma).
-        try
-        {
-            await _unitOfWork.SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
-        }
-        catch (DbUpdateException ex) when (DbErrors.IsUniqueViolation(ex))
-        {
-            // Iki eszamanli publish ayni versiyonu yazmaya kalkti - beklenen
-            // bir yaris, exception degil Result doner. Bellekteki book.Version
-            // bump'i sorun degil: context scoped, istek sonunda oluyor.
-            logger.LogInformation(ex, "Kitap {BookId} icin eszamanli yayin yarisi - versiyon {Version} zaten yazilmis.", bookId, newVersion);
-            return Result.Failure<PublishResultDto>(
-                Error.Conflict(
-                    "Publishing.VersionConflict",
-                    "Aynı anda başka bir yayın yapıldı, lütfen tekrar deneyin."));
-        }
-
-        return Result.Success(new PublishResultDto(
-            publication.Id, // EF, insert'te uretilen id'yi SaveChanges sonrasi geri doldurur
-            bookId,
-            newVersion,
-            snapshot.Contents.Count,
-            publication.Checksum,
-            publishedAt));
+        return await FinalizeAsync(bookId, newVersion, snapshot, publication, publishedAt, transaction, cancellationToken);
     }
 
     public async Task<Result<PublishResultDto>> RollbackAsync(
@@ -151,6 +112,30 @@ public class PublishingService(IUnitOfWork unitOfWork, ILogger<PublishingService
 
         var publication = BuildPublicationShell(bookId, newVersion, snapshot, publishedAt, publishedById);
 
+        return await FinalizeAsync(bookId, newVersion, snapshot, publication, publishedAt, transaction, cancellationToken);
+    }
+
+    /// <summary>
+    /// PublishAsync ve RollbackAsync'in ortak kuyrugu: journal diff'i (degisen +
+    /// tombstone), yazma/commit, eszamanli versiyon yarisi -> Conflict, basari
+    /// DTO'su. Ikisi arasindaki TEK fark publication/snapshot'in NEREDEN geldigi
+    /// (taze draft'tan mi, eski bir SnapshotJson'dan mi) - o fark cagiran
+    /// tarafta zaten bitmis oluyor, burasi farksiz.
+    /// </summary>
+    private async Task<Result<PublishResultDto>> FinalizeAsync(
+        int bookId,
+        int newVersion,
+        SyncSnapshotDto snapshot,
+        BookPublication publication,
+        DateTime publishedAt,
+        IDbContextTransaction transaction,
+        CancellationToken cancellationToken)
+    {
+        // Journal modeli (7.3-a): satir tablosu tam kopya DEGIL, degisiklik
+        // gunlugu - tam durum SnapshotJson'da. Her yayinda tum content'leri
+        // yeniden yazmak deltayi tam indirmeye esitlerdi. Content basina en
+        // son durum tek sorguyla gelir; hem "degisti mi?" kontrolu hem
+        // tombstone diff'i bundan beslenir.
         var latestStates = await _unitOfWork.Publications
             .GetLatestContentStatesAsync(bookId, cancellationToken);
 
@@ -159,6 +144,10 @@ public class PublishingService(IUnitOfWork unitOfWork, ILogger<PublishingService
 
         await _unitOfWork.Publications.AddAsync(publication, cancellationToken);
 
+        // Dar try: sadece yazma/commit adimi. Baska bir satirin exception'i
+        // yanlislikla Conflict kiligina girmesin. "when" filtresi sayesinde
+        // unique ihlali OLMAYAN DbUpdateException hic yakalanmaz, oldugu gibi
+        // global handler'a akar (bilmedigin hatayi yutma).
         try
         {
             await _unitOfWork.SaveChangesAsync(cancellationToken);
@@ -166,7 +155,10 @@ public class PublishingService(IUnitOfWork unitOfWork, ILogger<PublishingService
         }
         catch (DbUpdateException ex) when (DbErrors.IsUniqueViolation(ex))
         {
-            logger.LogInformation(ex, "Kitap {BookId} icin eszamanli rollback/publish yarisi - versiyon {Version} zaten yazilmis.", bookId, newVersion);
+            // Iki eszamanli publish/rollback ayni versiyonu yazmaya kalkti -
+            // beklenen bir yaris, exception degil Result doner. Bellekteki
+            // book.Version bump'i sorun degil: context scoped, istek sonunda oluyor.
+            logger.LogInformation(ex, "Kitap {BookId} icin eszamanli yayin yarisi - versiyon {Version} zaten yazilmis.", bookId, newVersion);
             return Result.Failure<PublishResultDto>(
                 Error.Conflict(
                     "Publishing.VersionConflict",
@@ -174,7 +166,7 @@ public class PublishingService(IUnitOfWork unitOfWork, ILogger<PublishingService
         }
 
         return Result.Success(new PublishResultDto(
-            publication.Id,
+            publication.Id, // EF, insert'te uretilen id'yi SaveChanges sonrasi geri doldurur
             bookId,
             newVersion,
             snapshot.Contents.Count,
