@@ -16,7 +16,15 @@ public class ModuleConfiguration : IEntityTypeConfiguration<Module>
             .HasForeignKey(m => m.BookId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        builder.HasIndex(m => new { m.BookId, m.DisplayOrder });
+        // Unique + partial (WHERE NOT IsDeleted): iki modul ayni kitapta
+        // ayni pozisyonu iddia edemez. Faz 5'teki reorder endpoint'i bu
+        // yuzden iki-fazli calismali (once gecici/negatif DisplayOrder'lara
+        // tasi, sonra final degerlere yaz) - tek adimda "B'yi C'nin yerine
+        // koy" yapmaya calismak gecici bir cakismaya (constraint ihlali)
+        // takilir.
+        builder.HasIndex(m => new { m.BookId, m.DisplayOrder })
+            .IsUnique()
+            .HasFilter("\"IsDeleted\" = false");
 
         builder.HasQueryFilter(m => !m.IsDeleted);
     }

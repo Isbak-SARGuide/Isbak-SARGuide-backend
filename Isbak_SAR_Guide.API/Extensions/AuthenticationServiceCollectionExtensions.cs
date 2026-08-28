@@ -10,10 +10,13 @@ public static class AuthenticationServiceCollectionExtensions
 {
     public static IServiceCollection AddApiAuthentication(this IServiceCollection services, IConfiguration configuration)
     {
-        var jwtSection = configuration.GetSection(JwtOptions.SectionName);
-        services.Configure<JwtOptions>(jwtSection);
-
-        var jwtOptions = jwtSection.Get<JwtOptions>()
+        // JwtOptions'in DI kaydi (IOptions<JwtOptions>, TokenService icin) ve
+        // fail-fast dogrulamasi AddBusiness()'ta yapilir (StorageOptions'la ayni
+        // desen, Faz 8 mimari incelemesinde bulundu: AddBusiness() tek basina
+        // cagrilirsa - ornegin bu extension unutulursa - TokenService bos/varsayilan
+        // bir anahtarla token imzalardi, baslangicta patlamak yerine). Burada
+        // sadece JWT bearer semasini kurmak icin ayni bolum dogrudan okunur.
+        var jwtOptions = configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
             ?? throw new InvalidOperationException("'Jwt' konfigurasyon bolumu eksik.");
 
         services

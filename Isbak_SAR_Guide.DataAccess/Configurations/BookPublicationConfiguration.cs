@@ -8,6 +8,11 @@ public class BookPublicationConfiguration : IEntityTypeConfiguration<BookPublica
 {
     public void Configure(EntityTypeBuilder<BookPublication> builder)
     {
+        // Version=0/negatif hicbir yayinin anlami degil - app zaten
+        // GetLatestVersionAsync+1 ile garanti ediyor, DB de son savunma
+        // hatti olarak dogrulasin (elle SQL/import script riskine karsi).
+        builder.ToTable(t => t.HasCheckConstraint("CK_BookPublications_Version", "\"Version\" > 0"));
+
         // json, jsonb DEGIL - PublishedContentConfiguration'daki sebeple ayni:
         // manifest Faz 4'te mobile AYNEN servis edilecek; dondurulan baytlarin
         // degismeden cikmasi bayt sadakati ister, jsonb bunu vermez.

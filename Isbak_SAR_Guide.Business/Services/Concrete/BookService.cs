@@ -36,8 +36,7 @@ public class BookService(
         var validationResult = await createValidator.ValidateAsync(dto, cancellationToken);
         if (!validationResult.IsValid)
         {
-            var message = string.Join("; ", validationResult.Errors.Select(e => e.ErrorMessage));
-            return Result.Failure<BookDto>(Error.Validation("Book.ValidationFailed", message));
+            return Result.Failure<BookDto>(validationResult.ToValidationError("Book.ValidationFailed"));
         }
 
         var book = dto.Adapt<Book>();
@@ -53,8 +52,7 @@ public class BookService(
         var validationResult = await updateValidator.ValidateAsync(dto, cancellationToken);
         if (!validationResult.IsValid)
         {
-            var message = string.Join("; ", validationResult.Errors.Select(e => e.ErrorMessage));
-            return Result.Failure<BookDto>(Error.Validation("Book.ValidationFailed", message));
+            return Result.Failure<BookDto>(validationResult.ToValidationError("Book.ValidationFailed"));
         }
 
         var book = await unitOfWork.Books.FindByIdAsync(id, cancellationToken);

@@ -487,6 +487,7 @@ $RECYCLE.BIN/
 appsettings.*.local.json
 .env
 .env.*
+!.env.example
 
 # Medya deposu (Faz 6: IStorageService local disk)
 /storage/
@@ -498,3 +499,13 @@ efbundle*
 # AI kod asistani dosyalari - repo disinda kalsin, sadece yerel
 CLAUDE.md
 .claude/
+
+# Kaynak materyal / gecici varliklar - buyuk ikili dosyalar, kaynak kod
+# degil. Icerik import script'leri lokal calisir, repo'ya girmez.
+*.pdf
+WhatsApp Image*.jpeg
+WhatsApp Image*.jpg
+
+# graphify - kod tabanindan uretilen bilgi grafigi (graph.json/html, cache,
+# manifest). Turetilmis/yerel arac ciktisi, repo'ya girmez.
+/graphify-out/

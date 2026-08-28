@@ -116,7 +116,10 @@ namespace Isbak_SAR_Guide.DataAccess.Migrations
                     b.HasIndex("BookId", "Version")
                         .IsUnique();
 
-                    b.ToTable("BookPublications");
+                    b.ToTable("BookPublications", t =>
+                        {
+                            t.HasCheckConstraint("CK_BookPublications_Version", "\"Version\" > 0");
+                        });
                 });
 
             modelBuilder.Entity("Isbak_SAR_Guide.Entities.Content.Content", b =>
@@ -157,9 +160,22 @@ namespace Isbak_SAR_Guide.DataAccess.Migrations
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("VariantGroupKey")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("VariantLabel")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
                     b.HasKey("Id");
 
-                    b.HasIndex("ModuleId", "DisplayOrder");
+                    b.HasIndex("ModuleId", "DisplayOrder")
+                        .IsUnique()
+                        .HasFilter("\"IsDeleted\" = false");
+
+                    b.HasIndex("ModuleId", "VariantGroupKey")
+                        .HasFilter("\"VariantGroupKey\" IS NOT NULL");
 
                     b.ToTable("Contents");
                 });
@@ -208,7 +224,10 @@ namespace Isbak_SAR_Guide.DataAccess.Migrations
 
                     b.HasIndex("ContentId", "DisplayOrder");
 
-                    b.ToTable("ContentBlocks");
+                    b.ToTable("ContentBlocks", t =>
+                        {
+                            t.HasCheckConstraint("CK_ContentBlocks_Type", "\"Type\" BETWEEN 1 AND 6");
+                        });
                 });
 
             modelBuilder.Entity("Isbak_SAR_Guide.Entities.Content.Media", b =>
@@ -268,9 +287,13 @@ namespace Isbak_SAR_Guide.DataAccess.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Checksum");
+                    b.HasIndex("Checksum")
+                        .IsUnique();
 
-                    b.ToTable("Media");
+                    b.ToTable("Media", t =>
+                        {
+                            t.HasCheckConstraint("CK_Media_MediaType", "\"MediaType\" BETWEEN 1 AND 4");
+                        });
                 });
 
             modelBuilder.Entity("Isbak_SAR_Guide.Entities.Content.Module", b =>
@@ -313,7 +336,9 @@ namespace Isbak_SAR_Guide.DataAccess.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("BookId", "DisplayOrder");
+                    b.HasIndex("BookId", "DisplayOrder")
+                        .IsUnique()
+                        .HasFilter("\"IsDeleted\" = false");
 
                     b.ToTable("Modules");
                 });
@@ -356,7 +381,10 @@ namespace Isbak_SAR_Guide.DataAccess.Migrations
 
                     b.HasIndex("BookId", "Version");
 
-                    b.ToTable("PublishedContents");
+                    b.ToTable("PublishedContents", t =>
+                        {
+                            t.HasCheckConstraint("CK_PublishedContents_Version", "\"Version\" > 0");
+                        });
                 });
 
             modelBuilder.Entity("Isbak_SAR_Guide.Entities.Identity.ApplicationUser", b =>
@@ -428,6 +456,42 @@ namespace Isbak_SAR_Guide.DataAccess.Migrations
                         .HasDatabaseName("UserNameIndex");
 
                     b.ToTable("AspNetUsers", (string)null);
+                });
+
+            modelBuilder.Entity("Isbak_SAR_Guide.Entities.Identity.RefreshToken", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("ExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("RevokedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique();
+
+                    b.HasIndex("UserId", "RevokedAtUtc");
+
+                    b.ToTable("RefreshTokens");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole", b =>
@@ -629,6 +693,17 @@ namespace Isbak_SAR_Guide.DataAccess.Migrations
                         .IsRequired();
 
                     b.Navigation("BookPublication");
+                });
+
+            modelBuilder.Entity("Isbak_SAR_Guide.Entities.Identity.RefreshToken", b =>
+                {
+                    b.HasOne("Isbak_SAR_Guide.Entities.Identity.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>

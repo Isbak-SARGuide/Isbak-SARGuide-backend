@@ -27,6 +27,8 @@ public class Isbak_SAR_GuideDbContext : IdentityDbContext<ApplicationUser>
 
     public DbSet<PublishedContent> PublishedContents => Set<PublishedContent>();
 
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);

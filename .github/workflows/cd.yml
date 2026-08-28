@@ -1,0 +1,64 @@
+name: CD
+
+# Kapsam bilerek dar: SADECE imaj build + ghcr.io'ya push. Bu projede henuz
+# gercek bir canli deploy hedefi (sunucu/orkestrasyon) yok - "deploy" adimi
+# eklemek simdilik hayali bir hedefe deploy etmek olurdu. Imaj hazir oldugunda
+# hangi ortama nasil cekilecegi ayri, gelecekteki bir karar.
+#
+# main'e MERGE OLDUKTAN SONRA calisir (push, PR degil) - CI zaten PR'da
+# derleme/test dogrulamasini yapiyor, burada tekrar etmiyoruz; ci.yml'in
+# basarili gectigini push, bu workflow'un tetiklendigi ANIN kendisi garanti
+# eder (main'e giren her commit CI'dan gecmis olmali, branch protection).
+on:
+  push:
+    branches: [ main ]
+
+concurrency:
+  group: cd-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-and-push:
+    name: Imaj Build + Push (ghcr.io)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Kodu cek
+        uses: actions/checkout@v4
+
+      - name: ghcr.io'ya giris yap
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Imaj etiketlerini/metadata'sini cikar
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha,prefix=,format=long
+            type=raw,value=latest
+
+      - name: Buildx kur
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build + push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

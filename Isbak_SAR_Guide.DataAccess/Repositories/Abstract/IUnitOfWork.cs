@@ -7,21 +7,24 @@ public interface IUnitOfWork
 {
     IBookRepository Books { get; }
 
-    IRepository<Module> Modules { get; }
+    IModuleRepository Modules { get; }
 
-    IRepository<Content> Contents { get; }
+    IContentRepository Contents { get; }
 
-    IRepository<ContentBlock> ContentBlocks { get; }
+    IContentBlockRepository ContentBlocks { get; }
 
-    IRepository<Media> Media { get; }
+    IMediaRepository Media { get; }
 
     IPublicationRepository Publications { get; }
+
+    IRefreshTokenRepository RefreshTokens { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Faz 3 (Publishing) icin: bir transaction icinde birden fazla
-    /// SaveChanges cagrisini atomik yapmak gerektiginde kullanilir.
+    /// Bir transaction icinde birden fazla SaveChanges cagrisini atomik yapmak
+    /// gerektiginde kullanilir - once PublishingService (Faz 3), sonra
+    /// ReorderHelper'in iki fazli Module/Content/ContentBlock reorder'i (Faz 5).
     /// </summary>
     Task<IDbContextTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default);
 }

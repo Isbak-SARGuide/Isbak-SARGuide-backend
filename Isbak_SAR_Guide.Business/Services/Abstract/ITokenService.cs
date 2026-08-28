@@ -9,7 +9,15 @@ namespace Isbak_SAR_Guide.Business.Services.Abstract;
 /// </summary>
 public sealed record AccessToken(string Token, DateTime ExpiresAtUtc);
 
+/// <summary>Ham token - sadece istemciye BiR KEZ donulur, DB'de hic saklanmaz (bkz. HashRefreshToken).</summary>
+public sealed record RefreshTokenResult(string Token, DateTime ExpiresAtUtc);
+
 public interface ITokenService
 {
     AccessToken GenerateAccessToken(ApplicationUser user, IList<string> roles);
+
+    RefreshTokenResult GenerateRefreshToken();
+
+    /// <summary>SHA-256 hex ozeti - sifre gibi, DB'de hep bu saklanir, ham token asla.</summary>
+    string HashRefreshToken(string token);
 }

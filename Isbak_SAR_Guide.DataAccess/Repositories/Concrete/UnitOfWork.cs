@@ -14,27 +14,31 @@ public class UnitOfWork : IUnitOfWork
         _dbContext = dbContext;
 
         Books = new BookRepository(dbContext);
-        Modules = new EfRepository<Module>(dbContext);
-        Contents = new EfRepository<Content>(dbContext);
-        ContentBlocks = new EfRepository<ContentBlock>(dbContext);
-        Media = new EfRepository<Media>(dbContext);
+        Modules = new ModuleRepository(dbContext);
+        Contents = new ContentRepository(dbContext);
+        ContentBlocks = new ContentBlockRepository(dbContext);
+        Media = new MediaRepository(dbContext);
         // Ayni dbContext instance'i sart: BeginTransactionAsync o context'in
         // baglantisinda transaction acar; farkli bir context kullansaydi
-        // Publications'in yazdiklari transaction'in disinda kalirdi.
+        // Publications'in (ve ReorderHelper'in Modules/Contents/ContentBlocks'a
+        // yazdiklarinin) transaction'in disinda kalirdi.
         Publications = new PublicationRepository(dbContext);
+        RefreshTokens = new RefreshTokenRepository(dbContext);
     }
 
     public IBookRepository Books { get; }
 
-    public IRepository<Module> Modules { get; }
+    public IModuleRepository Modules { get; }
 
-    public IRepository<Content> Contents { get; }
+    public IContentRepository Contents { get; }
 
-    public IRepository<ContentBlock> ContentBlocks { get; }
+    public IContentBlockRepository ContentBlocks { get; }
 
-    public IRepository<Media> Media { get; }
+    public IMediaRepository Media { get; }
 
     public IPublicationRepository Publications { get; }
+
+    public IRefreshTokenRepository RefreshTokens { get; }
 
     public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) =>
         _dbContext.SaveChangesAsync(cancellationToken);

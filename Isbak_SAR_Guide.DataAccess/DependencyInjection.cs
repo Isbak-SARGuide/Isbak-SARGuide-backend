@@ -1,4 +1,5 @@
 using Isbak_SAR_Guide.DataAccess.Context;
+using Isbak_SAR_Guide.DataAccess.HealthChecks;
 using Isbak_SAR_Guide.DataAccess.Repositories.Abstract;
 using Isbak_SAR_Guide.DataAccess.Repositories.Concrete;
 using Isbak_SAR_Guide.Entities.Identity;
@@ -24,11 +25,27 @@ public static class DataAccessServiceCollectionExtensions
         // baglanir. AddIdentityCore (AddIdentity DEGIL) - cookie auth semasi
         // kaydetmiyoruz, JWT semasi API katmaninda ayrica kaydedilecek (6.1).
         services
-            .AddIdentityCore<ApplicationUser>()
+            .AddIdentityCore<ApplicationUser>(options =>
+            {
+                // Faz 9.3: 5 basarisiz denemeden sonra 15 dakika kilit. Sadece
+                // burada AYARLAMAK yetmez - AuthService.LoginAsync bunu
+                // AccessFailedAsync/IsLockedOutAsync ile acikca tetiklemeli
+                // (UserManager.CheckPasswordAsync tek basina kilit izlemez).
+                options.Lockout.MaxFailedAccessAttempts = 5;
+                options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
+                options.Lockout.AllowedForNewUsers = true;
+            })
             .AddRoles<IdentityRole>()
             .AddEntityFrameworkStores<Isbak_SAR_GuideDbContext>();
 
         services.AddScoped<IUnitOfWork, UnitOfWork>();
+
+        // "ready" tag: Program.cs /health/ready sadece bu etiketli kontrolleri
+        // calistirir. /health (liveness) hicbir tag filtrelemez - "surec ayakta
+        // mi" sorusu DB'ye bagli olmamali (DB cokse bile process'in kendisi
+        // yasiyor olabilir, orkestratorun bunu ayirt etmesi gerekir).
+        services.AddHealthChecks()
+            .AddCheck<DatabaseHealthCheck>("database", tags: ["ready"]);
 
         return services;
     }
