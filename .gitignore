@@ -487,6 +487,7 @@ $RECYCLE.BIN/
 appsettings.*.local.json
 .env
 .env.*
+!.env.example
 
 # Medya deposu (Faz 6: IStorageService local disk)
 /storage/
