@@ -18,11 +18,15 @@ public class MediaRepository : EfRepository<Media>, IMediaRepository
         _contentBlocks = dbContext.Set<ContentBlock>();
     }
 
+    // AsNoTracking: iki cagiran da (dedup kontrolu -> DTO'ya cevrilir, orphan
+    // temizligi -> Remove() ile ACIKCA tekrar attach edilir) tracked bir
+    // sonuca ihtiyac duymuyor.
     public async Task<Media?> FindByChecksumAsync(string checksum, CancellationToken cancellationToken = default) =>
-        await DbSet.FirstOrDefaultAsync(m => m.Checksum == checksum, cancellationToken);
+        await DbSet.AsNoTracking().FirstOrDefaultAsync(m => m.Checksum == checksum, cancellationToken);
 
     public async Task<IReadOnlyList<Media>> FindOrphansAsync(DateTime olderThanUtc, CancellationToken cancellationToken = default) =>
         await DbSet
+            .AsNoTracking()
             .Where(m => m.CreatedAt < olderThanUtc)
             .Where(m => !_contentBlocks.Any(b => b.MediaId == m.Id))
             .ToListAsync(cancellationToken);

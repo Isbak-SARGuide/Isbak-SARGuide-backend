@@ -63,9 +63,15 @@ builder.Services.AddProblemDetails();
 builder.Services.AddApiAuthentication(builder.Configuration);
 
 // Faz 9.3: sadece kimlik-dogrulama uclari (login/refresh) icin - IP basina
-// dakikada N deneme. Global rate limiting bilerek kapsam disi (roadmap Faz 9
-// Hardening - "Anonim sync endpoint'i tek risk", auth farkli/daha acil bir yuzey).
+// dakikada N deneme, "login" adiyla ayri bir politika (AuthController'da
+// [EnableRateLimiting("login")] ile opt-in). Faz 12.8: TUM istekler icin
+// (ozellikle /sync/* - AllowAnonymous, kimlik dogrulamasi yok, roadmap'in
+// "tek risk" dedigi yuzey) GlobalLimiter ile ek, daha gevsek bir taban limiti.
+// Ikisi TOPLANMAZ, BIRLIKTE uygulanir: login/refresh istegi hem global hem
+// login limitinden gecmeli - login limiti daha siki oldugu icin pratikte o
+// once tetiklenir.
 builder.Services.Configure<LoginRateLimitOptions>(builder.Configuration.GetSection(LoginRateLimitOptions.SectionName));
+builder.Services.Configure<GlobalRateLimitOptions>(builder.Configuration.GetSection(GlobalRateLimitOptions.SectionName));
 
 builder.Services.AddRateLimiter(options =>
 {
@@ -80,6 +86,23 @@ builder.Services.AddRateLimiter(options =>
     {
         var rateLimitOptions = httpContext.RequestServices
             .GetRequiredService<IOptions<LoginRateLimitOptions>>().Value;
+
+        return RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = rateLimitOptions.PermitLimit,
+                Window = TimeSpan.FromSeconds(rateLimitOptions.WindowSeconds),
+                QueueLimit = 0,
+            });
+    });
+
+    // GlobalLimiter, EnableRateLimiting/RequireRateLimiting ile opt-in gerekmeden
+    // TUM endpoint'lere otomatik uygulanir - named policy'lerin aksine.
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
+    {
+        var rateLimitOptions = httpContext.RequestServices
+            .GetRequiredService<IOptions<GlobalRateLimitOptions>>().Value;
 
         return RateLimitPartition.GetFixedWindowLimiter(
             partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
@@ -126,14 +149,15 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
-// ONEMLI - reverse proxy eklenirse: login rate limiter (yukarida) IP'yi
-// httpContext.Connection.RemoteIpAddress'ten okuyor. Su an compose.prod.yaml
-// container'i DOGRUDAN disari aciyor (8080:8080), yani bu dogru IP'yi verir.
-// Onune bir reverse proxy/load balancer konursa ve UseForwardedHeaders() (X-
-// Forwarded-For, proxy'nin guvenilir IP'sine kisitlanmis) buraya eklenmezse,
-// RemoteIpAddress her istekte proxy'nin IP'sine sabitlenir - butun kullanicilar
-// TEK bir rate-limit havuzunu paylasir ve login brute-force korumasi
-// (5 deneme/60sn, IP basina) sessizce devre disi kalir. Bkz. docs/Deployment.md.
+// ONEMLI - reverse proxy eklenirse: hem login hem global rate limiter (yukarida,
+// Faz 9.3 + Faz 12.8) IP'yi httpContext.Connection.RemoteIpAddress'ten okuyor.
+// Su an compose.prod.yaml container'i DOGRUDAN disari aciyor (8080:8080), yani
+// bu dogru IP'yi verir. Onune bir reverse proxy/load balancer konursa ve
+// UseForwardedHeaders() (X-Forwarded-For, proxy'nin guvenilir IP'sine
+// kisitlanmis) buraya eklenmezse, RemoteIpAddress her istekte proxy'nin IP'sine
+// sabitlenir - butun kullanicilar TEK bir rate-limit havuzunu paylasir ve hem
+// login brute-force korumasi hem /sync/* icin taban koruma sessizce devre disi
+// kalir. Bkz. docs/Deployment.md.
 app.UseHttpsRedirection();
 
 app.UseHttpsRedirection();
@@ -168,14 +192,22 @@ app.MapControllers();
 // tasimaz. "/health": liveness, hicbir dependency check'i calistirmaz (Predicate
 // false) - sadece process'in istek karsiladigini kanitlar. "/health/ready":
 // readiness, "ready" tag'li check'leri (su an sadece Postgres) calistirir.
+// DisableRateLimiting: Faz 12.8'in global limiter'i olmadan da bu uclar
+// AllowAnonymous oldugu icin herkese acik - ama orkestrasyon araci (k8s
+// liveness/readiness probe, Docker HEALTHCHECK) gercek kullanici trafigiyle
+// AYNI IP/partition'i paylasirsa (reverse proxy arkasinda - bkz. yukaridaki
+// ONEMLI yorumu) global limite carpip 429 donebilir. Bu, orkestratorun
+// uygulamayi "olu" sanip GEREKSIZ YENIDEN BASLATMASINA yol acar - health
+// check'in kendisi rate limit'e tabi olmamali, canli dogrulamada yakalandi
+// (dusuk bir PermitLimit ile manuel test, /health de /sync/* gibi 429 donuyordu).
 app.MapHealthChecks("/health", new HealthCheckOptions
 {
     Predicate = _ => false,
-}).AllowAnonymous();
+}).AllowAnonymous().DisableRateLimiting();
 
 app.MapHealthChecks("/health/ready", new HealthCheckOptions
 {
     Predicate = check => check.Tags.Contains("ready"),
-}).AllowAnonymous();
+}).AllowAnonymous().DisableRateLimiting();
 
 app.Run();

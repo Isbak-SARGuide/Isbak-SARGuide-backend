@@ -55,6 +55,13 @@ public interface IPublicationRepository
     Task<string?> GetLatestSnapshotJsonAsync(int bookId, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Belirli bir versiyonun SnapshotJson'unu doner; o versiyon yoksa null.
+    /// Faz 12.6 rollback icin: GetManifestJsonAsync'in aynasi ama SnapshotJson
+    /// icin - geri alinacak versiyonun TAM icerigi lazim, sadece manifesti degil.
+    /// </summary>
+    Task<string?> GetSnapshotJsonAsync(int bookId, int version, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Content basina yayin gunlugundeki en son satirin ozetini doner
     /// (greatest-per-group). Journal modelinin temeli: satir tablosu tam
     /// kopya degil degisiklik gunlugu oldugu icin "v'deki satirlar" sorusu

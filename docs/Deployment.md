@@ -42,6 +42,8 @@ bir varsayimla ayaga kalkmaz. Hepsi `.env` dosyasindan (repo'ya girmez,
 | `STORAGE_ORPHAN_GRACE_HOURS` | Hayir (varsayilan `24`) | Orphan medya temizligi oncesi bekleme suresi |
 | `LOGIN_RATE_LIMIT_PERMIT` | Hayir (varsayilan `5`) | `/auth/login` icin IP basina pencere basina izin verilen istek |
 | `LOGIN_RATE_LIMIT_WINDOW_SECONDS` | Hayir (varsayilan `60`) | Yukaridaki pencerenin uzunlugu (saniye) |
+| `GLOBAL_RATE_LIMIT_PERMIT` | Hayir (varsayilan `300`) | TUM endpoint'ler icin IP basina pencere basina istek limiti (Faz 12.8) — ozellikle `/sync/*` gibi `AllowAnonymous` uclari icin taban koruma; login/refresh ayrica kendi daha siki limitine de tabidir |
+| `GLOBAL_RATE_LIMIT_WINDOW_SECONDS` | Hayir (varsayilan `60`) | Yukaridaki pencerenin uzunlugu (saniye) |
 
 `Storage__BasePath` compose icinde sabit (`/storage`, konteyner-ici mutlak
 yol + kalici volume) — ortam degiskeni olarak disari acilmadi, degistirmek
@@ -50,14 +52,16 @@ volume mount'unu da degistirmeyi gerektirir.
 ## Onune reverse proxy/load balancer eklenirse (henuz yok)
 
 Su anki `compose.prod.yaml` API container'ini dogrudan disari aciyor
-(`8080:8080`), reverse proxy yok. Login rate limiter (`Program.cs`)
-IP'yi `RemoteIpAddress`'ten okuyor — bu, dogrudan-erisimde doğru calisir.
-**Onune bir reverse proxy/load balancer/CDN konursa**, ASP.NET Core'un
-`UseForwardedHeaders()` middleware'i (proxy'nin IP'sine `KnownProxies`/
-`KnownNetworks` ile kisitlanmis) eklenmeden rate limiter'in butun trafigi
-proxy'nin tek IP'sinden geliyormus gibi gorup TUM kullanicilar icin PAYLASIMLI
-tek bir limit havuzuna dusecegini, yani login brute-force korumasinin
-(5 deneme/60sn, IP basina) sessizce devre disi kalacagini unutma.
+(`8080:8080`), reverse proxy yok. Hem login hem global rate limiter
+(`Program.cs`, Faz 9.3 + Faz 12.8) IP'yi `RemoteIpAddress`'ten okuyor — bu,
+dogrudan-erisimde doğru calisir. **Onune bir reverse proxy/load balancer/CDN
+konursa**, ASP.NET Core'un `UseForwardedHeaders()` middleware'i (proxy'nin
+IP'sine `KnownProxies`/`KnownNetworks` ile kisitlanmis) eklenmeden rate
+limiter'lerin butun trafigi proxy'nin tek IP'sinden geliyormus gibi gorup
+TUM kullanicilar icin PAYLASIMLI tek bir limit havuzuna dusecegini, yani hem
+login brute-force korumasinin (5 deneme/60sn, IP basina) hem `/sync/*` icin
+taban korumanin (300 istek/60sn, IP basina) sessizce devre disi kalacagini
+unutma.
 
 ## `docker compose up`
 

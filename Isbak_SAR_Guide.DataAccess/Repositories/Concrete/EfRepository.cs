@@ -13,8 +13,14 @@ public class EfRepository<T>(Isbak_SAR_GuideDbContext dbContext) : IRepository<T
     public async Task<T?> FindByIdAsync(int id, CancellationToken cancellationToken = default) =>
         await DbSet.FirstOrDefaultAsync(entity => entity.Id == id, cancellationToken);
 
+    // AsNoTracking: butun projede FindAllAsync'in tek amaci listeleme/DTO'ya
+    // cevirme (BookService.GetAllAsync, seed kontrolu) - donen entity'ler hicbir
+    // yerde dogrudan mutate edilip SaveChanges'e verilmiyor. FindByIdAsync ise
+    // KASITLI OLARAK tracked kaliyor - CRUD servislerindeki Update akislarinin
+    // cogu "FindByIdAsync -> dto.Adapt(entity) -> SaveChanges" seklinde change
+    // tracker'a guveniyor.
     public async Task<IReadOnlyList<T>> FindAllAsync(CancellationToken cancellationToken = default) =>
-        await DbSet.ToListAsync(cancellationToken);
+        await DbSet.AsNoTracking().ToListAsync(cancellationToken);
 
     public async Task AddAsync(T entity, CancellationToken cancellationToken = default) =>
         await DbSet.AddAsync(entity, cancellationToken);

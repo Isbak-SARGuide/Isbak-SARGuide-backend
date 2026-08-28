@@ -7,6 +7,7 @@ using Isbak_SAR_Guide.DataAccess.Common;
 using Isbak_SAR_Guide.DataAccess.Repositories.Abstract;
 using Isbak_SAR_Guide.Entities.Content;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Logging;
 
 namespace Isbak_SAR_Guide.Business.Services.Concrete;
@@ -54,6 +55,82 @@ public class PublishingService(IUnitOfWork unitOfWork, ILogger<PublishingService
         var snapshot = SnapshotBuilder.BuildSnapshot(book);
         var publication = BuildPublicationShell(bookId, newVersion, snapshot, publishedAt, publishedById);
 
+        return await FinalizeAsync(bookId, newVersion, snapshot, publication, publishedAt, transaction, cancellationToken);
+    }
+
+    public async Task<Result<PublishResultDto>> RollbackAsync(
+        int bookId,
+        int toVersion,
+        string publishedById,
+        CancellationToken cancellationToken = default)
+    {
+        var book = await _unitOfWork.Books.FindByIdAsync(bookId, cancellationToken);
+        if (book is null)
+        {
+            return Result.Failure<PublishResultDto>(
+                Error.NotFound("Publishing.BookNotFound", $"Id={bookId} olan kitap bulunamadı."));
+        }
+
+        var oldSnapshotJson = await _unitOfWork.Publications.GetSnapshotJsonAsync(bookId, toVersion, cancellationToken);
+        if (oldSnapshotJson is null)
+        {
+            return Result.Failure<PublishResultDto>(
+                Error.NotFound("Publishing.VersionNotFound", $"Kitap {bookId} için versiyon {toVersion} bulunamadı."));
+        }
+
+        var publishedAt = DateTime.UtcNow;
+
+        await using var transaction = await _unitOfWork.BeginTransactionAsync(cancellationToken);
+
+        var latestVersion = await _unitOfWork.Publications.GetLatestVersionAsync(bookId, cancellationToken);
+
+        // Geriye gitme semantigi: hedef, mevcut en son versiyondan KESINLIKLE
+        // eski olmali. Ayni versiyona "rollback" bos bir yayin uretir (anlamsiz,
+        // yasak degil ama kafa karistirir); ileri versiyon zaten
+        // GetSnapshotJsonAsync'te NotFound olarak elenir - burada asil amac
+        // "mevcut = hedef" durumunu acikca reddetmek.
+        if (toVersion >= latestVersion)
+        {
+            return Result.Failure<PublishResultDto>(Error.Validation(
+                "Publishing.RollbackTargetNotOlder",
+                $"Hedef versiyon ({toVersion}) mevcut en son versiyondan ({latestVersion}) eski olmalı."));
+        }
+
+        var newVersion = latestVersion + 1;
+        book.Version = newVersion;
+
+        // Eski snapshot'in ICINDEKI versiyon numarasi hala eski (toVersion) -
+        // yeni bir yayin olarak yazildigi icin hem ust seviye Version hem
+        // Book.Version alani yeni numarayla degistirilir. Modules/Contents
+        // (dolayisiyla Blocks) OLDUGU GIBI kalir - geri alinan asil icerik bu.
+        var oldSnapshot = SnapshotBuilder.Deserialize<SyncSnapshotDto>(oldSnapshotJson);
+        var snapshot = oldSnapshot with
+        {
+            Version = newVersion,
+            Book = oldSnapshot.Book with { Version = newVersion },
+        };
+
+        var publication = BuildPublicationShell(bookId, newVersion, snapshot, publishedAt, publishedById);
+
+        return await FinalizeAsync(bookId, newVersion, snapshot, publication, publishedAt, transaction, cancellationToken);
+    }
+
+    /// <summary>
+    /// PublishAsync ve RollbackAsync'in ortak kuyrugu: journal diff'i (degisen +
+    /// tombstone), yazma/commit, eszamanli versiyon yarisi -> Conflict, basari
+    /// DTO'su. Ikisi arasindaki TEK fark publication/snapshot'in NEREDEN geldigi
+    /// (taze draft'tan mi, eski bir SnapshotJson'dan mi) - o fark cagiran
+    /// tarafta zaten bitmis oluyor, burasi farksiz.
+    /// </summary>
+    private async Task<Result<PublishResultDto>> FinalizeAsync(
+        int bookId,
+        int newVersion,
+        SyncSnapshotDto snapshot,
+        BookPublication publication,
+        DateTime publishedAt,
+        IDbContextTransaction transaction,
+        CancellationToken cancellationToken)
+    {
         // Journal modeli (7.3-a): satir tablosu tam kopya DEGIL, degisiklik
         // gunlugu - tam durum SnapshotJson'da. Her yayinda tum content'leri
         // yeniden yazmak deltayi tam indirmeye esitlerdi. Content basina en
@@ -78,9 +155,9 @@ public class PublishingService(IUnitOfWork unitOfWork, ILogger<PublishingService
         }
         catch (DbUpdateException ex) when (DbErrors.IsUniqueViolation(ex))
         {
-            // Iki eszamanli publish ayni versiyonu yazmaya kalkti - beklenen
-            // bir yaris, exception degil Result doner. Bellekteki book.Version
-            // bump'i sorun degil: context scoped, istek sonunda oluyor.
+            // Iki eszamanli publish/rollback ayni versiyonu yazmaya kalkti -
+            // beklenen bir yaris, exception degil Result doner. Bellekteki
+            // book.Version bump'i sorun degil: context scoped, istek sonunda oluyor.
             logger.LogInformation(ex, "Kitap {BookId} icin eszamanli yayin yarisi - versiyon {Version} zaten yazilmis.", bookId, newVersion);
             return Result.Failure<PublishResultDto>(
                 Error.Conflict(
