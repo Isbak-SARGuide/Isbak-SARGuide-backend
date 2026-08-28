@@ -33,17 +33,30 @@ RUN dotnet publish Isbak_SAR_Guide.API/Isbak_SAR_Guide.API.csproj \
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 
+# Storage:BasePath prod'da /storage'a (compose.prod.yaml'daki api_storage
+# volume'unun mount noktasi) mutlak yolla set edilir - bkz. compose.prod.yaml
+# + docs/Deployment.md. root DISINDA bir kullaniciyla mount edilen, henuz
+# icinde veri olmayan bir named volume'un mount noktasini Docker varsayilan
+# olarak root:root sahipliginde OLUSTURUR - USER app'e gecmeden ONCE burada
+# elle olusturup chown etmezsek, app kullanicisi ilk medya yuklemesinde
+# (LocalFileStorageService.UploadAsync -> Directory.CreateDirectory alt
+# klasoru) yazma izni hatasi alir. Health check'ler bunu YAKALAMAZ (Storage
+# kok klasoru zaten var, sadece ALT klasor olusturma an'inda patlar).
+RUN mkdir -p /storage && chown app:app /storage
+
+# aspnet:10.0 (Ubuntu tabanli) curl/wget ICERMIYOR - compose.prod.yaml'daki
+# HEALTHCHECK (container-ici "curl -f http://localhost:8080/health") curl
+# olmadan calisamaz ve container surekli "unhealthy" raporlar (canli
+# compose testinde dogrulandi). --no-install-recommends + apt cache temizligi
+# ile ek yuk minimumda tutuluyor.
+RUN apt-get update && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
 # Root olarak calistirmiyoruz - imaj zaten "app" adinda ayricaliksiz bir
 # kullanici iceriyor (mcr.microsoft.com/dotnet/aspnet resmi imaj deseni).
 USER app
 
 COPY --from=build /app/publish .
 
-# Storage:BasePath varsayilani "../storage" (API'nin content root'una gore
-# GORELI - bkz. appsettings.Development.json). Container'da content root
-# /app oldugu icin bu, konteynerin KOKUNE (/storage) cikar - kasitli degil,
-# appsettings.Development.json'daki yerel-gelistirme varsayimindan miras.
-# Prod compose bunu VOLUME MOUNT'LU, mutlak bir yola (Storage__BasePath)
-# ORDE EDEREK gecersiz kilar - bkz. compose.prod.yaml + docs/Deployment.md.
 EXPOSE 8080
 ENTRYPOINT ["dotnet", "Isbak_SAR_Guide.API.dll"]

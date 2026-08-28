@@ -39,6 +39,12 @@ builder.Services.AddOpenApi();
 
 // Statik medya (PNG/JPG) zaten sikistirilmis - sadece JSON gövdeleri icin acik.
 // EnableForHttps: sync/API JSON trafigi HTTPS uzerinden gidiyor, orada da sikistirma istiyoruz.
+// BREACH riski degerlendirildi: access/refresh token'lar (LoginResponseDto)
+// ayni govdede client-etkileyebilir alanlarla (UserName/FullName) birlikte
+// donuyor, ama auth cerez DEGIL Bearer token ile yapiliyor - saldirganin
+// cross-origin istegi tarayiciya credential'i otomatik ekletemedigi icin
+// klasik BREACH senaryosu (CSRF benzeri, cerez tabanli) burada gecerli
+// degil. Bu yuzden HTTPS'te sikistirma acik tutuluyor.
 builder.Services.AddResponseCompression(options => options.EnableForHttps = true);
 
 builder.Services.AddCors(options =>
@@ -119,6 +125,16 @@ if (!app.Environment.IsDevelopment())
     // kalicilastigi icin sonradan http'ye donmek istendiginde sorun cikartir.
     app.UseHsts();
 }
+
+// ONEMLI - reverse proxy eklenirse: login rate limiter (yukarida) IP'yi
+// httpContext.Connection.RemoteIpAddress'ten okuyor. Su an compose.prod.yaml
+// container'i DOGRUDAN disari aciyor (8080:8080), yani bu dogru IP'yi verir.
+// Onune bir reverse proxy/load balancer konursa ve UseForwardedHeaders() (X-
+// Forwarded-For, proxy'nin guvenilir IP'sine kisitlanmis) buraya eklenmezse,
+// RemoteIpAddress her istekte proxy'nin IP'sine sabitlenir - butun kullanicilar
+// TEK bir rate-limit havuzunu paylasir ve login brute-force korumasi
+// (5 deneme/60sn, IP basina) sessizce devre disi kalir. Bkz. docs/Deployment.md.
+app.UseHttpsRedirection();
 
 app.UseHttpsRedirection();
 app.UseResponseCompression();
