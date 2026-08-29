@@ -49,6 +49,20 @@ bir varsayimla ayaga kalkmaz. Hepsi `.env` dosyasindan (repo'ya girmez,
 yol + kalici volume) — ortam degiskeni olarak disari acilmadi, degistirmek
 volume mount'unu da degistirmeyi gerektirir.
 
+## CORS — izin verilmeyen origin sessizce basarisiz olur
+
+CORS zaten koda gomulu DEGIL: `Program.cs` `Cors:AllowedOrigins` config
+bolumunden okur (appsettings'te bir dizi; prod'da `CORS_ALLOWED_ORIGIN_0`/
+`_1`/`_2`... env degiskenleriyle doldurulur, yukaridaki tabloya bakin).
+Allowlist'te olmayan bir origin'den gelen istek icin taraycini CORS hatasi
+SESSIZCE kalir (tarayici standardi, backend'in degistirebilecegi bir sey
+degil) — network sekmesinde istek "basarili" (200) gorunebilirken konsolda
+CORS hatasi cikmasi, ilk bakista "backend calisiyor, frontend bozuk"
+izlenimi verebilir. Deploy oncesi prod domain'i allowlist'e eklemeyi
+unutmayin; yeni bir dev/preview portu (Vite'in `5174`, `vite preview`'in
+`4173` gibi) eklendiginde de `appsettings.Development.json`'a eklenmesi
+gerekir.
+
 ## Onune reverse proxy/load balancer eklenirse (henuz yok)
 
 Su anki `compose.prod.yaml` API container'ini dogrudan disari aciyor
