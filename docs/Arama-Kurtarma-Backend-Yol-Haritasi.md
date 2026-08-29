@@ -345,6 +345,31 @@ atomic switch mobil geliştiricinin sorumluluğu.
 | 12.8 | Global rate limiting | 0,5 |
 | 12.9 | Public read endpoint'leri (**gerekliliği önce doğrula**) | 1,5 |
 
+### 13. Mobil & Web Frontend Uyumluluk Düzeltmeleri — ~9,0 sa (post-MVP)
+
+Mobil ekip (`docs/mobil_ekip_geri_bildirim_v1.1.md`) ve web frontend ekibi
+(`docs/Web-Frontend-Geri-Bildirim-v2.md` + `docs/Frontend-Notlar-ve-Oneriler.md`)
+gerçek çalışan backend'e karşı entegrasyon yaparken bulduğu, sözleşmeyi
+bozmayan (additive) küçük boşluk/uyumsuzluklar. İki ekip de temel
+sözleşmenin (alan adları, endpoint'ler, hata kodları, blok tipleri)
+tamamen uyumlu olduğunu doğruladı — aşağıdakiler netleştirme/küçük
+düzeltme, kırılma değil.
+
+| ID | Görev | Kaynak | Sa |
+|---|---|---|---|
+| 13.1 | Sync/CMS sözleşme netleştirmeleri (medya base URL, varyant grup başlığı, CORS notu, login 401 gövdesi) | mobil #1,#2 / web #3,#4 | 1,0 |
+| 13.2 | `/sync/changes`'e `book` alanı ekle | mobil #4 | 0,5 |
+| 13.3 | Publish `IsPublished`'a göre süzsün + tek seferlik backfill + `Book.IsPublished` bugfix'i | web #2 | 1,5 |
+| 13.4 | `ModuleDto.ContentCount` (admin panel N+1 düzeltmesi) | web #5 | 1,0 |
+| 13.5 | Reorder'ın alakasız bloğun `dataJson`'ını bozmasını önle | web #6 | 1,0 |
+| 13.6 | Tam `/users` CRUD (liste, rol değiştirme, pasifleştirme, kendi şifresini değiştirme) | web #7 | 3,0 |
+| 13.7 | Video/Animation `dataJson` taslak şeması (provisional) | mobil #3 | 1,0 |
+
+**Bilinçli olarak kapsam dışı:** Acil Durum Bandı backend desteği (web #1,
+bkz. §14 Faz 10 notu — sonradan eklenebilir, şimdi öncelik değil); web
+frontend'in kendi kod tabanındaki ölü kod/kitap seçici notları (web #8) —
+backend'i ilgilendirmiyor.
+
 ---
 
 ## 6. Bağımlılık Grafiği
@@ -569,6 +594,8 @@ PHASE 8 — Release Readiness                     3,5 sa   → M8
                                            ══ MVP TAMAM: 56 sa ══
 PHASE 9 — Hardening & Optimization             12,0 sa   → M9
                                         ══ PRODUCTION: ~68 sa ══
+PHASE 10 — Mobil & Web Uyumluluk Düzeltmeleri    9,0 sa   → M10
+                                    ══ TOPLAM: ~77 sa ══
 ```
 
 ### Orijinal plana göre değişenler
@@ -664,6 +691,7 @@ Her milestone **durulabilir** ve **gösterilebilir** — yarım iş bırakmaz.
 | **M7** | Secured | 52,5 sa | Refresh token, roller, lockout; yetkisiz erişim testleri geçiyor | ✅ |
 | **M8** | **MVP Deployable** | 56,0 sa | `docker compose up` ile prod imajı ayakta, health yeşil | ✅ |
 | **M9** | Hardened | 68,0 sa | ETag, cache, rollback, coverage, final review | ❌ |
+| **M10** | Mobil & Web Uyumlu | 77,0 sa | Mobil/web geri bildirimindeki tüm additive düzeltmeler yayında | ❌ |
 
 ---
 
@@ -917,3 +945,26 @@ ve deploy edilemeyen bir sistem kalır.
 - 12.2 (cache), 12.4 (ETag), 12.7 (WebP), 12.9 (Public read) — roadmap'in kendi ön
       koşulları (ölçüm/mobil stabilite/lisans/müşteri talebi) karşılanmadığı için bu
       fazda bilinçli olarak ERTELENDİ, görev-görev karar verildi.
+
+### PHASE 10 — Mobil & Web Uyumluluk Düzeltmeleri → M10
+
+Kaynak: `docs/mobil_ekip_geri_bildirim_v1.1.md` (4 madde) +
+`docs/Web-Frontend-Geri-Bildirim-v2.md` / `docs/Frontend-Notlar-ve-Oneriler.md`
+(8 madde) — iki takımın gerçek çalışan backend'e karşı entegrasyon sırasında
+bulduğu, sözleşmeyi bozmayan boşluk/uyumsuzluklar. Detaylı gerekçe/tasarım
+her alt görevin kendi commit mesajında ve §5.13'teki WBS tablosunda.
+
+- [x] 13.1 Sync/CMS sözleşme netleştirmeleri — medya base URL (aynı host, `/api/v{version}`
+      öneki YOK), varyant grubunun üst listede hangi title/summary'yi göstereceği (en küçük
+      `displayOrder`'lı varyant kazanır), `POST /auth/login`'in 401'inin (diğer uçların aksine)
+      dolu ProblemDetails döndüğü, CORS'un zaten config-driven olduğu (`Cors:AllowedOrigins`/
+      `CORS_ALLOWED_ORIGIN_0..`) — dördü de dokümantasyon-only, kod zaten doğru davranıyordu.
+- [ ] 13.2 `/sync/changes`'e `book` alanı ekle
+- [ ] 13.3 Publish `IsPublished`'a göre süzsün + tek seferlik backfill + `Book.IsPublished` bugfix'i
+- [ ] 13.4 `ModuleDto.ContentCount` (admin panel N+1 düzeltmesi)
+- [ ] 13.5 Reorder'ın alakasız bloğun `dataJson`'ını bozmasını önle
+- [ ] 13.6 Tam `/users` CRUD (liste, rol değiştirme, pasifleştirme, kendi şifresini değiştirme)
+- [ ] 13.7 Video/Animation `dataJson` taslak şeması (provisional)
+- 13.8 Acil Durum Bandı (web #1) — backend desteği (Book'a alan + Admin PUT + manifest'e
+      ek alan ya da yeni anonim endpoint) ERTELENDİ, kullanıcı onayıyla: şu an öncelik değil,
+      sonradan eklenebilir additive bir özellik.
