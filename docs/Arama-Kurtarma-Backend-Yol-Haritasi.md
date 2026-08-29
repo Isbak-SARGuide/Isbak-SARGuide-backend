@@ -965,7 +965,18 @@ her alt görevin kendi commit mesajında ve §5.13'teki WBS tablosunda.
       test verisi (Module 13/Content 100/Media 94) gerçek kitaba karışmış,
       contentCount'u 97 yerine 98 gösteriyordu — temizlenip yeniden yayınlandı
       (v18), gerçek sayı 97'ye döndü.
-- [ ] 13.3 Publish `IsPublished`'a göre süzsün + tek seferlik backfill + `Book.IsPublished` bugfix'i
+- [x] 13.3 Publish `IsPublished`'a göre süzsün + tek seferlik backfill + `Book.IsPublished`
+      bugfix'i — canlı doğrulama önce yapıldı: 8/10 gerçek Modül ve 85/97 gerçek Content
+      `IsPublished=false`'du (mobile'a zaten servis edilmesine rağmen) — filtre kod
+      değişikliğinden ÖNCE kapsamlı bir SQL backfill (sadece Book id=1, silinmemiş satırlar)
+      ile hepsi `true` yapıldı, yoksa bir sonraki publish 85 gerçek content'i sessizce
+      tombstone'lardı. `SnapshotBuilder.BuildSnapshot` artık Module/Content'i kendi
+      `IsPublished` bayrağına göre süzüyor — mevcut `AppendTombstones` mekanizması özel kod
+      gerekmeden bunu otomatik tombstone'lıyor. Yan bulgu: `Book.IsPublished` hiçbir yerde
+      set edilmiyordu (19+ gerçek yayından sonra bile hep varsayılan false) — `PublishAsync`
+      artık `book.Version` ile birlikte bunu da `true` yapıyor. Gerçek kitaba karşı doğrulandı:
+      backfill sonrası yeniden yayında contentCount hâlâ tam 97 (regresyon yok). 170/170 test
+      yeşil (4 yeni).
 - [ ] 13.4 `ModuleDto.ContentCount` (admin panel N+1 düzeltmesi)
 - [ ] 13.5 Reorder'ın alakasız bloğun `dataJson`'ını bozmasını önle
 - [ ] 13.6 Tam `/users` CRUD (liste, rol değiştirme, pasifleştirme, kendi şifresini değiştirme)
