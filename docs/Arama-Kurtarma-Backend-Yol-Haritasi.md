@@ -959,7 +959,12 @@ her alt görevin kendi commit mesajında ve §5.13'teki WBS tablosunda.
       `displayOrder`'lı varyant kazanır), `POST /auth/login`'in 401'inin (diğer uçların aksine)
       dolu ProblemDetails döndüğü, CORS'un zaten config-driven olduğu (`Cors:AllowedOrigins`/
       `CORS_ALLOWED_ORIGIN_0..`) — dördü de dokümantasyon-only, kod zaten doğru davranıyordu.
-- [ ] 13.2 `/sync/changes`'e `book` alanı ekle
+- [x] 13.2 `/sync/changes`'e `book` alanı ekle — `Modules`'la ayni gerekce ve
+      desen (7.3-b), koşulsuz her yanıtta gelir. Örneği canlı v17→v18 verisine
+      karşı yeniden üretirken keşfedilen bir yan bulgu: dev DB'de Faz 6'dan kalma
+      test verisi (Module 13/Content 100/Media 94) gerçek kitaba karışmış,
+      contentCount'u 97 yerine 98 gösteriyordu — temizlenip yeniden yayınlandı
+      (v18), gerçek sayı 97'ye döndü.
 - [ ] 13.3 Publish `IsPublished`'a göre süzsün + tek seferlik backfill + `Book.IsPublished` bugfix'i
 - [ ] 13.4 `ModuleDto.ContentCount` (admin panel N+1 düzeltmesi)
 - [ ] 13.5 Reorder'ın alakasız bloğun `dataJson`'ını bozmasını önle
