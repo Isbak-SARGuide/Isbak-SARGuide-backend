@@ -310,10 +310,12 @@ public class SyncChangesTests(ApiFactory factory)
         using var scope = factory.Services.CreateScope();
         var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
 
-        var module = new Module { Name = moduleName, DisplayOrder = 1 };
+        // Faz 13.3: IsPublished=true bilincli - bu testler delta motorunu test
+        // ediyor, IsPublished filtresinin kendisini degil.
+        var module = new Module { Name = moduleName, DisplayOrder = 1, IsPublished = true };
         for (var i = 0; i < contentTitles.Length; i++)
         {
-            module.Contents.Add(new Content { Title = contentTitles[i], DisplayOrder = i + 1 });
+            module.Contents.Add(new Content { Title = contentTitles[i], DisplayOrder = i + 1, IsPublished = true });
         }
 
         var book = new Book
@@ -371,7 +373,7 @@ public class SyncChangesTests(ApiFactory factory)
         // B zaten DisplayOrder=2'yi tutuyordur). Max+1 bosluklardan bagimsiz
         // her zaman kullanilmamis bir deger uretir.
         var nextOrder = module.Contents.Count == 0 ? 1 : module.Contents.Max(c => c.DisplayOrder) + 1;
-        module.Contents.Add(new Content { Title = title, DisplayOrder = nextOrder });
+        module.Contents.Add(new Content { Title = title, DisplayOrder = nextOrder, IsPublished = true });
         await unitOfWork.SaveChangesAsync();
     }
 
@@ -430,6 +432,7 @@ public class SyncChangesTests(ApiFactory factory)
         {
             Title = contentTitle,
             DisplayOrder = module.Contents.Count + 1,
+            IsPublished = true,
             Blocks = { new ContentBlock { Type = ContentBlockType.Image, DisplayOrder = 1, Media = media } },
         });
 

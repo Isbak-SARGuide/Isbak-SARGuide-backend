@@ -52,6 +52,14 @@ public class PublishingService(IUnitOfWork unitOfWork, ILogger<PublishingService
         // yazar. Entity zaten izleniyor (tracked) - SaveChanges farki gorur.
         book.Version = newVersion;
 
+        // Faz 13.3 bugfix: Book.IsPublished hicbir yerde set edilmiyordu (16+
+        // gercek yayindan sonra bile hep varsayilan false kaldi) - bu Module/
+        // Content'teki IsPublished'dan FARKLI bir alan (Create/UpdateBookDto'da
+        // hic yok, salt-okunur): "bu kitap en az bir kez yayinlandi mi" anlamina
+        // geliyor, bir taslak kapisi degil. Bir kez true olduktan sonra tekrar
+        // false'a donmesi gerekmez.
+        book.IsPublished = true;
+
         var snapshot = SnapshotBuilder.BuildSnapshot(book);
         var publication = BuildPublicationShell(bookId, newVersion, snapshot, publishedAt, publishedById);
 

@@ -197,7 +197,9 @@ public class RollbackTests(ApiFactory factory)
         using var scope = factory.Services.CreateScope();
         var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
 
-        var module = new Module { Name = "Rollback Test Modülü", DisplayOrder = 1 };
+        // Faz 13.3: IsPublished=true bilincli - bu testler rollback motorunu
+        // test ediyor, IsPublished filtresinin kendisini degil.
+        var module = new Module { Name = "Rollback Test Modülü", DisplayOrder = 1, IsPublished = true };
 
         for (var i = 0; i < contentTitles.Length; i++)
         {
@@ -206,6 +208,7 @@ public class RollbackTests(ApiFactory factory)
                 Title = contentTitles[i],
                 Summary = $"{contentTitles[i]} özeti",
                 DisplayOrder = i + 1,
+                IsPublished = true,
                 Blocks =
                 {
                     new ContentBlock { Type = ContentBlockType.Text, Text = $"{contentTitles[i]} metni", DisplayOrder = 1 },
