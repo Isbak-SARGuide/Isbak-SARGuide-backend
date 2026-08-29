@@ -10,7 +10,10 @@ yanıttır** — elle yazılmamıştır. Uzun listeler (97 content'ten 2'si gibi
 okunabilirlik için kısaltılmıştır, ama kısaltılan kısım hep gerçek verinin
 bir alt kümesidir; hiçbir alan adı, sıralama ya da biçim uydurulmamıştır.
 Örnekler 2026-08-28'de, kitabın tamamı (10 modül, 97 konu) yayınlanmış
-**v16** sürümüne karşı yeniden üretildi.
+**v16** sürümüne karşı yeniden üretildi. §3.3'teki `changes` örneği,
+`book` alanının eklenmesiyle (v1.2) 2026-08-29'da **v18**'e karşı ayrıca
+tazelendi — diğer bölümlerdeki örnekler hâlâ v16'dandır, aradaki
+versiyonlarda sadece bu belgeyle ilgisiz test verisi eklenip temizlendi.
 
 ---
 
@@ -268,14 +271,22 @@ sonraki güncellemeler `changes` ile gelir.
 > değişmediyse, bu yanıtta **hiç yer almaz** — bu bir hata değil, tasarımın
 > ta kendisi. "Neden bazı content'ler hiç gelmiyor?" sorusunun cevabı budur.
 
-**Örnek yanıt** (gerçek, `fromVersion=15` — bir önceki yayın ile şu anki
-(v16) arasındaki gerçek fark; bu yayında sadece bir content silinmiş,
+**Örnek yanıt** (gerçek, `fromVersion=17` — bir önceki yayın ile şu anki
+(v18) arasındaki gerçek fark; bu yayında sadece bir content silinmiş,
 yeni/değişen content yok):
 
 ```json
 {
-  "fromVersion": 15,
-  "toVersion": 16,
+  "fromVersion": 17,
+  "toVersion": 18,
+  "book": {
+    "id": 1,
+    "title": "Kentsel Arama Kurtarma El Kitabı",
+    "slug": "kentsel-arama-kurtarma-el-kitabi",
+    "description": "Kentsel arama kurtarma operasyonlarında görev alan ekipler için temel başvuru kaynağı.",
+    "languageCode": "tr",
+    "version": 18
+  },
   "upsertedContents": [],
   "deletedContentIds": [100],
   "modules": [
@@ -307,6 +318,7 @@ yeni/değişen content yok):
 |---|---|---|
 | `fromVersion` | int | İsteğinizdeki değer (yankı) |
 | `toVersion` | int | Sunucunun güncel sürümü — sonraki `changes` isteğinizde bunu `fromVersion` olarak kullanın |
+| `book` | object | **v1.2, additive.** `ToVersion`'daki güncel kitap durumu (`snapshot.book` ile aynı şekil) — `modules` gibi koşulsuz her yanıtta gelir, değişip değişmediğine bakılmaksızın |
 | `upsertedContents` | array | **Sadece değişen** content'ler — şekli `snapshot.contents[]` ile birebir aynı |
 | `deletedContentIds` | array\<int\> | Silinen content id'leri |
 | `modules` | array | **Her zaman güncel modül listesinin TAMAMI** (§8) |
@@ -549,3 +561,4 @@ süre paralel yaşamaya devam eder.
 | v1.0 | 2026-08-26 | İlk teslim — `manifest`, `snapshot`, `changes` (journal modeli, additive `modules` alanı dahil) |
 | v1.1 | 2026-08-26 | Additive: `contents[]`'e `variantGroupKey`/`variantLabel` eklendi — çok-varyantlı konuların (düğüm türleri gibi) mobilde string ayrıştırma yapılmadan sekmeli tek sayfada birleştirilebilmesi için (§3.2) |
 | — | 2026-08-28 | **Sözleşme değişmedi** (hâlâ v1.1) — tüm örnekler, kitabın tamamı yayınlandıktan sonraki gerçek v16 API yanıtlarıyla yenilendi (önceki örnekler 4 modüllük eski yer tutucu veriye aitti). İlk kez gerçek bir Image blok örneği (§3.2, §4) ve gerçek bir `changes` deltası (§3.3) eklendi. |
+| v1.2 | 2026-08-29 | Additive: `changes`'e `book` alanı eklendi (§3.3) — `manifest`/`snapshot`'ın aksine kitabın kendi meta verisini hiç taşımıyordu, `modules`'la aynı gerekçeyle (Faz 13.2, mobil ekip geri bildirimi #4) koşulsuz eklendi. §2'ye medya base URL netleştirmesi, §3.2'ye varyant grubu üst-liste title/summary kuralı eklendi (mobil ekip geri bildirimi #1, #2) — ikisi de mevcut davranışın dokümantasyonu, sözleşme değişikliği değil. |

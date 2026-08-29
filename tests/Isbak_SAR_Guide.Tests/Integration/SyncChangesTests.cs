@@ -32,6 +32,9 @@ public class SyncChangesTests(ApiFactory factory)
 
         changes.RootElement.GetProperty("fromVersion").GetInt32().ShouldBe(1);
         changes.RootElement.GetProperty("toVersion").GetInt32().ShouldBe(1);
+        // Faz 13.2: Modules gibi kosulsuz dolu - degisip degismedigine bakilmaksizin
+        // ToVersion'daki guncel Book durumu her yanitta gelir.
+        changes.RootElement.GetProperty("book").GetProperty("title").GetString().ShouldBe("Delta Test Kitabı");
         changes.RootElement.GetProperty("upsertedContents").GetArrayLength().ShouldBe(0);
         changes.RootElement.GetProperty("deletedContentIds").GetArrayLength().ShouldBe(0);
         // Modules kosulsuz doludur - "guncelsin" hata degil en mesru cevaptir.

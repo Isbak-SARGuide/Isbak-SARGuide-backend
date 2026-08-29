@@ -13,6 +13,12 @@ namespace Isbak_SAR_Guide.Business.DTOs.Sync;
 /// alani yok sayar); resmi v1.0 teslimi (7.6) henuz yapilmadigi icin bu
 /// son ucuz an.
 ///
+/// Book additive alan (Faz 13.2): manifest/snapshot'in aksine changes hic
+/// kitap meta verisi tasimiyordu - kitabin kendi basligi/aciklamasi bir
+/// yayinda degisirse istemci bunu ancak tam snapshot cekerek ogrenirdi.
+/// Modules'la ayni gerekce ve ayni "son ucuz an": ToVersion'daki GUNCEL
+/// Book durumu, degisip degismedigine bakilmaksizin her yanitta gelir.
+///
 /// UYARI - drift riski: gercek wire uretimi BU RECORD UZERINDEN DEGIL,
 /// Business/Mapping/SyncChangesJsonWriter'dadir (zarf elle Utf8JsonWriter
 /// ile yazilir; content parcalari ve Modules dizisi WriteRawValue ile ham
@@ -29,6 +35,7 @@ namespace Isbak_SAR_Guide.Business.DTOs.Sync;
 public sealed record SyncChangesDto(
     int FromVersion,
     int ToVersion,
+    SyncBookDto Book,
     IReadOnlyList<SyncContentDto> UpsertedContents,
     IReadOnlyList<int> DeletedContentIds,
     IReadOnlyList<SyncModuleDto> Modules,

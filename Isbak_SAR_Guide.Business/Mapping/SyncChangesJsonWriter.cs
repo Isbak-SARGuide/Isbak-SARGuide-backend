@@ -24,6 +24,7 @@ public static class SyncChangesJsonWriter
     public static string Write(
         int fromVersion,
         int toVersion,
+        string bookRawJson,
         IReadOnlyList<string> upsertedContentPayloads,
         IReadOnlyList<int> deletedContentIds,
         string modulesRawJson,
@@ -38,6 +39,9 @@ public static class SyncChangesJsonWriter
 
             writer.WriteNumber("fromVersion", fromVersion);
             writer.WriteNumber("toVersion", toVersion);
+
+            writer.WritePropertyName("book");
+            writer.WriteRawValue(bookRawJson);
 
             writer.WriteStartArray("upsertedContents");
             foreach (var payload in upsertedContentPayloads)
