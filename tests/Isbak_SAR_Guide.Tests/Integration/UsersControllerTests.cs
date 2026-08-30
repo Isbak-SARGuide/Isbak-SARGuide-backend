@@ -67,6 +67,20 @@ public class UsersControllerTests(ApiFactory factory)
     }
 
     [Fact]
+    public async Task ChangeRole_WithEditorToken_ReturnsForbidden()
+    {
+        // Rol degistirme, ayricalik yukseltme (privilege escalation) riski
+        // tasiyan en hassas eylem - [Authorize(Roles = RoleNames.Admin)]
+        // yanlislikla dususe bu test yakalamali (kod inceleme bulgusu:
+        // ChangeRole bu kapsamayan tek Admin-only eylemdi).
+        var client = await CreateAuthenticatedEditorClientAsync();
+
+        var response = await client.PutAsJsonAsync($"/api/v1/users/{Guid.NewGuid()}/role", new { role = RoleNames.Admin });
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
     public async Task Deactivate_WithEditorToken_ReturnsForbidden()
     {
         var client = await CreateAuthenticatedEditorClientAsync();

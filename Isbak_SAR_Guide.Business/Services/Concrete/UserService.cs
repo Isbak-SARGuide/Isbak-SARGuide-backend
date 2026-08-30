@@ -2,6 +2,7 @@ using FluentValidation;
 using Isbak_SAR_Guide.Business.Common;
 using Isbak_SAR_Guide.Business.DTOs.Users;
 using Isbak_SAR_Guide.Business.Services.Abstract;
+using Isbak_SAR_Guide.DataAccess.Repositories.Abstract;
 using Isbak_SAR_Guide.Entities.Identity;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -14,6 +15,7 @@ namespace Isbak_SAR_Guide.Business.Services.Concrete;
 /// </summary>
 public class UserService(
     UserManager<ApplicationUser> userManager,
+    IUnitOfWork unitOfWork,
     IValidator<CreateUserDto> createValidator,
     IValidator<ChangeRoleDto> changeRoleValidator,
     IValidator<ChangePasswordDto> changePasswordValidator) : IUserService
@@ -42,8 +44,7 @@ public class UserService(
         var createResult = await userManager.CreateAsync(user, dto.Password);
         if (!createResult.Succeeded)
         {
-            var message = string.Join("; ", createResult.Errors.Select(e => e.Description));
-            return Result.Failure<UserDto>(Error.Validation("User.CreateFailed", message));
+            return Result.Failure<UserDto>(createResult.ToValidationError("User.CreateFailed"));
         }
 
         var roleResult = await userManager.AddToRoleAsync(user, dto.Role);
@@ -53,8 +54,7 @@ public class UserService(
             // halde Admin "kullanici olustu" sanip rolsuz bir hesabin var
             // olduğunu asla ogrenmezdi (Faz 8 mimari incelemesinde bulundu).
             await userManager.DeleteAsync(user);
-            var message = string.Join("; ", roleResult.Errors.Select(e => e.Description));
-            return Result.Failure<UserDto>(Error.Validation("User.RoleAssignmentFailed", message));
+            return Result.Failure<UserDto>(roleResult.ToValidationError("User.RoleAssignmentFailed"));
         }
 
         return Result.Success(new UserDto(user.Id, user.UserName!, user.FullName, [dto.Role]));
@@ -100,18 +100,41 @@ public class UserService(
         }
 
         var currentRoles = await userManager.GetRolesAsync(user);
-        var removeResult = await userManager.RemoveFromRolesAsync(user, currentRoles);
-        if (!removeResult.Succeeded)
+
+        // Sistemdeki SON Admin'i Editor'a dusuremezsin - kurtarma yolu olmayan
+        // bir kilitlenme senaryosu, DeactivateAsync'teki self-lockout guard'la
+        // ayni gerekce (kod inceleme bulgusu, roadmap 13.6).
+        if (currentRoles.Contains(RoleNames.Admin) && dto.Role != RoleNames.Admin)
         {
-            var message = string.Join("; ", removeResult.Errors.Select(e => e.Description));
-            return Result.Failure<UserDto>(Error.Validation("User.RoleAssignmentFailed", message));
+            var adminCount = (await userManager.GetUsersInRoleAsync(RoleNames.Admin)).Count;
+            if (adminCount <= 1)
+            {
+                return Result.Failure<UserDto>(Error.Validation("User.LastAdminProtected", "Sistemde en az bir Admin kalmalı, bu kullanıcının rolü değiştirilemez."));
+            }
         }
 
-        var addResult = await userManager.AddToRoleAsync(user, dto.Role);
-        if (!addResult.Succeeded)
+        // Once YENI rolu ekle, SONRA eskilerini kaldir (tersi degil) - UserManager
+        // her cagriyi ayri/aninda commit eder (tek bir transaction degil), bu
+        // yuzden ikinci adim basarisiz olursa kullanici rolsuz degil FAZLA rollu
+        // kalir (daha az kotu bir ara durum). Zaten dto.Role'e sahipse AddToRoleAsync
+        // "already in role" hatasi verir, o yuzden onceden kontrol edilir.
+        if (!currentRoles.Contains(dto.Role))
         {
-            var message = string.Join("; ", addResult.Errors.Select(e => e.Description));
-            return Result.Failure<UserDto>(Error.Validation("User.RoleAssignmentFailed", message));
+            var addResult = await userManager.AddToRoleAsync(user, dto.Role);
+            if (!addResult.Succeeded)
+            {
+                return Result.Failure<UserDto>(addResult.ToValidationError("User.RoleAssignmentFailed"));
+            }
+        }
+
+        var rolesToRemove = currentRoles.Where(r => r != dto.Role).ToList();
+        if (rolesToRemove.Count > 0)
+        {
+            var removeResult = await userManager.RemoveFromRolesAsync(user, rolesToRemove);
+            if (!removeResult.Succeeded)
+            {
+                return Result.Failure<UserDto>(removeResult.ToValidationError("User.RoleAssignmentFailed"));
+            }
         }
 
         return Result.Success(new UserDto(user.Id, user.UserName!, user.FullName, [dto.Role]));
@@ -132,12 +155,30 @@ public class UserService(
             return Result.Failure(Error.NotFound("User.NotFound", $"Id={id} olan kullanıcı bulunamadı."));
         }
 
+        // Sistemdeki SON Admin pasiflestirilemez - ChangeRoleAsync'teki
+        // last-admin guard'la ayni gerekce (kod inceleme bulgusu).
+        if (await userManager.IsInRoleAsync(user, RoleNames.Admin))
+        {
+            var adminCount = (await userManager.GetUsersInRoleAsync(RoleNames.Admin)).Count;
+            if (adminCount <= 1)
+            {
+                return Result.Failure(Error.Validation("User.LastAdminProtected", "Sistemde en az bir Admin kalmalı, bu kullanıcı pasifleştirilemez."));
+            }
+        }
+
         var result = await userManager.SetLockoutEndDateAsync(user, DateTimeOffset.MaxValue);
         if (!result.Succeeded)
         {
-            var message = string.Join("; ", result.Errors.Select(e => e.Description));
-            return Result.Failure(Error.Validation("User.DeactivationFailed", message));
+            return Result.Failure(result.ToValidationError("User.DeactivationFailed"));
         }
+
+        // LockoutEnd tek basina yeterli DEGIL: mevcut bir refresh token
+        // (14 gunluk omur, JwtOptions.RefreshTokenExpiryDays) hala rotasyonla
+        // yenilenebilirdi - IsLockedOutAsync sadece LoginAsync'te kontrol
+        // edilir, RefreshAsync'te degil. Pasiflestirmenin erisimi GERCEKTEN
+        // kesmesi icin kullanicinin tum aktif refresh token'lari da iptal
+        // edilir (kod inceleme bulgusu, roadmap 13.6 - CRITICAL).
+        await unitOfWork.RefreshTokens.RevokeAllActiveForUserAsync(id, cancellationToken);
 
         return Result.Success();
     }
@@ -159,9 +200,13 @@ public class UserService(
         var result = await userManager.ChangePasswordAsync(user, dto.CurrentPassword, dto.NewPassword);
         if (!result.Succeeded)
         {
-            var message = string.Join("; ", result.Errors.Select(e => e.Description));
-            return Result.Failure(Error.Validation("User.PasswordChangeFailed", message));
+            return Result.Failure(result.ToValidationError("User.PasswordChangeFailed"));
         }
+
+        // Sifre calinmis olabilecegi icin degistiriliyor olabilir - eski
+        // oturumlarin (refresh token'larin) hayatta kalmasi bu senaryoda
+        // korumayi bosa cikarirdi, ayni DeactivateAsync'teki gerekce.
+        await unitOfWork.RefreshTokens.RevokeAllActiveForUserAsync(userId, cancellationToken);
 
         return Result.Success();
     }

@@ -1,4 +1,5 @@
 using Isbak_SAR_Guide.Business.Common;
+using Isbak_SAR_Guide.Business.DTOs.Auth;
 using Isbak_SAR_Guide.Business.DTOs.Users;
 using Isbak_SAR_Guide.Business.Services.Abstract;
 using Isbak_SAR_Guide.Entities.Identity;
@@ -140,6 +141,51 @@ public class UserServiceTests(ApiFactory factory)
     }
 
     [Fact]
+    public async Task DeactivateAsync_RevokesTargetUsersActiveRefreshToken()
+    {
+        // Kod inceleme bulgusu (CRITICAL): SetLockoutEndDateAsync TEK BASINA
+        // yetmiyordu - IsLockedOutAsync sadece LoginAsync'te kontrol ediliyordu,
+        // RefreshAsync'te degil, yani zaten alinmis bir refresh token
+        // pasiflestirmeden SONRA bile rotasyonla yenilenmeye devam edebiliyordu.
+        // Bu test, deaktivasyondan sonra o token'in artik ise yaramadigini
+        // dogrudan kanitliyor. Her adim KENDI scope'unda (ayri DbContext) -
+        // gercekte her HTTP istegi ayri bir scope alir; login/deactivate/refresh'i
+        // TEK scope'ta cagirmak, RevokeAllActiveForUserAsync'in (ExecuteUpdateAsync,
+        // change tracker'i atlar) zaten tracked olan RefreshToken nesnesini
+        // guncellemiyor gibi gorunmesine yol acan test-ozel bir EF identity-
+        // resolution artifact'i uretir - gercek uretimde olmayan bir durum.
+        const string password = "Editor!2026Pass";
+        var dto = new CreateUserDto($"revoke-{Guid.NewGuid():N}", password, "Token İptal Edilecek", RoleNames.Editor);
+        var created = await CreateAsync(dto);
+
+        string refreshToken;
+        using (var loginScope = factory.Services.CreateScope())
+        {
+            var authService = loginScope.ServiceProvider.GetRequiredService<IAuthService>();
+            var loginResult = await authService.LoginAsync(new LoginDto(dto.UserName, password));
+            loginResult.IsSuccess.ShouldBeTrue();
+            refreshToken = loginResult.Value.RefreshToken;
+        }
+
+        using (var deactivateScope = factory.Services.CreateScope())
+        {
+            var userManager = deactivateScope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            var admin = await userManager.FindByNameAsync("admin");
+            var userService = deactivateScope.ServiceProvider.GetRequiredService<IUserService>();
+            (await userService.DeactivateAsync(created.Value.Id, actingUserId: admin!.Id)).IsSuccess.ShouldBeTrue();
+        }
+
+        using (var refreshScope = factory.Services.CreateScope())
+        {
+            var authService = refreshScope.ServiceProvider.GetRequiredService<IAuthService>();
+            var refreshResult = await authService.RefreshAsync(new RefreshTokenRequestDto(refreshToken));
+
+            refreshResult.IsFailure.ShouldBeTrue();
+            refreshResult.Error!.Type.ShouldBe(ErrorType.Unauthorized);
+        }
+    }
+
+    [Fact]
     public async Task ChangeOwnPasswordAsync_WithCorrectCurrentPassword_Succeeds()
     {
         const string oldPassword = "Editor!2026Pass";
@@ -155,6 +201,42 @@ public class UserServiceTests(ApiFactory factory)
         var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
         var user = await userManager.FindByIdAsync(created.Value.Id);
         (await userManager.CheckPasswordAsync(user!, newPassword)).ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task ChangeOwnPasswordAsync_RevokesOtherActiveRefreshTokens()
+    {
+        // Sifre calinmis olabilecegi icin degistiriliyor olabilir - eski
+        // oturumlarin hayatta kalmasi bu senaryoda korumayi bosa cikarirdi.
+        // Ayri scope'lar icin bkz. DeactivateAsync_RevokesTargetUsersActiveRefreshToken'daki not.
+        const string oldPassword = "Editor!2026Pass";
+        const string newPassword = "Editor!2027PassNew";
+        var dto = new CreateUserDto($"pwdrevoke-{Guid.NewGuid():N}", oldPassword, "Oturum İptal", RoleNames.Editor);
+        var created = await CreateAsync(dto);
+
+        string refreshToken;
+        using (var loginScope = factory.Services.CreateScope())
+        {
+            var authService = loginScope.ServiceProvider.GetRequiredService<IAuthService>();
+            var loginResult = await authService.LoginAsync(new LoginDto(dto.UserName, oldPassword));
+            loginResult.IsSuccess.ShouldBeTrue();
+            refreshToken = loginResult.Value.RefreshToken;
+        }
+
+        using (var changePasswordScope = factory.Services.CreateScope())
+        {
+            var userService = changePasswordScope.ServiceProvider.GetRequiredService<IUserService>();
+            (await userService.ChangeOwnPasswordAsync(created.Value.Id, new ChangePasswordDto(oldPassword, newPassword))).IsSuccess.ShouldBeTrue();
+        }
+
+        using (var refreshScope = factory.Services.CreateScope())
+        {
+            var authService = refreshScope.ServiceProvider.GetRequiredService<IAuthService>();
+            var refreshResult = await authService.RefreshAsync(new RefreshTokenRequestDto(refreshToken));
+
+            refreshResult.IsFailure.ShouldBeTrue();
+            refreshResult.Error!.Type.ShouldBe(ErrorType.Unauthorized);
+        }
     }
 
     [Fact]
