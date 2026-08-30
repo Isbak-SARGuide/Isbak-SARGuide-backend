@@ -1010,7 +1010,13 @@ her alt görevin kendi commit mesajında ve §5.13'teki WBS tablosunda.
       yeşil (12 yeni: 8 servis + 4 HTTP-seviyesi, self-lockout guard ve Editor'ün kendi şifresini
       değiştirebildiğinin canlı kanıtı dahil). `docs/CMS-API-Sozlesmesi-v1.md` §3.5 dört yeni uç +
       auth-tasarım notuyla güncellendi.
-- [ ] 13.7 Video/Animation `dataJson` taslak şeması (provisional)
+- [x] 13.7 Video/Animation `dataJson` taslak şeması (provisional) — doküman-only, kod
+      değişikliği yok (`ContentBlock.DataJson` zaten şemasız arbitrary JSON kabul ediyor,
+      Table/Warning'le aynı). `docs/Sync-Sozlesmesi-v2.md` §4.1/§4.2'ye eklendi, açıkça
+      "PROVISIONAL — henüz gerçek içerik yok" uyarısıyla işaretli: Video için mevcut `media`
+      alanı yeterli, sadece elle seçilmiş kapak görseli gerekirse `dataJson.thumbnailMediaId`;
+      Animation için `dataJson.steps` dizisi (her adım kendi `text` + opsiyonel `mediaId`'si).
+      Zamanlama/süre bilgisi bilerek dışarıda bırakıldı (YAGNI, gerçek ihtiyaç yok).
 - 13.8 Acil Durum Bandı (web #1) — backend desteği (Book'a alan + Admin PUT + manifest'e
       ek alan ya da yeni anonim endpoint) ERTELENDİ, kullanıcı onayıyla: şu an öncelik değil,
       sonradan eklenebilir additive bir özellik.

@@ -402,6 +402,58 @@ yukarıdaki gibi gerçek örnekler artık mevcut); bu iki tip için `media`/
 `dataJson` alanı dolu geldiğinde şekli yukarıdaki §3.1'deki
 `MediaSummaryDto` iledir.
 
+> **⚠️ PROVISIONAL — henüz gerçek içerik yok, şema kesin DEĞİL (Faz 13.7).**
+> Aşağıdaki iki alt bölüm, mobil ekibin UI'ı önceden tasarlayabilmesi için
+> bir başlangıç noktası — §5'teki checksum kuralı gibi **donmuş bir
+> sözleşme değil**. Kitaba gerçek bir Video/Animation bloğu eklendiğinde bu
+> bölüm gerçek bir örnekle değiştirilecek (tıpkı Image/Table'ın yukarıda
+> yapıldığı gibi) ve o noktada şekil değişebilir.
+
+### 4.1 Video (`type=3`) — provisional
+
+Video dosyasının kendisi zaten `media` alanında (`MediaSummaryDto`) taşınıyor
+— ayrı bir `dataJson` şemasına **gerek yok** varsayılan durumda, `dataJson`
+`null` kalır. Tek olası ek alan: video dosyasından ayrı, elle seçilmiş bir
+kapak görseli isteniyorsa (`media`'daki dosyanın ilk karesi otomatik
+üretilmiyor, backend'de video transcoding/thumbnail çıkarma yok):
+
+```json
+{
+  "type": 3,
+  "text": null,
+  "dataJson": "{\"thumbnailMediaId\":42}",
+  "media": { "id": 41, "url": "media/.../egzersiz-videosu.mp4", "checksum": "...", "size": 12345678 }
+}
+```
+
+`thumbnailMediaId`, ayrı bir `Media` satırına (bir `Image` dosyasına) işaret
+eder — mobil bunu `media[]` listesinde `id`'ye göre arayıp çözer, aynı
+manifest'teki `media` dizisi gibi (bkz. §3.1). Gerçek bir video içeriği
+gelene kadar bu alan hiç kullanılmayabilir de.
+
+### 4.2 Animation (`type=4`) — provisional
+
+Bir animasyon genelde **birden fazla** görsel/adımdan oluşur (örn. bir
+düğüm bağlama sekansı) — tek bir `media` alanı yetmez, bu yüzden
+`dataJson` içinde bir `steps` dizisi öneriliyor, her adım kendi kısa
+metnini ve (varsa) kendi görselinin `Media` id'sini taşır:
+
+```json
+{
+  "type": 4,
+  "text": null,
+  "dataJson": "{\"steps\":[{\"text\":\"İpin ucunu çapraz geçirin.\",\"mediaId\":50},{\"text\":\"Halkadan geçirip sıkın.\",\"mediaId\":51}]}",
+  "media": null
+}
+```
+
+`media` alanı bu tipte muhtemelen hep `null` kalır — her adımın kendi
+`mediaId`'si `dataJson` içinde taşınır (tek bir "kapak" görseli lazımsa
+o da `media` alanına konabilir, ama bu henüz gerçek bir ihtiyaçla
+doğrulanmadı — YAGNI, ilk gerçek Animation içeriği eklendiğinde netleşir).
+Adım süresi/otomatik geçiş hızı gibi zamanlama bilgisi bilerek dışarıda
+bırakıldı — hiçbir gerçek kullanım örneği bunu gerektirmiyor henüz.
+
 ---
 
 ## 5. Bütünlük Doğrulama (Checksum)
