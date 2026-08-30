@@ -715,6 +715,51 @@ Gövde yok. O anki taslak ağacın tamamını donmuş bir sürüm olarak açar
 > olursa (iki admin aynı anda yayınlarsa) ikinci istek `409 Conflict`
 > alır — tekrar deneyin.
 
+### `POST /books/{bookId}/rollback` — sadece `Admin`
+
+Geçmiş bir sürümü **yeni bir sürüm olarak** tekrar yayınlar (immutable
+publication modeli gereği "geri alma" değil, `git revert` gibi — eski satırlar
+değişmez, sadece yeni bir tanesi eklenir). CMS'teki taslak ağaca **hiç
+dokunmaz**, sadece mobil/web'in gördüğü yayını etkiler. Route sınıf
+şablonunun (`.../publish`) altında değil, mutlak override ile kardeş bir
+kaynak olarak tanımlı. Gövde:
+
+```json
+{ "toVersion": 1 }
+```
+
+Başarılı yanıt, `publish` ile birebir aynı şekilde `PublishResultDto` döner
+(yeni `version` = `max(mevcut) + 1`). Hatalar:
+
+- `toVersion` mevcut en son sürüme eşit ya da ondan büyükse → `400 Validation`,
+  kod: `Publishing.RollbackTargetNotOlder` (rollback her zaman **geriye**
+  gitmeli).
+- `bookId` ya da `toVersion` yoksa → `404`, kod: `Publishing.BookNotFound`
+  / `Publishing.VersionNotFound`.
+
+### `GET /books/{bookId}/publications` — sadece `Admin`
+
+Kitabın **tüm yayın geçmişini** (en yeniden eskiye) döner — `rollback`'in
+`toVersion` girdisini elle ezberlemek yerine gerçek bir sürüm listesi/dropdown
+kurmak için (web ekibinin geri bildirimi). `SnapshotJson` (megabaytlik kolon)
+**hiç dönmez**, sadece özet:
+
+```json
+[
+  {
+    "publicationId": 12,
+    "version": 16,
+    "publishedAt": "2026-08-26T20:44:05.4212246Z",
+    "publishedByUserName": "admin",
+    "contentCount": 97,
+    "checksum": "7474124FE509AF711CA283468B2712ED22F1A53BC2972A407FC870575D1DF269"
+  }
+]
+```
+
+Kitap hiç yayınlanmamışsa boş dizi döner (hata değil). `bookId` yoksa `404`,
+kod: `Publishing.BookNotFound`.
+
 ---
 
 ## 10. Sayfalama

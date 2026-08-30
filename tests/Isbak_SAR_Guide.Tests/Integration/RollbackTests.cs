@@ -176,6 +176,61 @@ public class RollbackTests(ApiFactory factory)
         result.Error!.Type.ShouldBe(ErrorType.NotFound);
     }
 
+    [Fact]
+    public async Task GetHistoryAsync_ReturnsPublicationsNewestFirstWithContentCount()
+    {
+        // Web ekibinin geri bildirimi (Frontend-Notlar-ve-Oneriler.md madde
+        // 9b): rollback UI'inin gercek bir "surum gecmisi" listesine ihtiyaci
+        // var, elle "toVersion yaz" yerine.
+        var bookId = await CreateBookWithContentsAsync("Kalan", "Silinecek");
+        var adminId = await GetAdminIdAsync();
+        await PublishAsync(bookId, adminId); // v1: 2 content
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+            var book = await unitOfWork.Books.GetWithFullTreeAsync(bookId);
+            unitOfWork.Contents.Remove(book!.Modules.Single().Contents.Single(c => c.Title == "Silinecek"));
+            await unitOfWork.SaveChangesAsync();
+        }
+        await PublishAsync(bookId, adminId); // v2: 1 content (tombstone)
+
+        using var scope2 = factory.Services.CreateScope();
+        var publishingService = scope2.ServiceProvider.GetRequiredService<IPublishingService>();
+        var result = await publishingService.GetHistoryAsync(bookId);
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.Select(p => p.Version).ShouldBe([2, 1]); // en yeniden eskiye
+        result.Value.Single(p => p.Version == 1).ContentCount.ShouldBe(2);
+        result.Value.Single(p => p.Version == 2).ContentCount.ShouldBe(1);
+        result.Value.All(p => p.PublishedByUserName == "admin").ShouldBeTrue();
+        result.Value.All(p => !string.IsNullOrWhiteSpace(p.Checksum)).ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task GetHistoryAsync_BookNeverPublished_ReturnsEmptyList()
+    {
+        var bookId = await CreateBookWithContentsAsync("İçerik");
+
+        using var scope = factory.Services.CreateScope();
+        var publishingService = scope.ServiceProvider.GetRequiredService<IPublishingService>();
+        var result = await publishingService.GetHistoryAsync(bookId);
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task GetHistoryAsync_BookDoesNotExist_ReturnsNotFound()
+    {
+        using var scope = factory.Services.CreateScope();
+        var publishingService = scope.ServiceProvider.GetRequiredService<IPublishingService>();
+        var result = await publishingService.GetHistoryAsync(999_999);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error!.Type.ShouldBe(ErrorType.NotFound);
+    }
+
     // ---- Yardımcılar ----
 
     private async Task<Result<Business.DTOs.Publishing.PublishResultDto>> PublishAsync(int bookId, string adminId)

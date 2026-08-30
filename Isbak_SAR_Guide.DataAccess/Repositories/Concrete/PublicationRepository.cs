@@ -76,4 +76,11 @@ public class PublicationRepository(Isbak_SAR_GuideDbContext dbContext) : IPublic
 
     public async Task AddAsync(BookPublication publication, CancellationToken cancellationToken = default) =>
         await _publications.AddAsync(publication, cancellationToken);
+
+    public async Task<IReadOnlyList<PublicationHistoryRow>> GetHistoryAsync(int bookId, CancellationToken cancellationToken = default) =>
+        await _publications
+            .Where(p => p.BookId == bookId)
+            .OrderByDescending(p => p.Version)
+            .Select(p => new PublicationHistoryRow(p.Id, p.Version, p.PublishedBy.UserName!, p.ManifestJson))
+            .ToListAsync(cancellationToken);
 }

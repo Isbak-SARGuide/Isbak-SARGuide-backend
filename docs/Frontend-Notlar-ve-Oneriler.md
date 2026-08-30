@@ -173,10 +173,9 @@ uç noktaymış, tamamlandı. Frontend'deki "geri alınamaz" uyarısı artık ka
 yumuşatılabilir; kullanıcı `activate` ile geri getirilebiliyor (refresh token'ları geri
 gelmiyor, kullanıcı yeniden login olmak zorunda — beklenen).
 
-**b) Rollback için hangi sürümlerin var olduğunu görecek bir endpoint yok.**
-`POST /books/{bookId}/rollback` bir `toVersion` sayısı istiyor ama geçmiş yayınları
-(hangi sürümler var, ne zaman yayınlanmış, kaç içerik içeriyordu) listeleyen bir
-`GET /books/{bookId}/publications` gibi bir endpoint yok. Şu an admin panelinde rollback
-inputu "elle bir sayı yaz" şeklinde — kullanılabilir değil, admin'in versiyon numaralarını
-ezbere bilmesi gerekiyor. Böyle bir liste endpoint'i eklenirse UI'ı gerçek bir "sürüm geçmişi"
-dropdown'ına çevirebiliriz.
+**b) ~~Rollback için hangi sürümlerin var olduğunu görecek bir endpoint yok~~ — ÇÖZÜLDÜ (2026-08-30).**
+`GET /books/{bookId}/publications` eklendi (Admin-only) — kitabın tüm yayın geçmişini
+(en yeniden eskiye) `{publicationId, version, publishedAt, publishedByUserName, contentCount,
+checksum}` şeklinde döner, `SnapshotJson` hiç taşımaz (küçük payload). Kitap hiç
+yayınlanmamışsa boş dizi (hata değil). Rollback UI'ı artık gerçek bir "sürüm geçmişi"
+dropdown'ına çevrilebilir — `toVersion`'ı elle yazmaya gerek kalmadı.

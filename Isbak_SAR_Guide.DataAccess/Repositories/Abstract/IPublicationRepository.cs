@@ -76,4 +76,12 @@ public interface IPublicationRepository
     /// eder - PublishedContent icin ayri bir repo bilerek yok.
     /// </summary>
     Task AddAsync(BookPublication publication, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Kitabin tum yayin gecmisini (en yeniden eskiye) doner - rollback UI'inin
+    /// "hangi versiyona donulebilir" listesi icin (web ekibinin geri bildirimi,
+    /// bkz. Frontend-Notlar-ve-Oneriler.md madde 9b). SnapshotJson'a HIC
+    /// dokunmaz - GetLatestManifestJsonAsync ile ayni projection ilkesi.
+    /// </summary>
+    Task<IReadOnlyList<PublicationHistoryRow>> GetHistoryAsync(int bookId, CancellationToken cancellationToken = default);
 }
