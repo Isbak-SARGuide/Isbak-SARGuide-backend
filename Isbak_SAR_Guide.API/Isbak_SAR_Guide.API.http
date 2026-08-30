@@ -1,19 +1,75 @@
 @Isbak_SAR_Guide.API_HostAddress = http://localhost:5007
 
+# Bu dosya VS Code "REST Client" eklentisiyle kullanilmak icin yazildi
+# (her ### blogunun ustunde beliren "Send Request" linkine tiklayin - Scalar'da
+# elle JSON doldurmaya gerek kalmaz). "login" istegi adlandirilmis (# @name login);
+# altindaki tum istekler {{login.response.body.$.accessToken}} ile o token'i
+# otomatik okur - siz token'i elle kopyalamazsiniz, sadece once login'i,
+# sonra istediginiz diger istegi calistirin. Rider/IntelliJ HTTP Client
+# kullaniyorsaniz bu degisken referansi calismaz; onun yerine
+# `> {% client.global.set("token", response.body.accessToken) %}` script'i
+# login isteginin altina eklemeniz gerekir.
+
+### ============================================================
+### AUTH
+### ============================================================
+
+### Login - admin token al (asagidaki tum korumali istekler buna dayanir)
+# @name login
+POST {{Isbak_SAR_Guide.API_HostAddress}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "userName": "admin",
+  "password": "Admin!Dev123"
+}
+
+### Refresh token - suresi dolan access token'i yenile
+POST {{Isbak_SAR_Guide.API_HostAddress}}/api/v1/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "{{login.response.body.$.refreshToken}}"
+}
+
+### ============================================================
+### SYNC - mobil/web okuyucu ucu, TAMAMI ANONIM (token GONDERMEYIN)
+### ============================================================
+
+### Sync - manifest (versiyon + checksum, kucuk/ucuz)
+GET {{Isbak_SAR_Guide.API_HostAddress}}/api/v1/sync/manifest?bookId=1
+Accept: application/json
+
+### Sync - snapshot (ilk kurulum, tam paket)
+GET {{Isbak_SAR_Guide.API_HostAddress}}/api/v1/sync/snapshot?bookId=1
+Accept: application/json
+
+### Sync - changes (delta, fromVersion=0 = "her seyi ver")
+GET {{Isbak_SAR_Guide.API_HostAddress}}/api/v1/sync/changes?bookId=1&fromVersion=0
+Accept: application/json
+
+### ============================================================
+### BOOKS (admin - token gerekir)
+### ============================================================
+
 ### Books - tum kitaplari listele
 GET {{Isbak_SAR_Guide.API_HostAddress}}/api/v1/books
+Authorization: Bearer {{login.response.body.$.accessToken}}
 Accept: application/json
 
 ### Books - id ile getir
 GET {{Isbak_SAR_Guide.API_HostAddress}}/api/v1/books/1
+Authorization: Bearer {{login.response.body.$.accessToken}}
 Accept: application/json
 
 ### Books - olmayan id (404 beklenir)
 GET {{Isbak_SAR_Guide.API_HostAddress}}/api/v1/books/9999
+Authorization: Bearer {{login.response.body.$.accessToken}}
 Accept: application/json
 
 ### Books - yeni kitap olustur
 POST {{Isbak_SAR_Guide.API_HostAddress}}/api/v1/books
+Authorization: Bearer {{login.response.body.$.accessToken}}
 Content-Type: application/json
 
 {
@@ -25,6 +81,7 @@ Content-Type: application/json
 
 ### Books - gecersiz veri (400 + validation hatasi beklenir)
 POST {{Isbak_SAR_Guide.API_HostAddress}}/api/v1/books
+Authorization: Bearer {{login.response.body.$.accessToken}}
 Content-Type: application/json
 
 {
@@ -35,6 +92,7 @@ Content-Type: application/json
 
 ### Books - guncelle
 PUT {{Isbak_SAR_Guide.API_HostAddress}}/api/v1/books/2
+Authorization: Bearer {{login.response.body.$.accessToken}}
 Content-Type: application/json
 
 {
@@ -46,3 +104,219 @@ Content-Type: application/json
 
 ### Books - sil (204 beklenir, soft delete)
 DELETE {{Isbak_SAR_Guide.API_HostAddress}}/api/v1/books/2
+Authorization: Bearer {{login.response.body.$.accessToken}}
+
+### ============================================================
+### MODULES (admin - Faz 5) - gercek book id=1 uzerinden
+### ============================================================
+
+### Modules - book 1'in modullerini sayfali listele
+GET {{Isbak_SAR_Guide.API_HostAddress}}/api/v1/books/1/modules?page=1&pageSize=20
+Authorization: Bearer {{login.response.body.$.accessToken}}
+Accept: application/json
+
+### Modules - id ile getir (gercek id: 2 = "Olay Yonetimi")
+GET {{Isbak_SAR_Guide.API_HostAddress}}/api/v1/books/1/modules/2
+Authorization: Bearer {{login.response.body.$.accessToken}}
+Accept: application/json
+
+### Modules - yeni modul olustur (DisplayOrder otomatik atanir, gondermeyin)
+# @name createModule
+POST {{Isbak_SAR_Guide.API_HostAddress}}/api/v1/books/1/modules
+Authorization: Bearer {{login.response.body.$.accessToken}}
+Content-Type: application/json
+
+{
+  "name": "Test Modulu",
+  "description": "REST Client ile olusturulan deneme modulu",
+  "isPublished": false
+}
+
+### Modules - az once olusturulani guncelle
+PUT {{Isbak_SAR_Guide.API_HostAddress}}/api/v1/books/1/modules/{{createModule.response.body.$.id}}
+Authorization: Bearer {{login.response.body.$.accessToken}}
+Content-Type: application/json
+
+{
+  "name": "Test Modulu (guncellendi)",
+  "description": "guncellenmis aciklama",
+  "isPublished": false
+}
+
+### Modules - sirala (tum kardes id'ler dahil olmali, eksik/fazla -> Validation hatasi)
+PUT {{Isbak_SAR_Guide.API_HostAddress}}/api/v1/books/1/modules/reorder
+Authorization: Bearer {{login.response.body.$.accessToken}}
+Content-Type: application/json
+
+{
+  "orderedIds": [1, 2, 3, 4, 5, 6, 7, 8, 10, 11]
+}
+
+### Modules - az once olusturulani sil (204 beklenir)
+DELETE {{Isbak_SAR_Guide.API_HostAddress}}/api/v1/books/1/modules/{{createModule.response.body.$.id}}
+Authorization: Bearer {{login.response.body.$.accessToken}}
+
+### ============================================================
+### CONTENTS (admin - Faz 5) - gercek module id=2 uzerinden
+### ============================================================
+
+### Contents - module 2'nin icerigini sayfali listele
+GET {{Isbak_SAR_Guide.API_HostAddress}}/api/v1/modules/2/contents?page=1&pageSize=20
+Authorization: Bearer {{login.response.body.$.accessToken}}
+Accept: application/json
+
+### Contents - id ile getir (gercek id: 2 = "Sinyaller ve Uyarilar")
+GET {{Isbak_SAR_Guide.API_HostAddress}}/api/v1/modules/2/contents/2
+Authorization: Bearer {{login.response.body.$.accessToken}}
+Accept: application/json
+
+### Contents - yeni content olustur
+# @name createContent
+POST {{Isbak_SAR_Guide.API_HostAddress}}/api/v1/modules/2/contents
+Authorization: Bearer {{login.response.body.$.accessToken}}
+Content-Type: application/json
+
+{
+  "title": "Test Konusu",
+  "summary": "REST Client ile olusturulan deneme konusu",
+  "isPublished": false,
+  "variantGroupKey": null,
+  "variantLabel": null
+}
+
+### Contents - az once olusturulani guncelle
+PUT {{Isbak_SAR_Guide.API_HostAddress}}/api/v1/modules/2/contents/{{createContent.response.body.$.id}}
+Authorization: Bearer {{login.response.body.$.accessToken}}
+Content-Type: application/json
+
+{
+  "title": "Test Konusu (guncellendi)",
+  "summary": "guncellenmis ozet",
+  "isPublished": false,
+  "variantGroupKey": null,
+  "variantLabel": null
+}
+
+### Contents - sirala
+PUT {{Isbak_SAR_Guide.API_HostAddress}}/api/v1/modules/2/contents/reorder
+Authorization: Bearer {{login.response.body.$.accessToken}}
+Content-Type: application/json
+
+{
+  "orderedIds": [2, 3, 4]
+}
+
+### Contents - az once olusturulani sil (204 beklenir)
+DELETE {{Isbak_SAR_Guide.API_HostAddress}}/api/v1/modules/2/contents/{{createContent.response.body.$.id}}
+Authorization: Bearer {{login.response.body.$.accessToken}}
+
+### ============================================================
+### CONTENT BLOCKS (admin - Faz 5) - gercek content id=2 uzerinden
+### ContentBlockType: Text=1, Image=2, Video=3, Animation=4, Warning=5, Table=6
+### ============================================================
+
+### ContentBlocks - content 2'nin bloklarini sayfali listele
+GET {{Isbak_SAR_Guide.API_HostAddress}}/api/v1/contents/2/blocks?page=1&pageSize=20
+Authorization: Bearer {{login.response.body.$.accessToken}}
+Accept: application/json
+
+### ContentBlocks - id ile getir (gercek id: 16, Type=1 Text)
+GET {{Isbak_SAR_Guide.API_HostAddress}}/api/v1/contents/2/blocks/16
+Authorization: Bearer {{login.response.body.$.accessToken}}
+Accept: application/json
+
+### ContentBlocks - yeni Text blogu olustur
+# @name createBlock
+POST {{Isbak_SAR_Guide.API_HostAddress}}/api/v1/contents/2/blocks
+Authorization: Bearer {{login.response.body.$.accessToken}}
+Content-Type: application/json
+
+{
+  "type": 1,
+  "text": "REST Client ile olusturulan deneme metin blogu.",
+  "dataJson": null,
+  "mediaId": null
+}
+
+### ContentBlocks - yeni Warning blogu ornegi (dataJson = severity)
+POST {{Isbak_SAR_Guide.API_HostAddress}}/api/v1/contents/2/blocks
+Authorization: Bearer {{login.response.body.$.accessToken}}
+Content-Type: application/json
+
+{
+  "type": 5,
+  "text": "Deneme uyari metni.",
+  "dataJson": "{\"severity\":\"high\"}",
+  "mediaId": null
+}
+
+### ContentBlocks - yeni Table blogu ornegi (dataJson = headers/rows)
+POST {{Isbak_SAR_Guide.API_HostAddress}}/api/v1/contents/2/blocks
+Authorization: Bearer {{login.response.body.$.accessToken}}
+Content-Type: application/json
+
+{
+  "type": 6,
+  "text": null,
+  "dataJson": "{\"headers\":[\"Sutun 1\",\"Sutun 2\"],\"rows\":[[\"deger 1\",\"deger 2\"]]}",
+  "mediaId": null
+}
+
+### ContentBlocks - az once olusturulan Text blogunu guncelle
+PUT {{Isbak_SAR_Guide.API_HostAddress}}/api/v1/contents/2/blocks/{{createBlock.response.body.$.id}}
+Authorization: Bearer {{login.response.body.$.accessToken}}
+Content-Type: application/json
+
+{
+  "type": 1,
+  "text": "guncellenmis metin.",
+  "dataJson": null,
+  "mediaId": null
+}
+
+### ContentBlocks - sirala
+PUT {{Isbak_SAR_Guide.API_HostAddress}}/api/v1/contents/2/blocks/reorder
+Authorization: Bearer {{login.response.body.$.accessToken}}
+Content-Type: application/json
+
+{
+  "orderedIds": [15, 16, 17]
+}
+
+### ContentBlocks - az once olusturulani sil (204 beklenir)
+DELETE {{Isbak_SAR_Guide.API_HostAddress}}/api/v1/contents/2/blocks/{{createBlock.response.body.$.id}}
+Authorization: Bearer {{login.response.body.$.accessToken}}
+
+### ============================================================
+### MEDIA (admin - Faz 6)
+### ============================================================
+
+### Media - dosya yukle (multipart)
+# NOT: bu istegi calistirmadan once "< ./test-image.png" satirini kendi
+# makinenizde gercekten var olan bir resmin yoluna cevirin (orn.
+# "< C:/Users/erena/Pictures/ornek.png") - REST Client o dosyayi okuyup
+# multipart/form-data govdesine gomer, siz elle byte kopyalamazsiniz.
+POST {{Isbak_SAR_Guide.API_HostAddress}}/api/v1/media
+Authorization: Bearer {{login.response.body.$.accessToken}}
+Content-Type: multipart/form-data; boundary=----BOUNDARY
+
+------BOUNDARY
+Content-Disposition: form-data; name="file"; filename="test.png"
+Content-Type: image/png
+
+< ./test-image.png
+------BOUNDARY--
+
+
+### Media - id ile getir (gercek bir medya id'si icin manifest yanitindaki "id" degerlerine bakin)
+GET {{Isbak_SAR_Guide.API_HostAddress}}/api/v1/media/1
+Authorization: Bearer {{login.response.body.$.accessToken}}
+Accept: application/json
+
+### ============================================================
+### PUBLISHING (sadece Admin rolu)
+### ============================================================
+
+### Publish - book 1'i yeni bir versiyon olarak yayinla
+POST {{Isbak_SAR_Guide.API_HostAddress}}/api/v1/books/1/publish
+Authorization: Bearer {{login.response.body.$.accessToken}}
