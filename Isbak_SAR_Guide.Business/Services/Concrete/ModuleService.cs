@@ -27,7 +27,8 @@ public class ModuleService(
         }
 
         var (items, totalCount) = await unitOfWork.Modules.GetPagedAsync(bookId, page, pageSize, isPublished, cancellationToken);
-        var pagedResult = new PagedResult<ModuleDto>(items.Adapt<List<ModuleDto>>(), totalCount, page, pageSize);
+        var dtos = items.Select(x => x.Module.Adapt<ModuleDto>() with { ContentCount = x.ContentCount }).ToList();
+        var pagedResult = new PagedResult<ModuleDto>(dtos, totalCount, page, pageSize);
         return Result.Success(pagedResult);
     }
 

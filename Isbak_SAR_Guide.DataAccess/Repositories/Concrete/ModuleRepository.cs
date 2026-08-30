@@ -8,7 +8,7 @@ namespace Isbak_SAR_Guide.DataAccess.Repositories.Concrete;
 public class ModuleRepository(Isbak_SAR_GuideDbContext dbContext)
     : EfRepository<Module>(dbContext), IModuleRepository
 {
-    public async Task<(IReadOnlyList<Module> Items, int TotalCount)> GetPagedAsync(
+    public async Task<(IReadOnlyList<ModuleWithContentCount> Items, int TotalCount)> GetPagedAsync(
         int bookId,
         int page,
         int pageSize,
@@ -29,6 +29,12 @@ public class ModuleRepository(Isbak_SAR_GuideDbContext dbContext)
             .OrderBy(m => m.DisplayOrder)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
+            // Contents.Count tek sorguda (SQL correlated subquery) geliyor -
+            // sayfa basina ayri "kac content" cagrisi yok (N+1'in tam ortadan
+            // kalktigi nokta). Soft-delete: global filtre navigation'a da
+            // uygulanir, ama acikca !IsDeleted eklemek niyeti sorgunun
+            // kendisinde okunur kilar.
+            .Select(m => new ModuleWithContentCount(m, m.Contents.Count(c => !c.IsDeleted)))
             .ToListAsync(cancellationToken);
 
         return (items, totalCount);

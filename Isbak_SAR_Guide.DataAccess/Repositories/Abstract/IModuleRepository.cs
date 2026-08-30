@@ -7,8 +7,11 @@ public interface IModuleRepository : IRepository<Module>
     /// <summary>
     /// Bir kitabin modullerini sayfali/filtreli ceker (Faz 5 CMS liste ucu).
     /// DisplayOrder'a gore siralanir - admin panelde de gercek gorunum sirasi.
+    /// Her modulun ContentCount'unu (Faz 13.4) AYNI sorguda dondurur - admin
+    /// panelin ayrica her modul icin "GET .../contents" cagirip saymasina
+    /// (N+1) gerek kalmaz.
     /// </summary>
-    Task<(IReadOnlyList<Module> Items, int TotalCount)> GetPagedAsync(
+    Task<(IReadOnlyList<ModuleWithContentCount> Items, int TotalCount)> GetPagedAsync(
         int bookId,
         int page,
         int pageSize,
