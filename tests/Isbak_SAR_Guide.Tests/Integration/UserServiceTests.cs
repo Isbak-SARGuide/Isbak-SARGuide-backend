@@ -203,6 +203,57 @@ public class UserServiceTests(ApiFactory factory)
     }
 
     [Fact]
+    public async Task ActivateAsync_ReactivatesADeactivatedUser()
+    {
+        const string password = "Editor!2026Pass";
+        var dto = new CreateUserDto($"reactivate-{Guid.NewGuid():N}", password, "Yeniden Aktive Edilecek", RoleNames.Editor);
+        var created = await CreateAsync(dto);
+
+        using var scope = factory.Services.CreateScope();
+        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        var admin = await userManager.FindByNameAsync("admin");
+        var userService = scope.ServiceProvider.GetRequiredService<IUserService>();
+
+        (await userService.DeactivateAsync(created.Value.Id, actingUserId: admin!.Id)).IsSuccess.ShouldBeTrue();
+        var lockedUser = await userManager.FindByIdAsync(created.Value.Id);
+        (await userManager.IsLockedOutAsync(lockedUser!)).ShouldBeTrue();
+
+        var activateResult = await userService.ActivateAsync(created.Value.Id);
+
+        activateResult.IsSuccess.ShouldBeTrue();
+        var reactivatedUser = await userManager.FindByIdAsync(created.Value.Id);
+        (await userManager.IsLockedOutAsync(reactivatedUser!)).ShouldBeFalse();
+
+        var authService = scope.ServiceProvider.GetRequiredService<IAuthService>();
+        var loginResult = await authService.LoginAsync(new LoginDto(dto.UserName, password));
+        loginResult.IsSuccess.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task ActivateAsync_WithAlreadyActiveUser_IsIdempotent()
+    {
+        var dto = new CreateUserDto($"already-active-{Guid.NewGuid():N}", "Editor!2026Pass", "Zaten Aktif", RoleNames.Editor);
+        var created = await CreateAsync(dto);
+
+        using var scope = factory.Services.CreateScope();
+        var userService = scope.ServiceProvider.GetRequiredService<IUserService>();
+        var result = await userService.ActivateAsync(created.Value.Id);
+
+        result.IsSuccess.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task ActivateAsync_WithNonExistentUser_ReturnsNotFound()
+    {
+        using var scope = factory.Services.CreateScope();
+        var userService = scope.ServiceProvider.GetRequiredService<IUserService>();
+        var result = await userService.ActivateAsync(Guid.NewGuid().ToString());
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error!.Type.ShouldBe(ErrorType.NotFound);
+    }
+
+    [Fact]
     public async Task ChangeOwnPasswordAsync_WithCorrectCurrentPassword_Succeeds()
     {
         const string oldPassword = "Editor!2026Pass";

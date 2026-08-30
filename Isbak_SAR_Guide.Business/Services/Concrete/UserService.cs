@@ -183,6 +183,27 @@ public class UserService(
         return Result.Success();
     }
 
+    public async Task<Result> ActivateAsync(string id, CancellationToken cancellationToken = default)
+    {
+        var user = await userManager.FindByIdAsync(id);
+        if (user is null)
+        {
+            return Result.Failure(Error.NotFound("User.NotFound", $"Id={id} olan kullanıcı bulunamadı."));
+        }
+
+        // Idempotent: zaten aktif bir kullaniciyi tekrar "aktive etmek" hata
+        // degil - RevokeAsync'teki (AuthService, acik logout) ayni gerekce.
+        // SetLockoutEndDateAsync(..., null) zaten aktif bir kullanicida da
+        // guvenle cagrilabilir (no-op'a yakin), ekstra kontrole gerek yok.
+        var result = await userManager.SetLockoutEndDateAsync(user, lockoutEnd: null);
+        if (!result.Succeeded)
+        {
+            return Result.Failure(result.ToValidationError("User.ActivationFailed"));
+        }
+
+        return Result.Success();
+    }
+
     public async Task<Result> ChangeOwnPasswordAsync(string userId, ChangePasswordDto dto, CancellationToken cancellationToken = default)
     {
         var validationResult = await changePasswordValidator.ValidateAsync(dto, cancellationToken);

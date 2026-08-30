@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text.Json;
 using Isbak_SAR_Guide.Business.DTOs.Auth;
 using Isbak_SAR_Guide.Entities.Identity;
 using Microsoft.AspNetCore.Identity;
@@ -88,6 +89,35 @@ public class UsersControllerTests(ApiFactory factory)
         var response = await client.PostAsync($"/api/v1/users/{Guid.NewGuid()}/deactivate", content: null);
 
         response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task Activate_WithEditorToken_ReturnsForbidden()
+    {
+        var client = await CreateAuthenticatedEditorClientAsync();
+
+        var response = await client.PostAsync($"/api/v1/users/{Guid.NewGuid()}/activate", content: null);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task Activate_WithAdminToken_ReactivatesDeactivatedUser()
+    {
+        var adminClient = await CreateAuthenticatedAdminClientAsync();
+        var newUser = new { userName = $"activate-http-{Guid.NewGuid():N}", password = "Editor!2026Pass", fullName = "HTTP Aktivasyon", role = RoleNames.Editor };
+        var createResponse = await adminClient.PostAsJsonAsync("/api/v1/users", newUser);
+        var created = await createResponse.Content.ReadFromJsonAsync<JsonElement>();
+        var userId = created.GetProperty("id").GetString();
+
+        (await adminClient.PostAsync($"/api/v1/users/{userId}/deactivate", content: null)).StatusCode.ShouldBe(HttpStatusCode.NoContent);
+
+        var activateResponse = await adminClient.PostAsync($"/api/v1/users/{userId}/activate", content: null);
+
+        activateResponse.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+
+        var loginResponse = await factory.CreateClient().PostAsJsonAsync("/api/v1/auth/login", new { userName = newUser.userName, password = newUser.password });
+        loginResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
     }
 
     [Fact]

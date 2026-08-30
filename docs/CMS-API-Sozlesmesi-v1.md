@@ -233,6 +233,14 @@ kimliği ise `400 Validation`, kod: `User.SelfDeactivationForbidden`).
 Sistemdeki **son Admin** de pasifleştirilemez (`400 Validation`, kod:
 `User.LastAdminProtected`). Başarılı yanıt `204 No Content`.
 
+#### `POST /users/{id}/activate` — `Admin`
+
+`deactivate`'in tersi — `LockoutEnd`'i kaldırır (`SetLockoutEndDateAsync(...,
+null)`), kullanıcı tekrar giriş yapabilir hale gelir. Gövde yok. **İdempotent**:
+zaten aktif bir kullanıcı için de `204` döner, hata değil. Refresh token'ları
+geri getirmez — kullanıcı yeniden `login` olmak zorunda (beklenen davranış,
+deaktivasyon sırasında iptal edilenler kalıcı olarak geçersizdir).
+
 #### `PUT /users/me/password` — herhangi bir authenticated kullanıcı
 
 Sadece **kendi** şifresi — `id` yok, hedef her zaman token'daki kullanıcı.

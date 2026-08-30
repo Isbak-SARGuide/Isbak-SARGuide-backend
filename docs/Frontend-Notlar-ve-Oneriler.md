@@ -166,13 +166,12 @@ obje değil.
 Kullanıcı yönetimini frontend'e bağlarken canlı testte karşıma çıkan, backend'e sorulmaya
 değer iki nokta:
 
-**a) Pasifleştirilen bir kullanıcıyı geri aktive etmenin yolu yok.**
-`POST /users/{id}/deactivate` var ama tersi (`activate`) yok. Test ettim: pasifleştirilen
-kullanıcı bir daha hiç giriş yapamıyor, API üzerinden geri döndürecek hiçbir uç nokta yok.
-Bu kasıtlı bir tasarım mı (örn. "pasifleştirme kalıcıdır, yanlışlıkla basmayın" gibi bir
-güvenlik kararı), yoksa `PUT /users/{id}/role` gibi bir "reactivate" endpoint'i eksik mi
-kaldı, netleşse iyi olur — çünkü frontend'de bu işlemi "geri alınamaz" diye çok sert bir
-uyarıyla sunuyoruz şu an, gerçekten öyleyse doğru, değilse gereksiz korkutuyoruz.
+**a) ~~Pasifleştirilen bir kullanıcıyı geri aktive etmenin yolu yok~~ — ÇÖZÜLDÜ (2026-08-30).**
+`POST /users/{id}/activate` eklendi (Admin-only, gövde yok, `LockoutEnd`'i kaldırır,
+idempotent). Kasıtlı bir "kalıcı pasifleştirme" tasarımı değilmiş — eksik kalmış bir
+uç noktaymış, tamamlandı. Frontend'deki "geri alınamaz" uyarısı artık kaldırılabilir/
+yumuşatılabilir; kullanıcı `activate` ile geri getirilebiliyor (refresh token'ları geri
+gelmiyor, kullanıcı yeniden login olmak zorunda — beklenen).
 
 **b) Rollback için hangi sürümlerin var olduğunu görecek bir endpoint yok.**
 `POST /books/{bookId}/rollback` bir `toVersion` sayısı istiyor ama geçmiş yayınları

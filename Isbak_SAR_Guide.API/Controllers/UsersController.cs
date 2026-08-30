@@ -65,6 +65,14 @@ public class UsersController(IUserService userService) : ControllerBase
         return result.ToActionResult(this);
     }
 
+    [HttpPost("{id}/activate")]
+    [Authorize(Roles = RoleNames.Admin)]
+    public async Task<IActionResult> Activate(string id, CancellationToken cancellationToken)
+    {
+        var result = await userService.ActivateAsync(id, cancellationToken);
+        return result.ToActionResult(this);
+    }
+
     // Sinif seviyesindeki [Authorize] disinda ek rol kisiti YOK, bilerek:
     // herhangi bir authenticated kullanici (Admin veya Editor) sadece KENDI
     // sifresini degistirebilir.
