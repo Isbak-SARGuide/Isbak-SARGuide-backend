@@ -214,16 +214,24 @@ döner, `roles` ve `isLockedOut` her kullanıcı için ayrıca hesaplanır:
 
 Gövde: `{ "role": "Admin" }` (`"Admin"` veya `"Editor"` olmalı). Kullanıcının
 **mevcut tüm rolleri** kaldırılıp yeni rol eklenir (rol değişimi, ekleme
-değil). Başarılı yanıt güncel `UserDto`.
+değil) — önce yeni rol eklenir, sonra eskiler kaldırılır (tersi değil),
+böylece ara bir adım başarısız olursa kullanıcı rolsüz değil fazla-rollü
+kalır. Sistemdeki **son Admin**'i Editor'a düşüremezsiniz
+(`400 Validation`, kod: `User.LastAdminProtected`) — kurtarılamaz bir
+admin-panel kilitlenmesini önler. Başarılı yanıt güncel `UserDto`.
 
 #### `POST /users/{id}/deactivate` — `Admin`
 
 Gövde yok. Hard delete **değil** — Identity'nin `LockoutEnd` mekanizmasıyla
 süresiz kilitler (`SetLockoutEndDateAsync(..., DateTimeOffset.MaxValue)`),
 `RefreshToken.UserId`/`BookPublication.PublishedById` gibi FK'ler bozulmaz.
+**Ayrıca kullanıcının tüm aktif refresh token'larını da iptal eder** —
+sadece `LockoutEnd` yeterli değildir, aksi halde zaten alınmış bir refresh
+token pasifleştirmeden sonra bile rotasyonla yenilenmeye devam edebilirdi.
 Bir Admin **kendi hesabını** pasifleştiremez (`id` == çağıran kullanıcının
-kimliği ise `400 Validation` — kurtarılamaz bir admin-panel kilitlenmesini
-önler). Başarılı yanıt `204 No Content`.
+kimliği ise `400 Validation`, kod: `User.SelfDeactivationForbidden`).
+Sistemdeki **son Admin** de pasifleştirilemez (`400 Validation`, kod:
+`User.LastAdminProtected`). Başarılı yanıt `204 No Content`.
 
 #### `PUT /users/me/password` — herhangi bir authenticated kullanıcı
 
@@ -238,7 +246,13 @@ Gövde:
 ```
 
 Yanlış `currentPassword` ya da Identity şifre politikasına uymayan
-`newPassword` → `400 Validation`. Başarılı yanıt `204 No Content`.
+`newPassword` → `400 Validation`. Başarılı olursa, çalınmış olabilecek bir
+kimlik bilgisi senaryosuna karşı kullanıcının **tüm aktif refresh
+token'ları iptal edilir** (deactivate ile aynı gerekçe) — bu isteği yapan
+istemcinin mevcut access token'ı kendi süresi dolana kadar geçerli kalır,
+ama refresh token'ı da dahil her cihaz/oturum bir sonraki yenilemede
+`401` alır ve yeniden login olmak zorunda kalır. Başarılı yanıt
+`204 No Content`.
 
 ---
 

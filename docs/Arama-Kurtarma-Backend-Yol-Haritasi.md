@@ -1006,10 +1006,53 @@ her alt görevin kendi commit mesajında ve §5.13'teki WBS tablosunda.
       canlı HTTP testi `403` döndürdü, çünkü ASP.NET Core çoklu `[Authorize]` filtrelerini
       **birleştirir** (AND), en yakını kazanmaz. Düzeltme: sınıf seviyesi sadece `[Authorize]`,
       Admin-only dört eylemin (Create/GetAll/ChangeRole/Deactivate) her biri kendi
-      `[Authorize(Roles = "Admin")]`'ini taşıyor, `me/password` ek kısıt taşımıyor. 184/184 test
-      yeşil (12 yeni: 8 servis + 4 HTTP-seviyesi, self-lockout guard ve Editor'ün kendi şifresini
-      değiştirebildiğinin canlı kanıtı dahil). `docs/CMS-API-Sozlesmesi-v1.md` §3.5 dört yeni uç +
-      auth-tasarım notuyla güncellendi.
+      `[Authorize(Roles = "Admin")]`'ini taşıyor, `me/password` ek kısıt taşımıyor.
+
+      **Faz sonu parallel security-reviewer + csharp-reviewer geçişi bir CRITICAL + bir HIGH +
+      üç MEDIUM bulgu çıkardı, hepsi bu görev bitmeden düzeltildi:**
+      - **CRITICAL** — `DeactivateAsync` sadece `SetLockoutEndDateAsync` çağırıyordu;
+        `IsLockedOutAsync` sadece `LoginAsync`'te kontrol ediliyordu, `RefreshAsync`'te değil —
+        yani zaten alınmış bir refresh token pasifleştirmeden SONRA bile rotasyonla süresiz
+        yenilenebiliyordu (deaktivasyon erişimi gerçekte KESMİYORDU). Düzeltme:
+        `DeactivateAsync`/`ChangeOwnPasswordAsync` artık `unitOfWork.RefreshTokens.
+        RevokeAllActiveForUserAsync` çağırıyor (`AuthService`'in reuse-tespitinde kullandığı
+        aynı metod); `AuthService.RefreshAsync`'e de defense-in-depth olarak `IsLockedOutAsync`
+        kontrolü eklendi.
+      - **HIGH** — `ChangeRoleAsync` önce TÜM mevcut rolleri kaldırıp sonra yeni rolü ekliyordu;
+        `UserManager` her çağrıyı ayrı/anında commit ettiği için (tek transaction değil) ikinci
+        adım başarısız olursa kullanıcı kalıcı olarak rolsüz kalabilirdi. Düzeltme: sıra
+        tersine çevrildi (önce ekle, sonra kaldır) — ara başarısızlık kullanıcıyı rolsüz değil
+        fazla-rollü bırakır.
+      - **MEDIUM** — Sistemdeki son Admin'i `ChangeRoleAsync` ile düşürmek ya da `DeactivateAsync`
+        ile pasifleştirmek mümkündü (kurtarılamaz kilitlenme, self-lockout guard'ın önlediği
+        AYNI senaryo ama başka bir yoldan) — her iki metoda da `GetUsersInRoleAsync(Admin).Count
+        <= 1` kontrolü eklendi (`User.LastAdminProtected`). **Not:** bu sınırı gerçek bir
+        entegrasyon testiyle kanıtlamak, paylaşılan seed `admin` hesabının rolünü değiştirmeyi
+        gerektirirdi — testler bunu yapmamalı (bkz. CLAUDE.md "Testing": "don't mutate the
+        shared seed ... admin user", düzinelerce başka test buna güveniyor) — bu yüzden bilerek
+        sadece kod incelemesiyle doğrulandı, otomatik testi yok.
+      - **MEDIUM** — `IdentityResult` hata mesajı birleştirme deseni (`string.Join("; ",
+        ...Errors.Select(...))`) `UserService.cs` içinde 6 kez tekrarlanmıştı — yeni
+        `Business/Common/IdentityResultExtensions.cs` (`ValidationResultExtensions`'ın
+        FluentValidation-dışı eşdeğeri) tüm çağrı noktalarına uygulandı.
+      - **MEDIUM** — `ChangeRole` (ayrıcalık yükseltme riski taşıyan en hassas eylem) HTTP
+        seviyesinde 403 testi eksikti — `ChangeRole_WithEditorToken_ReturnsForbidden` eklendi.
+
+      Düzeltmeler sırasında bir test-özel EF Core tuzağı da bulundu: `RevokeAllActiveForUserAsync`
+      (`ExecuteUpdateAsync`, change tracker'ı atlar) + aynı DbContext scope'unda önceden tracked
+      edilmiş bir `RefreshToken` + hemen ardından aynı scope'ta tracked bir sorgu (`FindByTokenHashAsync`)
+      birleşince, entity'nin bellekteki (stale) hâli döner — EF'in identity resolution'ı. Gerçek
+      üretimde her HTTP isteği ayrı bir scope aldığı için bu oluşmaz; testler bu yüzden
+      login/revoke/refresh adımlarını AYRI `CreateScope()` bloklarında çalıştırıyor (gerçek
+      istek sınırlarını taklit eder) — tek bir paylaşılan scope kullanan ilk hâli yanlışlıkla
+      yeşil çıkabiliyordu (bkz. `DeactivateAsync_RevokesTargetUsersActiveRefreshToken`'ın kod
+      yorumu).
+
+      187/187 test yeşil (15 yeni: 8 servis + 1 HTTP-seviyesi ilk turdan, +2 servis regresyon
+      testi + 1 eksik HTTP-seviyesi testi review sonrası eklendi). `docs/CMS-API-Sozlesmesi-v1.md`
+      §3.5 dört yeni uç + auth-tasarım notu + son-Admin/refresh-token-iptal davranışlarıyla
+      güncellendi. `pageSize` üst sınırı olmaması bilerek kapsam dışı bırakıldı (LOW,
+      Modules/Contents/ContentBlocks'ta da aynı ön-var-olan desen, bu branch'in dışında).
 - [x] 13.7 Video/Animation `dataJson` taslak şeması (provisional) — doküman-only, kod
       değişikliği yok (`ContentBlock.DataJson` zaten şemasız arbitrary JSON kabul ediyor,
       Table/Warning'le aynı). `docs/Sync-Sozlesmesi-v2.md` §4.1/§4.2'ye eklendi, açıkça
