@@ -983,7 +983,18 @@ her alt görevin kendi commit mesajında ve §5.13'teki WBS tablosunda.
       doldurur, tekil/create/update/reorder'da hep `0`). 171/171 test yeşil (1 yeni:
       soft-delete edilmiş content'in sayılmadığını doğruluyor). `docs/CMS-API-Sozlesmesi-v1.md`
       Module liste yanıtı güncellendi.
-- [ ] 13.5 Reorder'ın alakasız bloğun `dataJson`'ını bozmasını önle
+- [x] 13.5 Reorder'ın alakasız bloğun `dataJson`'ını bozmasını önle — `ReorderHelper`'ın
+      `markDirty`'si artık `IRepository<T>.Update(entity)` (tüm kolonları kirli işaretler)
+      yerine yeni `IRepository<T>.UpdateProperty(entity, x => x.DisplayOrder)`
+      (`EfRepository<T>`, `dbContext.Entry(entity).Property(...).IsModified = true`) kullanıyor
+      — UPDATE artık sadece `DisplayOrder` (+ audit `UpdatedAt`) kolonunu kapsıyor,
+      `ContentBlock.DataJson` (jsonb) hiç dokunulmuyor. Regresyon testi yazarken bir yan bulgu:
+      Postgres jsonb kolonu zaten İLK INSERT'te kendi kanonik biçimine dönüştürüyor (anahtar
+      sırası uzunluğa göre değişiyor, örn. `{"headers":...,"rows":...}` → `{"rows":...,
+      "headers":...}`) — bu yüzden test, orijinal gönderilen string'e değil, reorder ÖNCESİ
+      DB'den okunan kanonik değere karşı reorder SONRASI değeri karşılaştırıyor (tam eşleşme
+      bekleniyor, taşınan blok dahil). 172/172 test yeşil (1 yeni:
+      `ReorderAsync_DoesNotAlterSiblingsDataJson`).
 - [ ] 13.6 Tam `/users` CRUD (liste, rol değiştirme, pasifleştirme, kendi şifresini değiştirme)
 - [ ] 13.7 Video/Animation `dataJson` taslak şeması (provisional)
 - 13.8 Acil Durum Bandı (web #1) — backend desteği (Book'a alan + Admin PUT + manifest'e
