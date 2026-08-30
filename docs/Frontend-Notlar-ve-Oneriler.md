@@ -6,22 +6,15 @@ ileride bir özellik/karar gerektiğinde referans olsun diye.
 
 ---
 
-## 1. Acil Durum Bandı (Emergency Banner) — şu an sadece localStorage'da, DB'de değil
+## 1. ~~Acil Durum Bandı (Emergency Banner)~~ — KALDIRILDI (2026-08-30)
 
-`src/components/ui/EmergencyBanner.jsx` ve `Dashboard.jsx`'deki "Yayına Al" kontrolü, backend
-sözleşmesinde (`CMS-API-Sozlesmesi-v1.md`) hiç karşılığı olmayan bir özellik. Şu anki hali:
-admin panelde bandı açtığında bu sadece **o admini'nin kendi tarayıcısının localStorage'ına**
-yazılıyor; başka bir cihazdan/tarayıcıdan siteye giren ziyaretçi bunu görmüyor. Yani gerçek bir
-yayın mekanizması değil, tek-tarayıcılık bir demo.
-
-**Gerçek hale getirmek için backend'de gerekenler:**
-- Book (veya global bir ayar) üzerinde `emergencyBannerActive: bool` ve `emergencyBannerMessage: string`
-  gibi alanlar; bunları okuyucu tarafının da görebileceği bir yol (Sync manifest'e eklenebilir,
-  ya da ayrı bir `GET /api/v1/announcements` gibi anonim bir endpoint).
-- CMS tarafında bunu güncelleyecek bir `PUT` endpoint'i (muhtemelen Admin rolü ile sınırlı).
-
-**Alternatif:** Backend'de bu öncelikli değilse, admin panelindeki bu kontrolü kaldırmak daha
-doğru olur — şu anki hali "bunu yayınladım, herkes görüyor" izlenimi veriyor ama vermiyor.
+Bu özellik `Dashboard.jsx`, `UserLayout.jsx` ve `src/components/ui/EmergencyBanner.jsx`'ten
+tamamen kaldırıldı. Sebep: sadece tarayıcı `localStorage`'ında tutuluyordu, backend'de hiç
+karşılığı yoktu — admin bandı "yayınladığında" bu sadece kendi tarayıcısında görünüyordu,
+başka ziyaretçiler görmüyordu. Karar: özellik backend'de gerçek bir karşılığı olmadan
+frontend'de tutulmayacak. İleride gerçek bir duyuru/banner özelliği istenirse, backend'de
+(Book veya global ayar üzerinde `active`/`message` alanları + okuyucu tarafının görebileceği
+anonim bir endpoint) baştan tasarlanmalı.
 
 ---
 
@@ -118,13 +111,40 @@ Fonksiyonel bir bozukluk değil (JSON hâlâ geçerli, aynı veri), ama iki aç�
 
 ---
 
-## 7. `/users` sadece oluşturma destekliyor — listeleme/güncelleme/silme yok
+## 7. ~~`/users` sadece oluşturma destekliyor~~ — ÇÖZÜLDÜ + frontend'e bağlandı (2026-08-30)
 
-Admin panelinde "Ayarlar" sayfasına yeni Editor/Admin ekleme özelliğini `POST /users` üzerinden
-bağladık. Ama mevcut kullanıcıları **listeleyecek**, rolünü **değiştirecek**, hesabı
-**pasifleştirecek/silecek** veya kendi şifresini **değiştirecek** bir endpoint yok. Şu an bu
-işlemler için admin panelde hiçbir arayüz sunmuyoruz (yoktular zaten, ama gerçek bir kullanıcı
-yönetimi ekranı için bu dörtlü gerekecek).
+Backend `GET /users`, `PUT /users/{id}/role`, `POST /users/{id}/deactivate`,
+`PUT /users/me/password` endpoint'lerini ekledi; gerçek backend'e karşı canlı test edilip
+(test kullanıcıları oluşturulup, rol değiştirilip, pasifleştirilip, sonra pasifleştirilerek
+temizlendi) `Settings.jsx`'e bağlandı:
+
+- **Kullanıcılar listesi** (Admin) — `UserDto`: `{id (guid), userName, fullName, roles[], isLockedOut}`.
+  Kendi hesabınız için rol değiştirme/pasifleştirme butonları devre dışı bırakılıyor (yanlışlıkla
+  kendi kendini kilitlemeyi önlemek için).
+- **Rol değiştir** (Admin) — `PUT /users/{id}/role`, 200 + güncel `UserDto` döner.
+- **Pasifleştir** (Admin) — `POST /users/{id}/deactivate`, 204. **Doğrulandı: geri alan bir
+  endpoint yok** (`activate` yok) — pasifleştirilen kullanıcı bir daha giriş yapamıyor
+  (`Auth.InvalidCredentials` ile aynı jenerik 401'i alıyor, hesabın kilitli olduğu ayrıca
+  belirtilmiyor — güvenlik açısından doğru davranış). Frontend'de bu geri alınamazlığı
+  onay diyaloğunda açıkça belirtiyoruz.
+- **Kendi şifreni değiştir** (herkes, Editor dahil) — `PUT /users/me/password`, 204. Yanlış
+  `currentPassword` → 400 `User.PasswordChangeFailed` (`detail` İngilizce geliyor: "Incorrect
+  password." — diğer hata mesajları Türkçe, bu tek İngilizce kalmış, backend'e küçük bir not).
+
+**Rol kısıtlamaları canlı test edildi:** `GET/POST /users`, `PUT .../role`, `POST .../deactivate`,
+`POST /media/cleanup-orphans`, `POST /books/{id}/rollback` → Editor token'ıyla hepsi **403**.
+`PUT /users/me/password` → Editor'e de **izinli** (kendi şifresi, beklenen).
+
+**Rollback** (`POST /books/{bookId}/rollback`, body `{"toVersion": int}`) `Dashboard.jsx`'e
+eklendi, Admin-only. **Önemli kısıt:** backend'de geçmiş sürümleri listeleyen bir endpoint
+yok, admin hangi sürüme döneceğini elle bilmek zorunda (sadece `book.version` — o anki
+sürüm — biliniyor). Gerçek bir rollback'i paylaşılan kitaba karşı test etmedim (canlı veriyi
+bozma riski), ama geçersiz/olmayan `toVersion` ile hata şeklini doğruladım:
+`404 Publishing.VersionNotFound`.
+
+**Medya temizliği** (`POST /media/cleanup-orphans`) `Settings.jsx`'e "Bakım" kartı olarak
+eklendi, Admin-only. Canlı test edildi — yanıt düz bir sayı (`0` gibi, silinen dosya sayısı),
+obje değil.
 
 ---
 
@@ -136,3 +156,26 @@ yönetimi ekranı için bu dörtlü gerekecek).
 - Admin panelinde kitap seçici yok; tek kitap olduğu varsayımıyla `VITE_DEFAULT_BOOK_ID` env
   değişkenine sabitlendi (bkz. `README.md`). Backend'de ikinci bir kitap açılırsa bu varsayım
   kırılır, bir kitap seçici eklemek gerekir.
+
+---
+
+## 9. Yeni kullanıcı yönetimi endpoint'lerinden çıkan iki soru (2026-08-30)
+
+Kullanıcı yönetimini frontend'e bağlarken canlı testte karşıma çıkan, backend'e sorulmaya
+değer iki nokta:
+
+**a) Pasifleştirilen bir kullanıcıyı geri aktive etmenin yolu yok.**
+`POST /users/{id}/deactivate` var ama tersi (`activate`) yok. Test ettim: pasifleştirilen
+kullanıcı bir daha hiç giriş yapamıyor, API üzerinden geri döndürecek hiçbir uç nokta yok.
+Bu kasıtlı bir tasarım mı (örn. "pasifleştirme kalıcıdır, yanlışlıkla basmayın" gibi bir
+güvenlik kararı), yoksa `PUT /users/{id}/role` gibi bir "reactivate" endpoint'i eksik mi
+kaldı, netleşse iyi olur — çünkü frontend'de bu işlemi "geri alınamaz" diye çok sert bir
+uyarıyla sunuyoruz şu an, gerçekten öyleyse doğru, değilse gereksiz korkutuyoruz.
+
+**b) Rollback için hangi sürümlerin var olduğunu görecek bir endpoint yok.**
+`POST /books/{bookId}/rollback` bir `toVersion` sayısı istiyor ama geçmiş yayınları
+(hangi sürümler var, ne zaman yayınlanmış, kaç içerik içeriyordu) listeleyen bir
+`GET /books/{bookId}/publications` gibi bir endpoint yok. Şu an admin panelinde rollback
+inputu "elle bir sayı yaz" şeklinde — kullanılabilir değil, admin'in versiyon numaralarını
+ezbere bilmesi gerekiyor. Böyle bir liste endpoint'i eklenirse UI'ı gerçek bir "sürüm geçmişi"
+dropdown'ına çevirebiliriz.
