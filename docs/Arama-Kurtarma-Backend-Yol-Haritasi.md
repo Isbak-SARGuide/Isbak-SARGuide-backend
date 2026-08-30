@@ -995,7 +995,21 @@ her alt görevin kendi commit mesajında ve §5.13'teki WBS tablosunda.
       DB'den okunan kanonik değere karşı reorder SONRASI değeri karşılaştırıyor (tam eşleşme
       bekleniyor, taşınan blok dahil). 172/172 test yeşil (1 yeni:
       `ReorderAsync_DoesNotAlterSiblingsDataJson`).
-- [ ] 13.6 Tam `/users` CRUD (liste, rol değiştirme, pasifleştirme, kendi şifresini değiştirme)
+- [x] 13.6 Tam `/users` CRUD (liste, rol değiştirme, pasifleştirme, kendi şifresini değiştirme) —
+      `IUserService`'e `GetAllAsync`/`ChangeRoleAsync`/`DeactivateAsync`/`ChangeOwnPasswordAsync`
+      eklendi (`UserManager<ApplicationUser>` üzerinden, aynı `CreateAsync` deseni). Deaktivasyon
+      hard delete değil — `SetLockoutEndDateAsync(..., DateTimeOffset.MaxValue)`, FK bütünlüğünü
+      bozmaz; bir Admin kendi hesabını kilitleyemez (self-lockout guard, `400 Validation`).
+      **Auth tasarımı canlı testle düzeltildi:** ilk deneme sınıf seviyesine
+      `[Authorize(Roles = "Admin")]` koyup `PUT /users/me/password`'e sadece `[Authorize]`
+      eklemekti ("eylem seviyesi sınıfı geçersiz kılar" varsayımıyla) — bir Editor token'ıyla
+      canlı HTTP testi `403` döndürdü, çünkü ASP.NET Core çoklu `[Authorize]` filtrelerini
+      **birleştirir** (AND), en yakını kazanmaz. Düzeltme: sınıf seviyesi sadece `[Authorize]`,
+      Admin-only dört eylemin (Create/GetAll/ChangeRole/Deactivate) her biri kendi
+      `[Authorize(Roles = "Admin")]`'ini taşıyor, `me/password` ek kısıt taşımıyor. 184/184 test
+      yeşil (12 yeni: 8 servis + 4 HTTP-seviyesi, self-lockout guard ve Editor'ün kendi şifresini
+      değiştirebildiğinin canlı kanıtı dahil). `docs/CMS-API-Sozlesmesi-v1.md` §3.5 dört yeni uç +
+      auth-tasarım notuyla güncellendi.
 - [ ] 13.7 Video/Animation `dataJson` taslak şeması (provisional)
 - 13.8 Acil Durum Bandı (web #1) — backend desteği (Book'a alan + Admin PUT + manifest'e
       ek alan ya da yeni anonim endpoint) ERTELENDİ, kullanıcı onayıyla: şu an öncelik değil,

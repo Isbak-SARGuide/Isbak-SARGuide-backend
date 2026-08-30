@@ -153,7 +153,23 @@ dön" olarak ele almalı, gövdeyi JSON diye parse etmeye çalışmamalı.
 (yanlış kullanıcı adı/şifre) **dolu bir ProblemDetails** döner, bkz. §3.1.
 Ayrım: `/auth/login` hariç her uçtaki 401 boş gövdelidir.
 
-### 3.5 `POST /users` — sadece `Admin`
+### 3.5 Kullanıcı yönetimi (`/users`)
+
+**Auth modeli (Faz 13.6):** `UsersController` sınıf seviyesinde sadece
+`[Authorize]` taşır (kimlik doğrulanmış olmak yeterli) — her uç kendi rol
+gereksinimini **ayrıca** bildirir. `POST`/`GET`/`PUT .../role`/
+`POST .../deactivate` eylem-seviyesinde `[Authorize(Roles = "Admin")]`
+taşıdığı için Admin-only kalır; `PUT /users/me/password` ek rol kısıtı
+taşımadığı için herhangi bir authenticated kullanıcı (Admin veya Editor)
+kendi şifresini değiştirebilir. **Not:** ilk tasarım sınıf seviyesine
+`[Authorize(Roles = "Admin")]` koyup `me/password`'e sadece `[Authorize]`
+eklemekti ("eylem seviyesi sınıf seviyesini geçersiz kılar" varsayımıyla)
+— canlı bir HTTP testi bunun 403 ile başarısız olduğunu gösterdi: ASP.NET
+Core çoklu `[Authorize]` filtrelerini **birleştirir** (AND), en yakını
+kazanmaz. Yukarıdaki (sınıf seviyesi minimal, her eylem kendi rolünü
+bildirir) tasarım bunun yerine kullanılıyor.
+
+#### `POST /users` — `Admin`
 
 Yeni bir Editor/Admin hesabı açmanın **tek yolu** — kayıt (self sign-up)
 yok. Gövde şekli (`CreateUserDto`, kaynak koddan):
@@ -166,6 +182,63 @@ yok. Gövde şekli (`CreateUserDto`, kaynak koddan):
   "role": "Editor"
 }
 ```
+
+#### `GET /users?page=&pageSize=` — `Admin`
+
+Sayfalı liste (`page`/`pageSize` verilmezse ya da ≤0 ise `page=1`,
+`pageSize=50` — diğer liste uçlarıyla aynı kural, bkz. §10). `UserDto`
+döner, `roles` ve `isLockedOut` her kullanıcı için ayrıca hesaplanır:
+
+```json
+{
+  "items": [
+    {
+      "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "userName": "editor1",
+      "fullName": "Ayşe Yılmaz",
+      "roles": ["Editor"],
+      "isLockedOut": false
+    }
+  ],
+  "totalCount": 1,
+  "page": 1,
+  "pageSize": 50
+}
+```
+
+> `isLockedOut` sadece bu listede doldurulur — `POST /users` ve
+> `PUT .../role` yanıtlarında her zaman `false` gelir (o yollar tek bir
+> kullanıcının kilit durumunu ayrıca sorgulamaz).
+
+#### `PUT /users/{id}/role` — `Admin`
+
+Gövde: `{ "role": "Admin" }` (`"Admin"` veya `"Editor"` olmalı). Kullanıcının
+**mevcut tüm rolleri** kaldırılıp yeni rol eklenir (rol değişimi, ekleme
+değil). Başarılı yanıt güncel `UserDto`.
+
+#### `POST /users/{id}/deactivate` — `Admin`
+
+Gövde yok. Hard delete **değil** — Identity'nin `LockoutEnd` mekanizmasıyla
+süresiz kilitler (`SetLockoutEndDateAsync(..., DateTimeOffset.MaxValue)`),
+`RefreshToken.UserId`/`BookPublication.PublishedById` gibi FK'ler bozulmaz.
+Bir Admin **kendi hesabını** pasifleştiremez (`id` == çağıran kullanıcının
+kimliği ise `400 Validation` — kurtarılamaz bir admin-panel kilitlenmesini
+önler). Başarılı yanıt `204 No Content`.
+
+#### `PUT /users/me/password` — herhangi bir authenticated kullanıcı
+
+Sadece **kendi** şifresi — `id` yok, hedef her zaman token'daki kullanıcı.
+Gövde:
+
+```json
+{
+  "currentPassword": "EskiSifre!1",
+  "newPassword": "YeniSifre!2"
+}
+```
+
+Yanlış `currentPassword` ya da Identity şifre politikasına uymayan
+`newPassword` → `400 Validation`. Başarılı yanıt `204 No Content`.
 
 ---
 
