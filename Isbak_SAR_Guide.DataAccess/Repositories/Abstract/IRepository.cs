@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using Isbak_SAR_Guide.Entities.Common;
 
 namespace Isbak_SAR_Guide.DataAccess.Repositories.Abstract;
@@ -16,6 +17,13 @@ public interface IRepository<T> where T : BaseEntity
     Task AddAsync(T entity, CancellationToken cancellationToken = default);
 
     void Update(T entity);
+
+    /// <summary>
+    /// Update(entity) tum kolonlari kirli isaretler - bir tek alan degistiginde
+    /// (orn. reorder'in DisplayOrder'i) bu, geri kalan kolonlari (mesela jsonb
+    /// bir DataJson) gereksiz yere yeniden yazmadan tek kolonu gunceller.
+    /// </summary>
+    void UpdateProperty<TProperty>(T entity, Expression<Func<T, TProperty>> propertyExpression);
 
     void Remove(T entity);
 }

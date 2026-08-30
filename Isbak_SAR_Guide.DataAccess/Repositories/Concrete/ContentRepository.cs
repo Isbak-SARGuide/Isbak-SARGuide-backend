@@ -35,8 +35,8 @@ public class ContentRepository(Isbak_SAR_GuideDbContext dbContext)
     }
 
     // AsNoTracking: bkz. ModuleRepository.FindAllByBookIdAsync - ayni gerekce
-    // (salt-okunur Create hesabi ya da ReorderHelper'in acikca Update() ettigi
-    // reorder akisi).
+    // (salt-okunur Create hesabi ya da ReorderHelper'in acikca UpdateProperty()
+    // ile tek kolon isaretleyip yeniden attach ettigi reorder akisi).
     public async Task<IReadOnlyList<Content>> FindAllByModuleIdAsync(int moduleId, CancellationToken cancellationToken = default) =>
         await DbSet
             .AsNoTracking()

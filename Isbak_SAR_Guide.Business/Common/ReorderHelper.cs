@@ -13,6 +13,10 @@ namespace Isbak_SAR_Guide.Business.Common;
 /// kardesler gecici negatif DisplayOrder'a tasinir, sonra final degerlere
 /// yazilir; ikisi de tek transaction icinde. ContentBlock'ta unique index yok
 /// ama ayni kod yolu zararsiz - uc serviste kopyala-yapistir yerine burada tek yer.
+/// markDirty her zaman TEK bir property'i (DisplayOrder) kirli isaretlemeli
+/// (repo.UpdateProperty), tum entity'yi degil (bkz. IRepository&lt;T&gt;.UpdateProperty
+/// dogurusu) - aksi halde ContentBlock.DataJson (jsonb) gereksiz yeniden yazilir
+/// ve bir sonraki publish'te sahte bir "degisti" satiri uretebilir.
 /// </summary>
 internal static class ReorderHelper
 {

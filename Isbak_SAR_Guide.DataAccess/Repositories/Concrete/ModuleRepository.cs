@@ -41,9 +41,9 @@ public class ModuleRepository(Isbak_SAR_GuideDbContext dbContext)
     }
 
     // AsNoTracking: iki cagiran da ya salt-okunur (Create'in max(DisplayOrder)
-    // hesabi) ya da ReorderHelper.ApplyAsync'in her entity'yi ACIKCA Update()
-    // ile tekrar attach ettigi reorder akisi - hicbiri onceden tracked olmayi
-    // gerektirmiyor.
+    // hesabi) ya da ReorderHelper.ApplyAsync'in her entity'yi ACIKCA
+    // UpdateProperty() ile tekrar attach ettigi reorder akisi - hicbiri
+    // onceden tracked olmayi gerektirmiyor.
     public async Task<IReadOnlyList<Module>> FindAllByBookIdAsync(int bookId, CancellationToken cancellationToken = default) =>
         await DbSet
             .AsNoTracking()

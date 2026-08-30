@@ -127,7 +127,7 @@ public class ModuleService(
             dto.OrderedIds,
             getId: m => m.Id,
             setDisplayOrder: (m, order) => m.DisplayOrder = order,
-            markDirty: unitOfWork.Modules.Update,
+            markDirty: m => unitOfWork.Modules.UpdateProperty(m, x => x.DisplayOrder),
             mismatchError: Error.Validation("Module.ReorderMismatch", "OrderedIds, kitabın mevcut modül kümesiyle birebir eşleşmeli."),
             conflictError: Error.Conflict("Module.ReorderConflict", "Aynı anda başka bir sıralama işlemi yapıldı, lütfen tekrar deneyin."),
             cancellationToken);
