@@ -1,5 +1,6 @@
 using Isbak_SAR_Guide.DataAccess.Context;
 using Isbak_SAR_Guide.DataAccess.HealthChecks;
+using Isbak_SAR_Guide.DataAccess.Identity;
 using Isbak_SAR_Guide.DataAccess.Repositories.Abstract;
 using Isbak_SAR_Guide.DataAccess.Repositories.Concrete;
 using Isbak_SAR_Guide.Entities.Identity;
@@ -36,7 +37,13 @@ public static class DataAccessServiceCollectionExtensions
                 options.Lockout.AllowedForNewUsers = true;
             })
             .AddRoles<IdentityRole>()
-            .AddEntityFrameworkStores<Isbak_SAR_GuideDbContext>();
+            .AddEntityFrameworkStores<Isbak_SAR_GuideDbContext>()
+            // API'nin geri kalanindaki her Error.Validation mesaji Turkce -
+            // varsayilan IdentityErrorDescriber (sifre politikasi, "already in
+            // role" vb.) hep Ingilizceydi, tek tutarsizlik noktasi (web ekibinin
+            // ChangeOwnPassword'de fark ettigi "Incorrect password." bunun bir
+            // ornegiydi, kokeni her IdentityResult cagrisini etkiliyordu).
+            .AddErrorDescriber<TurkishIdentityErrorDescriber>();
 
         services.AddScoped<IUnitOfWork, UnitOfWork>();
 

@@ -128,8 +128,10 @@ temizlendi) `Settings.jsx`'e bağlandı:
   belirtilmiyor — güvenlik açısından doğru davranış). Frontend'de bu geri alınamazlığı
   onay diyaloğunda açıkça belirtiyoruz.
 - **Kendi şifreni değiştir** (herkes, Editor dahil) — `PUT /users/me/password`, 204. Yanlış
-  `currentPassword` → 400 `User.PasswordChangeFailed` (`detail` İngilizce geliyor: "Incorrect
-  password." — diğer hata mesajları Türkçe, bu tek İngilizce kalmış, backend'e küçük bir not).
+  `currentPassword` → 400 `User.PasswordChangeFailed`. ~~`detail` İngilizce geliyor~~ —
+  **ÇÖZÜLDÜ**: backend'e `TurkishIdentityErrorDescriber` eklendi, `UserManager`'dan gelen tüm
+  `IdentityResult` mesajları (şifre politikası, "already in role" vb. dahil, sadece bu tek örnek
+  değil) artık Türkçe. `detail` artık "Mevcut şifre hatalı." döner.
 
 **Rol kısıtlamaları canlı test edildi:** `GET/POST /users`, `PUT .../role`, `POST .../deactivate`,
 `POST /media/cleanup-orphans`, `POST /books/{id}/rollback` → Editor token'ıyla hepsi **403**.

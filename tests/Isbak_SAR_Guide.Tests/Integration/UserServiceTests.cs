@@ -67,6 +67,23 @@ public class UserServiceTests(ApiFactory factory)
     }
 
     [Fact]
+    public async Task CreateAsync_WithWeakPassword_ReturnsTurkishErrorMessage()
+    {
+        // Web ekibinin ChangeOwnPassword'de fark ettigi "Incorrect password."
+        // (Ingilizce) sorununun kokeni: TurkishIdentityErrorDescriber
+        // eklenmeden once UserManager'in TUM IdentityResult mesajlari
+        // Ingilizce'ydi - API'nin geri kalani Turkce oldugu icin tutarsizdi.
+        // Bu test, describer'in gercekten devrede oldugunu dogrudan kanitlar.
+        var dto = new CreateUserDto($"weakpass-{Guid.NewGuid():N}", "abc", "Kullanıcı", RoleNames.Editor);
+
+        var result = await CreateAsync(dto);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error!.Message.ShouldNotContain("Passwords must", Case.Insensitive);
+        result.Error!.Message.ShouldContain("şifre", Case.Insensitive);
+    }
+
+    [Fact]
     public async Task GetAllAsync_ReturnsCreatedUserWithRoleAndLockoutStatus()
     {
         var dto = new CreateUserDto($"list-{Guid.NewGuid():N}", "Editor!2026Pass", "Listelenecek Kullanıcı", RoleNames.Editor);
@@ -242,6 +259,9 @@ public class UserServiceTests(ApiFactory factory)
     [Fact]
     public async Task ChangeOwnPasswordAsync_WithWrongCurrentPassword_ReturnsValidationError()
     {
+        // Web ekibinin canli testte fark ettigi tam senaryo: yanlis
+        // currentPassword eskiden "Incorrect password." (Ingilizce) donuyordu -
+        // TurkishIdentityErrorDescriber sonrasi Turkce olmali.
         var dto = new CreateUserDto($"pwdwrong-{Guid.NewGuid():N}", "Editor!2026Pass", "Şifre", RoleNames.Editor);
         var created = await CreateAsync(dto);
 
@@ -251,6 +271,8 @@ public class UserServiceTests(ApiFactory factory)
 
         result.IsFailure.ShouldBeTrue();
         result.Error!.Type.ShouldBe(ErrorType.Validation);
+        result.Error!.Message.ShouldNotContain("Incorrect password", Case.Insensitive);
+        result.Error!.Message.ShouldContain("şifre", Case.Insensitive);
     }
 
     private async Task<Result<UserDto>> CreateAsync(CreateUserDto dto)
