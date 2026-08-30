@@ -977,7 +977,12 @@ her alt görevin kendi commit mesajında ve §5.13'teki WBS tablosunda.
       artık `book.Version` ile birlikte bunu da `true` yapıyor. Gerçek kitaba karşı doğrulandı:
       backfill sonrası yeniden yayında contentCount hâlâ tam 97 (regresyon yok). 170/170 test
       yeşil (4 yeni).
-- [ ] 13.4 `ModuleDto.ContentCount` (admin panel N+1 düzeltmesi)
+- [x] 13.4 `ModuleDto.ContentCount` (admin panel N+1 düzeltmesi) — `IModuleRepository.GetPagedAsync`
+      artık `ModuleWithContentCount` (`Module` + `Contents.Count(!IsDeleted)`) döner, tek sorguda
+      hesaplanır; `ModuleDto`'ya additive `ContentCount = 0` alanı eklendi (sadece bu liste ucu
+      doldurur, tekil/create/update/reorder'da hep `0`). 171/171 test yeşil (1 yeni:
+      soft-delete edilmiş content'in sayılmadığını doğruluyor). `docs/CMS-API-Sozlesmesi-v1.md`
+      Module liste yanıtı güncellendi.
 - [ ] 13.5 Reorder'ın alakasız bloğun `dataJson`'ını bozmasını önle
 - [ ] 13.6 Tam `/users` CRUD (liste, rol değiştirme, pasifleştirme, kendi şifresini değiştirme)
 - [ ] 13.7 Video/Animation `dataJson` taslak şeması (provisional)

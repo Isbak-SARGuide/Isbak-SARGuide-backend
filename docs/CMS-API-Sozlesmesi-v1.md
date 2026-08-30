@@ -271,7 +271,8 @@ gösteriliyor):
       "displayOrder": 0,
       "isPublished": false,
       "createdAt": "2026-08-26T10:30:33.618546Z",
-      "updatedAt": "2026-08-26T10:30:33.618546Z"
+      "updatedAt": "2026-08-26T10:30:33.618546Z",
+      "contentCount": 12
     },
     {
       "id": 2,
@@ -281,7 +282,8 @@ gösteriliyor):
       "displayOrder": 1,
       "isPublished": false,
       "createdAt": "2026-08-26T10:44:40.550774Z",
-      "updatedAt": "2026-08-26T10:44:40.550774Z"
+      "updatedAt": "2026-08-26T10:44:40.550774Z",
+      "contentCount": 9
     }
   ],
   "totalCount": 10,
@@ -293,6 +295,13 @@ gösteriliyor):
 (Üçüncü öğe okunabilirlik için kısaltıldı — şekli aynı.) `page`/`pageSize`
 verilmezse (veya ≤0) sunucu `page=1`, `pageSize=50` varsayar. Sayfalama
 zarfının genel şekli için §10.
+
+**`contentCount` (Faz 13.4, additive):** modülün altındaki soft-delete
+edilmemiş Content sayısı, admin panelin her modül için ayrı bir "kaç içerik
+var" çağrısı yapmasını (N+1) önlemek için tek sorguda hesaplanıp döner.
+**Sadece bu liste ucunda dolu** — `GET .../modules/{id}` (tekil), `POST`,
+`PUT` ve `PUT .../reorder` yanıtlarında her zaman `0` gelir (bu uçlar tek bir
+modülü sayan ayrı bir sorgu çalıştırmaz).
 
 ### `GET /books/{bookId}/modules/{id}` — tekil
 
