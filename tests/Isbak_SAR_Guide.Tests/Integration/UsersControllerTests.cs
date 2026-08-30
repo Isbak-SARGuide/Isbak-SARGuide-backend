@@ -46,6 +46,81 @@ public class UsersControllerTests(ApiFactory factory)
         response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
     }
 
+    [Fact]
+    public async Task GetAll_WithEditorToken_ReturnsForbidden()
+    {
+        var client = await CreateAuthenticatedEditorClientAsync();
+
+        var response = await client.GetAsync("/api/v1/users?page=1&pageSize=10");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task GetAll_WithAdminToken_ReturnsOk()
+    {
+        var client = await CreateAuthenticatedAdminClientAsync();
+
+        var response = await client.GetAsync("/api/v1/users?page=1&pageSize=10");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task ChangeRole_WithEditorToken_ReturnsForbidden()
+    {
+        // Rol degistirme, ayricalik yukseltme (privilege escalation) riski
+        // tasiyan en hassas eylem - [Authorize(Roles = RoleNames.Admin)]
+        // yanlislikla dususe bu test yakalamali (kod inceleme bulgusu:
+        // ChangeRole bu kapsamayan tek Admin-only eylemdi).
+        var client = await CreateAuthenticatedEditorClientAsync();
+
+        var response = await client.PutAsJsonAsync($"/api/v1/users/{Guid.NewGuid()}/role", new { role = RoleNames.Admin });
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task Deactivate_WithEditorToken_ReturnsForbidden()
+    {
+        var client = await CreateAuthenticatedEditorClientAsync();
+
+        var response = await client.PostAsync($"/api/v1/users/{Guid.NewGuid()}/deactivate", content: null);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task ChangeOwnPassword_WithEditorToken_ReturnsNoContent()
+    {
+        // 13.6'nin en onemli auth-wiring kaniti: sinif seviyesindeki
+        // [Authorize(Roles = RoleNames.Admin)] burada eylem-seviyesindeki
+        // [Authorize] tarafindan GECERSIZ KILINMALI - bir Editor (Admin
+        // DEGIL) kendi sifresini degistirebilmeli, 403 almamali.
+        const string password = "Editor!Test123";
+        var client = await CreateAuthenticatedEditorClientAsync();
+
+        var response = await client.PutAsJsonAsync("/api/v1/users/me/password", new { currentPassword = password, newPassword = "Editor!Test456" });
+
+        response.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+
+        // Sifreyi eski haline geri al - bu client sabit bir test kullanicisi
+        // kullaniyor (CreateAuthenticatedEditorClientAsync), diger testlerin
+        // ayni sifreyle tekrar login olabilmesi icin degisiklik kalici olmamali.
+        var revertResponse = await client.PutAsJsonAsync("/api/v1/users/me/password", new { currentPassword = "Editor!Test456", newPassword = password });
+        revertResponse.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+    }
+
+    [Fact]
+    public async Task ChangeOwnPassword_WithoutToken_ReturnsUnauthorized()
+    {
+        var client = factory.CreateClient();
+
+        var response = await client.PutAsJsonAsync("/api/v1/users/me/password", new { currentPassword = "x", newPassword = "y" });
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+    }
+
     // ---- Yardımcılar ----
 
     private async Task<HttpClient> CreateAuthenticatedAdminClientAsync()

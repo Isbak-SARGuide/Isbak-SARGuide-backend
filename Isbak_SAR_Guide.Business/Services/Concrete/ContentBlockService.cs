@@ -144,7 +144,7 @@ public class ContentBlockService(
             dto.OrderedIds,
             getId: b => b.Id,
             setDisplayOrder: (b, order) => b.DisplayOrder = order,
-            markDirty: unitOfWork.ContentBlocks.Update,
+            markDirty: b => unitOfWork.ContentBlocks.UpdateProperty(b, x => x.DisplayOrder),
             mismatchError: Error.Validation("ContentBlock.ReorderMismatch", "OrderedIds, içeriğin mevcut blok kümesiyle birebir eşleşmeli."),
             conflictError: Error.Conflict("ContentBlock.ReorderConflict", "Aynı anda başka bir sıralama işlemi yapıldı, lütfen tekrar deneyin."),
             cancellationToken);

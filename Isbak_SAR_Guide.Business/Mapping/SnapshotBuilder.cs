@@ -44,7 +44,17 @@ public static class SnapshotBuilder
         var bookDto = new SyncBookDto(
             book.Id, book.Title, book.Slug, book.Description, book.LanguageCode, book.Version);
 
+        // Faz 13.3: IsPublished=false olan Module/Content publish'e HIC girmez -
+        // "Taslak" isaretlemenin CMS'te tasidigi anlam artik gercekten publish
+        // davranisini etkiliyor. Modul disarida kalirsa cocuk Content'lerinin
+        // kendi flag'i ne olursa olsun hepsi disarida kalir (SelectMany zaten
+        // filtrelenmis orderedModules'tan besleniyor); Content kendi flag'iyle
+        // AYRICA filtrelenir - yayinlanmis bir modulun icinde taslak content
+        // olabilir. AppendTombstones (PublishingService) bu filtreden dusen,
+        // daha once yayinda olan bir Module/Content'i otomatik tombstone'lar -
+        // ozel bir dal gerekmez.
         var orderedModules = book.Modules
+            .Where(m => m.IsPublished)
             .OrderBy(m => m.DisplayOrder).ThenBy(m => m.Id)
             .ToList();
 
@@ -53,7 +63,7 @@ public static class SnapshotBuilder
             .ToList();
 
         var contents = orderedModules
-            .SelectMany(m => m.Contents.OrderBy(c => c.DisplayOrder).ThenBy(c => c.Id))
+            .SelectMany(m => m.Contents.Where(c => c.IsPublished).OrderBy(c => c.DisplayOrder).ThenBy(c => c.Id))
             .Select(BuildContentDto)
             .ToList();
 

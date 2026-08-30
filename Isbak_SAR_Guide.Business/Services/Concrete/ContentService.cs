@@ -126,7 +126,7 @@ public class ContentService(
             dto.OrderedIds,
             getId: c => c.Id,
             setDisplayOrder: (c, order) => c.DisplayOrder = order,
-            markDirty: unitOfWork.Contents.Update,
+            markDirty: c => unitOfWork.Contents.UpdateProperty(c, x => x.DisplayOrder),
             mismatchError: Error.Validation("Content.ReorderMismatch", "OrderedIds, modülün mevcut içerik kümesiyle birebir eşleşmeli."),
             conflictError: Error.Conflict("Content.ReorderConflict", "Aynı anda başka bir sıralama işlemi yapıldı, lütfen tekrar deneyin."),
             cancellationToken);

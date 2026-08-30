@@ -127,8 +127,10 @@ public class SyncSnapshotTests(ApiFactory factory)
         using var scope = factory.Services.CreateScope();
         var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
 
-        var module = new Module { Name = "Snapshot Modülü", DisplayOrder = 1 };
-        module.Contents.Add(new Content { Title = "Snapshot İçeriği", DisplayOrder = 1 });
+        // Faz 13.3: IsPublished=true bilincli - bu testler snapshot/publish
+        // motorunu test ediyor, IsPublished filtresinin kendisini degil.
+        var module = new Module { Name = "Snapshot Modülü", DisplayOrder = 1, IsPublished = true };
+        module.Contents.Add(new Content { Title = "Snapshot İçeriği", DisplayOrder = 1, IsPublished = true });
 
         var book = new Book
         {

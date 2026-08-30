@@ -257,7 +257,153 @@ public class PublishingTests(ApiFactory factory)
         result.Error!.Type.ShouldBe(ErrorType.NotFound);
     }
 
+    [Fact]
+    public async Task PublishAsync_UnpublishedModule_ExcludedFromSnapshotEntirely()
+    {
+        // Arrange - iki modul: biri yayinda, digeri (icindeki content'iyle
+        // birlikte) taslak.
+        var bookId = await CreateBookWithMixedPublishStateAsync();
+        var adminId = await GetAdminIdAsync();
+
+        // Act
+        var result = await PublishAsync(bookId, adminId);
+
+        // Assert - sadece yayinlanmis modulun content'i sayildi.
+        result.Value.ContentCount.ShouldBe(1);
+
+        using var scope = factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<Isbak_SAR_GuideDbContext>();
+        var publication = await dbContext.Set<BookPublication>().SingleAsync(p => p.BookId == bookId);
+        publication.SnapshotJson.ShouldContain("Yayindaki İçerik");
+        publication.SnapshotJson.ShouldNotContain("Taslak Modül");
+        publication.SnapshotJson.ShouldNotContain("Taslak İçerik");
+    }
+
+    [Fact]
+    public async Task PublishAsync_UnpublishedContentUnderPublishedModule_ExcludedFromSnapshot()
+    {
+        // Arrange
+        var bookId = await CreateBookWithMixedPublishStateAsync();
+        var adminId = await GetAdminIdAsync();
+
+        // Act
+        await PublishAsync(bookId, adminId);
+
+        // Assert - yayindaki modulun ALTINDA da taslak content disarida kaldi
+        // (modul yayinda olmasi tek basina yeterli degil, content kendi
+        // flag'iyle AYRICA filtrelenir).
+        using var scope = factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<Isbak_SAR_GuideDbContext>();
+        var publication = await dbContext.Set<BookPublication>().SingleAsync(p => p.BookId == bookId);
+        publication.SnapshotJson.ShouldNotContain("Yayindaki Modülde Taslak İçerik");
+    }
+
+    [Fact]
+    public async Task PublishAsync_ContentFlippedToUnpublished_TombstonesOnNextPublish()
+    {
+        // Arrange - v1: yayinda bir content. Sonra taslaga cevrilir.
+        var bookId = await CreateBookWithContentsAsync("Geri Alınacak İçerik");
+        var adminId = await GetAdminIdAsync();
+        await PublishAsync(bookId, adminId);
+
+        int contentId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+            var book = await unitOfWork.Books.GetWithFullTreeAsync(bookId);
+            var content = book!.Modules.Single().Contents.Single();
+            contentId = content.Id;
+            content.IsPublished = false;
+            await unitOfWork.SaveChangesAsync();
+        }
+
+        // Act - v2: filtre disina dusen content tombstone'lanmali (mevcut
+        // AppendTombstones mekanizmasi - ozel kod gerekmedi).
+        var result = await PublishAsync(bookId, adminId);
+
+        // Assert
+        result.Value.ContentCount.ShouldBe(0);
+
+        using var scope2 = factory.Services.CreateScope();
+        var dbContext = scope2.ServiceProvider.GetRequiredService<Isbak_SAR_GuideDbContext>();
+        var tombstone = await dbContext.Set<PublishedContent>()
+            .SingleAsync(pc => pc.BookId == bookId && pc.Version == 2 && pc.ContentId == contentId);
+        tombstone.IsDeleted.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task PublishAsync_FirstPublish_SetsBookIsPublishedTrue()
+    {
+        // Arrange - Faz 13.3 bugfix: Book.IsPublished hicbir yerde set
+        // edilmiyordu, hep varsayilan false kaliyordu (Create/UpdateBookDto'da
+        // hic yok, salt-okunur bir alan).
+        var bookId = await CreateBookWithContentsAsync("İçerik");
+        var adminId = await GetAdminIdAsync();
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<Isbak_SAR_GuideDbContext>();
+            var bookBefore = await dbContext.Set<Book>().SingleAsync(b => b.Id == bookId);
+            bookBefore.IsPublished.ShouldBeFalse();
+        }
+
+        // Act
+        await PublishAsync(bookId, adminId);
+
+        // Assert
+        using var scope2 = factory.Services.CreateScope();
+        var dbContext2 = scope2.ServiceProvider.GetRequiredService<Isbak_SAR_GuideDbContext>();
+        var bookAfter = await dbContext2.Set<Book>().SingleAsync(b => b.Id == bookId);
+        bookAfter.IsPublished.ShouldBeTrue();
+    }
+
     // ---- Yardimcilar ----
+
+    /// <summary>
+    /// İki modul: biri (ve tek content'i) yayinda, digeri (ve tek content'i)
+    /// taslak. Ayrica yayindaki modulun ALTINA bir taslak content daha eklenir
+    /// (modul-seviyesi ve content-seviyesi filtrenin BAGIMSIZ calistigini
+    /// kanitlamak icin).
+    /// </summary>
+    private async Task<int> CreateBookWithMixedPublishStateAsync()
+    {
+        using var scope = factory.Services.CreateScope();
+        var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+
+        var publishedModule = new Module
+        {
+            Name = "Yayındaki Modül",
+            DisplayOrder = 1,
+            IsPublished = true,
+            Contents =
+            {
+                new Content { Title = "Yayindaki İçerik", DisplayOrder = 1, IsPublished = true },
+                new Content { Title = "Yayindaki Modülde Taslak İçerik", DisplayOrder = 2, IsPublished = false },
+            },
+        };
+
+        var draftModule = new Module
+        {
+            Name = "Taslak Modül",
+            DisplayOrder = 2,
+            IsPublished = false,
+            Contents =
+            {
+                new Content { Title = "Taslak İçerik", DisplayOrder = 1, IsPublished = true },
+            },
+        };
+
+        var book = new Book
+        {
+            Title = "Karışık Yayın Durumu Kitabı",
+            Slug = $"mixed-publish-test-{Guid.NewGuid():N}",
+            Modules = { publishedModule, draftModule },
+        };
+
+        await unitOfWork.Books.AddAsync(book);
+        await unitOfWork.SaveChangesAsync();
+        return book.Id;
+    }
 
     private async Task<Result<Business.DTOs.Publishing.PublishResultDto>> PublishAsync(int bookId, string adminId)
     {
@@ -273,7 +419,12 @@ public class PublishingTests(ApiFactory factory)
         using var scope = factory.Services.CreateScope();
         var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
 
-        var module = new Module { Name = "Test Modülü", DisplayOrder = 1 };
+        // Faz 13.3: IsPublished=true burada BILINCLI - bu yardimci "publish
+        // motorunun payload/tombstone/checksum davranisini test eden" mevcut
+        // 18 testin ortak Arrange'i, IsPublished filtresinin KENDISINI test
+        // etmiyorlar. O davranisin kendi testleri asagida ayri, kendi
+        // draft/published Module-Content kombinasyonlarini acikca kuruyor.
+        var module = new Module { Name = "Test Modülü", DisplayOrder = 1, IsPublished = true };
 
         for (var i = 0; i < contentTitles.Length; i++)
         {
@@ -282,6 +433,7 @@ public class PublishingTests(ApiFactory factory)
                 Title = contentTitles[i],
                 Summary = $"{contentTitles[i]} özeti",
                 DisplayOrder = i + 1,
+                IsPublished = true,
                 Blocks =
                 {
                     new ContentBlock { Type = ContentBlockType.Text, Text = $"{contentTitles[i]} metni", DisplayOrder = 1 },

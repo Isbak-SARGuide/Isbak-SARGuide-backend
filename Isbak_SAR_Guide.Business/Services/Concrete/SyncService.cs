@@ -71,7 +71,8 @@ public class SyncService(IUnitOfWork unitOfWork) : ISyncService
         var currentSnapshotJson = (await unitOfWork.Publications.GetLatestSnapshotJsonAsync(bookId, cancellationToken))!;
         var currentManifestJson = (await unitOfWork.Publications.GetLatestManifestJsonAsync(bookId, cancellationToken))!;
 
-        var modulesRawJson = ExtractModulesRawJson(currentSnapshotJson);
+        var bookRawJson = ExtractRawProperty(currentSnapshotJson, "book");
+        var modulesRawJson = ExtractRawProperty(currentSnapshotJson, "modules");
         var (addedMedia, removedMediaIds) = ComputeMediaDiff(previousManifestJson, currentManifestJson);
 
         // fromVersion == currentVersion icin ozel dal YOK: sorgu matematigi
@@ -84,7 +85,7 @@ public class SyncService(IUnitOfWork unitOfWork) : ISyncService
         var deletedContentIds = changedRows.Where(r => r.IsDeleted).Select(r => r.ContentId).ToList();
 
         var json = SyncChangesJsonWriter.Write(
-            fromVersion, currentVersion, upsertedPayloads, deletedContentIds, modulesRawJson, addedMedia, removedMediaIds);
+            fromVersion, currentVersion, bookRawJson, upsertedPayloads, deletedContentIds, modulesRawJson, addedMedia, removedMediaIds);
 
         return Result.Success(json);
     }
@@ -105,10 +106,10 @@ public class SyncService(IUnitOfWork unitOfWork) : ISyncService
             : Error.NotFound("Sync.NotPublished", "Kitap henüz yayınlanmadı.");
     }
 
-    private static string ExtractModulesRawJson(string snapshotJson)
+    private static string ExtractRawProperty(string snapshotJson, string propertyName)
     {
         using var document = JsonDocument.Parse(snapshotJson);
-        return document.RootElement.GetProperty("modules").GetRawText();
+        return document.RootElement.GetProperty(propertyName).GetRawText();
     }
 
     /// <summary>

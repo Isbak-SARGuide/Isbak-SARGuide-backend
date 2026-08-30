@@ -345,6 +345,31 @@ atomic switch mobil geliştiricinin sorumluluğu.
 | 12.8 | Global rate limiting | 0,5 |
 | 12.9 | Public read endpoint'leri (**gerekliliği önce doğrula**) | 1,5 |
 
+### 13. Mobil & Web Frontend Uyumluluk Düzeltmeleri — ~9,0 sa (post-MVP)
+
+Mobil ekip (`docs/mobil_ekip_geri_bildirim_v1.1.md`) ve web frontend ekibi
+(`docs/Web-Frontend-Geri-Bildirim-v2.md` + `docs/Frontend-Notlar-ve-Oneriler.md`)
+gerçek çalışan backend'e karşı entegrasyon yaparken bulduğu, sözleşmeyi
+bozmayan (additive) küçük boşluk/uyumsuzluklar. İki ekip de temel
+sözleşmenin (alan adları, endpoint'ler, hata kodları, blok tipleri)
+tamamen uyumlu olduğunu doğruladı — aşağıdakiler netleştirme/küçük
+düzeltme, kırılma değil.
+
+| ID | Görev | Kaynak | Sa |
+|---|---|---|---|
+| 13.1 | Sync/CMS sözleşme netleştirmeleri (medya base URL, varyant grup başlığı, CORS notu, login 401 gövdesi) | mobil #1,#2 / web #3,#4 | 1,0 |
+| 13.2 | `/sync/changes`'e `book` alanı ekle | mobil #4 | 0,5 |
+| 13.3 | Publish `IsPublished`'a göre süzsün + tek seferlik backfill + `Book.IsPublished` bugfix'i | web #2 | 1,5 |
+| 13.4 | `ModuleDto.ContentCount` (admin panel N+1 düzeltmesi) | web #5 | 1,0 |
+| 13.5 | Reorder'ın alakasız bloğun `dataJson`'ını bozmasını önle | web #6 | 1,0 |
+| 13.6 | Tam `/users` CRUD (liste, rol değiştirme, pasifleştirme, kendi şifresini değiştirme) | web #7 | 3,0 |
+| 13.7 | Video/Animation `dataJson` taslak şeması (provisional) | mobil #3 | 1,0 |
+
+**Bilinçli olarak kapsam dışı:** Acil Durum Bandı backend desteği (web #1,
+bkz. §14 Faz 10 notu — sonradan eklenebilir, şimdi öncelik değil); web
+frontend'in kendi kod tabanındaki ölü kod/kitap seçici notları (web #8) —
+backend'i ilgilendirmiyor.
+
 ---
 
 ## 6. Bağımlılık Grafiği
@@ -569,6 +594,8 @@ PHASE 8 — Release Readiness                     3,5 sa   → M8
                                            ══ MVP TAMAM: 56 sa ══
 PHASE 9 — Hardening & Optimization             12,0 sa   → M9
                                         ══ PRODUCTION: ~68 sa ══
+PHASE 10 — Mobil & Web Uyumluluk Düzeltmeleri    9,0 sa   → M10
+                                    ══ TOPLAM: ~77 sa ══
 ```
 
 ### Orijinal plana göre değişenler
@@ -664,6 +691,7 @@ Her milestone **durulabilir** ve **gösterilebilir** — yarım iş bırakmaz.
 | **M7** | Secured | 52,5 sa | Refresh token, roller, lockout; yetkisiz erişim testleri geçiyor | ✅ |
 | **M8** | **MVP Deployable** | 56,0 sa | `docker compose up` ile prod imajı ayakta, health yeşil | ✅ |
 | **M9** | Hardened | 68,0 sa | ETag, cache, rollback, coverage, final review | ❌ |
+| **M10** | Mobil & Web Uyumlu | 77,0 sa | Mobil/web geri bildirimindeki tüm additive düzeltmeler yayında | ❌ |
 
 ---
 
@@ -917,3 +945,121 @@ ve deploy edilemeyen bir sistem kalır.
 - 12.2 (cache), 12.4 (ETag), 12.7 (WebP), 12.9 (Public read) — roadmap'in kendi ön
       koşulları (ölçüm/mobil stabilite/lisans/müşteri talebi) karşılanmadığı için bu
       fazda bilinçli olarak ERTELENDİ, görev-görev karar verildi.
+
+### PHASE 10 — Mobil & Web Uyumluluk Düzeltmeleri → M10
+
+Kaynak: `docs/mobil_ekip_geri_bildirim_v1.1.md` (4 madde) +
+`docs/Web-Frontend-Geri-Bildirim-v2.md` / `docs/Frontend-Notlar-ve-Oneriler.md`
+(8 madde) — iki takımın gerçek çalışan backend'e karşı entegrasyon sırasında
+bulduğu, sözleşmeyi bozmayan boşluk/uyumsuzluklar. Detaylı gerekçe/tasarım
+her alt görevin kendi commit mesajında ve §5.13'teki WBS tablosunda.
+
+- [x] 13.1 Sync/CMS sözleşme netleştirmeleri — medya base URL (aynı host, `/api/v{version}`
+      öneki YOK), varyant grubunun üst listede hangi title/summary'yi göstereceği (en küçük
+      `displayOrder`'lı varyant kazanır), `POST /auth/login`'in 401'inin (diğer uçların aksine)
+      dolu ProblemDetails döndüğü, CORS'un zaten config-driven olduğu (`Cors:AllowedOrigins`/
+      `CORS_ALLOWED_ORIGIN_0..`) — dördü de dokümantasyon-only, kod zaten doğru davranıyordu.
+- [x] 13.2 `/sync/changes`'e `book` alanı ekle — `Modules`'la ayni gerekce ve
+      desen (7.3-b), koşulsuz her yanıtta gelir. Örneği canlı v17→v18 verisine
+      karşı yeniden üretirken keşfedilen bir yan bulgu: dev DB'de Faz 6'dan kalma
+      test verisi (Module 13/Content 100/Media 94) gerçek kitaba karışmış,
+      contentCount'u 97 yerine 98 gösteriyordu — temizlenip yeniden yayınlandı
+      (v18), gerçek sayı 97'ye döndü.
+- [x] 13.3 Publish `IsPublished`'a göre süzsün + tek seferlik backfill + `Book.IsPublished`
+      bugfix'i — canlı doğrulama önce yapıldı: 8/10 gerçek Modül ve 85/97 gerçek Content
+      `IsPublished=false`'du (mobile'a zaten servis edilmesine rağmen) — filtre kod
+      değişikliğinden ÖNCE kapsamlı bir SQL backfill (sadece Book id=1, silinmemiş satırlar)
+      ile hepsi `true` yapıldı, yoksa bir sonraki publish 85 gerçek content'i sessizce
+      tombstone'lardı. `SnapshotBuilder.BuildSnapshot` artık Module/Content'i kendi
+      `IsPublished` bayrağına göre süzüyor — mevcut `AppendTombstones` mekanizması özel kod
+      gerekmeden bunu otomatik tombstone'lıyor. Yan bulgu: `Book.IsPublished` hiçbir yerde
+      set edilmiyordu (19+ gerçek yayından sonra bile hep varsayılan false) — `PublishAsync`
+      artık `book.Version` ile birlikte bunu da `true` yapıyor. Gerçek kitaba karşı doğrulandı:
+      backfill sonrası yeniden yayında contentCount hâlâ tam 97 (regresyon yok). 170/170 test
+      yeşil (4 yeni).
+- [x] 13.4 `ModuleDto.ContentCount` (admin panel N+1 düzeltmesi) — `IModuleRepository.GetPagedAsync`
+      artık `ModuleWithContentCount` (`Module` + `Contents.Count(!IsDeleted)`) döner, tek sorguda
+      hesaplanır; `ModuleDto`'ya additive `ContentCount = 0` alanı eklendi (sadece bu liste ucu
+      doldurur, tekil/create/update/reorder'da hep `0`). 171/171 test yeşil (1 yeni:
+      soft-delete edilmiş content'in sayılmadığını doğruluyor). `docs/CMS-API-Sozlesmesi-v1.md`
+      Module liste yanıtı güncellendi.
+- [x] 13.5 Reorder'ın alakasız bloğun `dataJson`'ını bozmasını önle — `ReorderHelper`'ın
+      `markDirty`'si artık `IRepository<T>.Update(entity)` (tüm kolonları kirli işaretler)
+      yerine yeni `IRepository<T>.UpdateProperty(entity, x => x.DisplayOrder)`
+      (`EfRepository<T>`, `dbContext.Entry(entity).Property(...).IsModified = true`) kullanıyor
+      — UPDATE artık sadece `DisplayOrder` (+ audit `UpdatedAt`) kolonunu kapsıyor,
+      `ContentBlock.DataJson` (jsonb) hiç dokunulmuyor. Regresyon testi yazarken bir yan bulgu:
+      Postgres jsonb kolonu zaten İLK INSERT'te kendi kanonik biçimine dönüştürüyor (anahtar
+      sırası uzunluğa göre değişiyor, örn. `{"headers":...,"rows":...}` → `{"rows":...,
+      "headers":...}`) — bu yüzden test, orijinal gönderilen string'e değil, reorder ÖNCESİ
+      DB'den okunan kanonik değere karşı reorder SONRASI değeri karşılaştırıyor (tam eşleşme
+      bekleniyor, taşınan blok dahil). 172/172 test yeşil (1 yeni:
+      `ReorderAsync_DoesNotAlterSiblingsDataJson`).
+- [x] 13.6 Tam `/users` CRUD (liste, rol değiştirme, pasifleştirme, kendi şifresini değiştirme) —
+      `IUserService`'e `GetAllAsync`/`ChangeRoleAsync`/`DeactivateAsync`/`ChangeOwnPasswordAsync`
+      eklendi (`UserManager<ApplicationUser>` üzerinden, aynı `CreateAsync` deseni). Deaktivasyon
+      hard delete değil — `SetLockoutEndDateAsync(..., DateTimeOffset.MaxValue)`, FK bütünlüğünü
+      bozmaz; bir Admin kendi hesabını kilitleyemez (self-lockout guard, `400 Validation`).
+      **Auth tasarımı canlı testle düzeltildi:** ilk deneme sınıf seviyesine
+      `[Authorize(Roles = "Admin")]` koyup `PUT /users/me/password`'e sadece `[Authorize]`
+      eklemekti ("eylem seviyesi sınıfı geçersiz kılar" varsayımıyla) — bir Editor token'ıyla
+      canlı HTTP testi `403` döndürdü, çünkü ASP.NET Core çoklu `[Authorize]` filtrelerini
+      **birleştirir** (AND), en yakını kazanmaz. Düzeltme: sınıf seviyesi sadece `[Authorize]`,
+      Admin-only dört eylemin (Create/GetAll/ChangeRole/Deactivate) her biri kendi
+      `[Authorize(Roles = "Admin")]`'ini taşıyor, `me/password` ek kısıt taşımıyor.
+
+      **Faz sonu parallel security-reviewer + csharp-reviewer geçişi bir CRITICAL + bir HIGH +
+      üç MEDIUM bulgu çıkardı, hepsi bu görev bitmeden düzeltildi:**
+      - **CRITICAL** — `DeactivateAsync` sadece `SetLockoutEndDateAsync` çağırıyordu;
+        `IsLockedOutAsync` sadece `LoginAsync`'te kontrol ediliyordu, `RefreshAsync`'te değil —
+        yani zaten alınmış bir refresh token pasifleştirmeden SONRA bile rotasyonla süresiz
+        yenilenebiliyordu (deaktivasyon erişimi gerçekte KESMİYORDU). Düzeltme:
+        `DeactivateAsync`/`ChangeOwnPasswordAsync` artık `unitOfWork.RefreshTokens.
+        RevokeAllActiveForUserAsync` çağırıyor (`AuthService`'in reuse-tespitinde kullandığı
+        aynı metod); `AuthService.RefreshAsync`'e de defense-in-depth olarak `IsLockedOutAsync`
+        kontrolü eklendi.
+      - **HIGH** — `ChangeRoleAsync` önce TÜM mevcut rolleri kaldırıp sonra yeni rolü ekliyordu;
+        `UserManager` her çağrıyı ayrı/anında commit ettiği için (tek transaction değil) ikinci
+        adım başarısız olursa kullanıcı kalıcı olarak rolsüz kalabilirdi. Düzeltme: sıra
+        tersine çevrildi (önce ekle, sonra kaldır) — ara başarısızlık kullanıcıyı rolsüz değil
+        fazla-rollü bırakır.
+      - **MEDIUM** — Sistemdeki son Admin'i `ChangeRoleAsync` ile düşürmek ya da `DeactivateAsync`
+        ile pasifleştirmek mümkündü (kurtarılamaz kilitlenme, self-lockout guard'ın önlediği
+        AYNI senaryo ama başka bir yoldan) — her iki metoda da `GetUsersInRoleAsync(Admin).Count
+        <= 1` kontrolü eklendi (`User.LastAdminProtected`). **Not:** bu sınırı gerçek bir
+        entegrasyon testiyle kanıtlamak, paylaşılan seed `admin` hesabının rolünü değiştirmeyi
+        gerektirirdi — testler bunu yapmamalı (bkz. CLAUDE.md "Testing": "don't mutate the
+        shared seed ... admin user", düzinelerce başka test buna güveniyor) — bu yüzden bilerek
+        sadece kod incelemesiyle doğrulandı, otomatik testi yok.
+      - **MEDIUM** — `IdentityResult` hata mesajı birleştirme deseni (`string.Join("; ",
+        ...Errors.Select(...))`) `UserService.cs` içinde 6 kez tekrarlanmıştı — yeni
+        `Business/Common/IdentityResultExtensions.cs` (`ValidationResultExtensions`'ın
+        FluentValidation-dışı eşdeğeri) tüm çağrı noktalarına uygulandı.
+      - **MEDIUM** — `ChangeRole` (ayrıcalık yükseltme riski taşıyan en hassas eylem) HTTP
+        seviyesinde 403 testi eksikti — `ChangeRole_WithEditorToken_ReturnsForbidden` eklendi.
+
+      Düzeltmeler sırasında bir test-özel EF Core tuzağı da bulundu: `RevokeAllActiveForUserAsync`
+      (`ExecuteUpdateAsync`, change tracker'ı atlar) + aynı DbContext scope'unda önceden tracked
+      edilmiş bir `RefreshToken` + hemen ardından aynı scope'ta tracked bir sorgu (`FindByTokenHashAsync`)
+      birleşince, entity'nin bellekteki (stale) hâli döner — EF'in identity resolution'ı. Gerçek
+      üretimde her HTTP isteği ayrı bir scope aldığı için bu oluşmaz; testler bu yüzden
+      login/revoke/refresh adımlarını AYRI `CreateScope()` bloklarında çalıştırıyor (gerçek
+      istek sınırlarını taklit eder) — tek bir paylaşılan scope kullanan ilk hâli yanlışlıkla
+      yeşil çıkabiliyordu (bkz. `DeactivateAsync_RevokesTargetUsersActiveRefreshToken`'ın kod
+      yorumu).
+
+      187/187 test yeşil (15 yeni: 8 servis + 1 HTTP-seviyesi ilk turdan, +2 servis regresyon
+      testi + 1 eksik HTTP-seviyesi testi review sonrası eklendi). `docs/CMS-API-Sozlesmesi-v1.md`
+      §3.5 dört yeni uç + auth-tasarım notu + son-Admin/refresh-token-iptal davranışlarıyla
+      güncellendi. `pageSize` üst sınırı olmaması bilerek kapsam dışı bırakıldı (LOW,
+      Modules/Contents/ContentBlocks'ta da aynı ön-var-olan desen, bu branch'in dışında).
+- [x] 13.7 Video/Animation `dataJson` taslak şeması (provisional) — doküman-only, kod
+      değişikliği yok (`ContentBlock.DataJson` zaten şemasız arbitrary JSON kabul ediyor,
+      Table/Warning'le aynı). `docs/Sync-Sozlesmesi-v2.md` §4.1/§4.2'ye eklendi, açıkça
+      "PROVISIONAL — henüz gerçek içerik yok" uyarısıyla işaretli: Video için mevcut `media`
+      alanı yeterli, sadece elle seçilmiş kapak görseli gerekirse `dataJson.thumbnailMediaId`;
+      Animation için `dataJson.steps` dizisi (her adım kendi `text` + opsiyonel `mediaId`'si).
+      Zamanlama/süre bilgisi bilerek dışarıda bırakıldı (YAGNI, gerçek ihtiyaç yok).
+- 13.8 Acil Durum Bandı (web #1) — backend desteği (Book'a alan + Admin PUT + manifest'e
+      ek alan ya da yeni anonim endpoint) ERTELENDİ, kullanıcı onayıyla: şu an öncelik değil,
+      sonradan eklenebilir additive bir özellik.
