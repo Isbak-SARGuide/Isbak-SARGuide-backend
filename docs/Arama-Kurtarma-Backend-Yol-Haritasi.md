@@ -945,10 +945,33 @@ ve deploy edilemeyen bir sistem kalır.
 - 12.2 (cache), 12.4 (ETag), 12.7 (WebP), 12.9 (Public read) — roadmap'in kendi ön
       koşulları (ölçüm/mobil stabilite/lisans/müşteri talebi) karşılanmadığı için bu
       fazda bilinçli olarak ERTELENDİ, görev-görev karar verildi.
-- 12.7 (WebP + thumbnail) yeniden gündeme geldi (2026-08-31, mobil optimizasyon
-      sorusu) — **hâlâ ERTELENDİ**, kullanıcı onayıyla: iki ön koşuldan hiçbiri (medya hacmi
-      artışı, WebP encoding kütüphanesinin lisans doğrulaması) henüz karşılanmadı. Sadece not
-      düşüldü, tetiklenmedi.
+- [x] 12.7 (WebP + thumbnail) — yeniden gündeme geldi (2026-08-31, mobil optimizasyon
+      sorusu), kullanıcı onayıyla **artık ERTELENMİYOR, uygulandı** (iki ön koşul —
+      medya hacmi artışı, lisans doğrulaması — resmi tetiklenme şartı olmaktan çıktı,
+      doğrudan yapıldı). `SixLabors.ImageSharp`'ın Split License'ı yerine `SkiaSharp`
+      (MIT) seçildi — ticari kullanımda kısıtlama yok. `MediaService.UploadAsync`
+      artık her yüklenen görseli SkiaSharp ile decode edip **storage'a yazılan asıl
+      dosyayı WebP'ye çeviriyor** (`ContentType` her zaman `image/webp`, orijinal
+      format ne olursa olsun) + `Media.ThumbnailStoragePath` (yeni, nullable kolon,
+      migration `AddMediaThumbnailStoragePath`) altında `Storage:ThumbnailMaxDimension`
+      (varsayılan 400px) ile sınırlı bir küçük önizleme üretiyor. `Checksum` artık
+      WebP-sonrası baytlardan hesaplanıyor (dedup + mobil bütünlük doğrulaması **tek
+      alanla** çalışmaya devam ediyor — WebP encode deterministik olduğu için ayrı bir
+      "orijinal" checksum alanına gerek çıkmadı, ilk tasarım varsayımı yanlıştı).
+      Sync sözleşmesine additive `MediaSummaryDto.ThumbnailUrl` eklendi (Faz 10'daki
+      `book`/`ContentCount` ile aynı "trailing nullable param" deseni). **Sadece bu
+      özellikten SONRAKİ yüklemeler** — mevcut 93 medyaya geriye dönük backfill
+      YAPILMADI, `ThumbnailStoragePath` o satırlarda `null` kalıyor.
+      **Kod incelemesinde bulunan gerçek bir hata:** `SKBitmap.Decode`, imza doğru
+      ama gövdesi bozuk bir dosyada (`ImageSignatureDetectorTests.BuildMinimalPng`
+      gibi sahte-header-gerçek-piksel-yok girdilerde) beklenenin aksine `null` değil
+      `ArgumentNullException` fırlatıyordu — yakalanmasaydı saldırgan kontrollü böyle
+      bir dosya `400 Validation` yerine `500`'e düşerdi; dar bir try/catch ile
+      düzeltildi, doğrudan regresyon testi eklendi. Docker: `SkiaSharp.NativeAssets.
+      Linux` API projesine eklendi, `Dockerfile`'a `libfontconfig1` (SkiaSharp'ın
+      Linux'taki bilinen bağımlılığı — Faz 8'deki curl/`/storage` izin sınıfı bir
+      "sadece `docker compose up`'ta ortaya çıkar" riski, henüz canlı compose ile
+      doğrulanmadı, birleştirmeden önce önerilir). 208/208 test yeşil.
 
 ### PHASE 10 — Mobil & Web Uyumluluk Düzeltmeleri → M10
 

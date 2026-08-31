@@ -47,9 +47,15 @@ RUN mkdir -p /storage && chown app:app /storage
 # aspnet:10.0 (Ubuntu tabanli) curl/wget ICERMIYOR - compose.prod.yaml'daki
 # HEALTHCHECK (container-ici "curl -f http://localhost:8080/health") curl
 # olmadan calisamaz ve container surekli "unhealthy" raporlar (canli
-# compose testinde dogrulandi). --no-install-recommends + apt cache temizligi
-# ile ek yuk minimumda tutuluyor.
-RUN apt-get update && apt-get install -y --no-install-recommends curl \
+# compose testinde dogrulandi). libfontconfig1: SkiaSharp'in native paylasimli
+# kutuphanesi (libSkiaSharp.so, Faz 12.7 WebP+thumbnail icin eklendi) Linux'ta
+# bunu dinamik olarak baglar - eksikse MediaService.UploadAsync'in ilk
+# cagrisinda "Unable to load shared library 'libSkiaSharp'" ile patlar, health
+# check bunu YAKALAMAZ (sadece ilk medya yuklemesi aninda ortaya cikar, Faz
+# 8'deki /storage izin sorunuyla ayni sinif hata - dotnet build/test hicbir
+# zaman gormez). --no-install-recommends + apt cache temizligi ile ek yuk
+# minimumda tutuluyor.
+RUN apt-get update && apt-get install -y --no-install-recommends curl libfontconfig1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Root olarak calistirmiyoruz - imaj zaten "app" adinda ayricaliksiz bir

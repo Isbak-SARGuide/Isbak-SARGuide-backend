@@ -670,9 +670,20 @@ Content-Type: image/png
 Max dosya boyutu `Storage:MaxFileSizeBytes` (dev'de ~20MB); magic-byte +
 MIME doğrulaması yapılıyor, sadece uzantıya güvenilmiyor.
 
+**Faz 12.7 (mobil optimizasyon) — sadece bu özellikten SONRAKİ yüklemeler:**
+storage'a yazılan asıl dosya artık her zaman **WebP**'ye çevrilmiş hali
+(`contentType` her zaman `"image/webp"`, `storagePath` her zaman `.webp` ile
+biter — yüklenen orijinal format PNG/JPEG/GIF/WEBP fark etmez). Ayrıca küçük
+bir WebP önizleme (`thumbnailStoragePath`, en uzun kenarı `Storage:
+ThumbnailMaxDimension` — varsayılan 400px — ile sınırlı) üretilir. Bu
+özellikten ÖNCE yüklenmiş medya geriye dönük dönüştürülmedi —
+`thumbnailStoragePath` o satırlarda `null` kalır, istemci bunu "önizleme
+yok, `storagePath`'i kullan" olarak ele almalı.
+
 ### `GET /media/{id}` — tekil
 
-**Gerçek yanıt** (`id=1`):
+**Gerçek yanıt** (`id=1` — Faz 12.7 ÖNCESİ içe aktarılmış 93 medyadan biri,
+bu yüzden `thumbnailStoragePath` bilerek `null`; yeni bir yükleme dolu gelir):
 
 ```json
 {
@@ -686,7 +697,8 @@ MIME doğrulaması yapılıyor, sadece uzantıya güvenilmiyor.
   "width": 551,
   "height": 372,
   "duration": null,
-  "createdAt": "2026-08-26T10:53:46.490204Z"
+  "createdAt": "2026-08-26T10:53:46.490204Z",
+  "thumbnailStoragePath": null
 }
 ```
 

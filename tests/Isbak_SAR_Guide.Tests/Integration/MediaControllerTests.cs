@@ -25,13 +25,14 @@ public class MediaControllerTests(ApiFactory factory)
     public async Task Upload_WithValidTokenAndPng_ReturnsOkWithMediaDto()
     {
         var client = await CreateAuthenticatedClientAsync();
-        using var content = BuildMultipartPng(ImageSignatureDetectorTests.BuildMinimalPng(3, 4), "foto.png");
+        using var content = BuildMultipartPng(TestImageFactory.BuildRealPng(3, 4), "foto.png");
 
         var response = await client.PostAsync("/api/v1/media", content);
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
         var media = await response.Content.ReadFromJsonAsync<MediaDto>();
-        media!.ContentType.ShouldBe("image/png");
+        // Faz 12.7: STORAGE'A YAZILAN dosya artik her zaman WebP.
+        media!.ContentType.ShouldBe("image/webp");
         media.Width.ShouldBe(3);
         media.Height.ShouldBe(4);
     }
@@ -40,7 +41,7 @@ public class MediaControllerTests(ApiFactory factory)
     public async Task Upload_WithoutToken_ReturnsUnauthorized()
     {
         var client = factory.CreateClient();
-        using var content = BuildMultipartPng(ImageSignatureDetectorTests.BuildMinimalPng(1, 1), "foto.png");
+        using var content = BuildMultipartPng(TestImageFactory.BuildRealPng(1, 1), "foto.png");
 
         var response = await client.PostAsync("/api/v1/media", content);
 
@@ -73,7 +74,7 @@ public class MediaControllerTests(ApiFactory factory)
     public async Task GetById_AfterUpload_ReturnsOk()
     {
         var client = await CreateAuthenticatedClientAsync();
-        var uploaded = await UploadAsync(client, ImageSignatureDetectorTests.BuildMinimalPng(5, 5), "get-test.png");
+        var uploaded = await UploadAsync(client, TestImageFactory.BuildRealPng(5, 5), "get-test.png");
 
         var response = await client.GetAsync($"/api/v1/media/{uploaded.Id}");
 
@@ -94,7 +95,7 @@ public class MediaControllerTests(ApiFactory factory)
     public async Task Delete_UnreferencedMedia_ReturnsNoContent()
     {
         var client = await CreateAuthenticatedClientAsync();
-        var uploaded = await UploadAsync(client, ImageSignatureDetectorTests.BuildMinimalPng(6, 6), "delete-test.png");
+        var uploaded = await UploadAsync(client, TestImageFactory.BuildRealPng(6, 6), "delete-test.png");
 
         var response = await client.DeleteAsync($"/api/v1/media/{uploaded.Id}");
 

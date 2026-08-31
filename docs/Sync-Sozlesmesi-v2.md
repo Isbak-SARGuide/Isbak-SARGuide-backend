@@ -81,19 +81,22 @@ kısaltıldı):
       "id": 1,
       "url": "media/kentsel-arama-kurtarma-el-kitabi/sektor-ceyrek-diyagrami.png",
       "checksum": "AC5F5E0B6C81D6CEE012B91C7E9F03519D19337C80F0CB76F9B0D6DD24F1E4EB",
-      "size": 37898
+      "size": 37898,
+      "thumbnailUrl": null
     },
     {
       "id": 2,
       "url": "media/kentsel-arama-kurtarma-el-kitabi/kat-seviyesi-gosterimi.png",
       "checksum": "C5BD4008343972696B1BBDD235F4EFDAF445CFDFD47E2807301B7D5F2A0AA5DD",
-      "size": 56515
+      "size": 56515,
+      "thumbnailUrl": null
     },
     {
       "id": 3,
       "url": "media/kentsel-arama-kurtarma-el-kitabi/bolge-tanimlama-ornek.png",
       "checksum": "863B3CDED6F30FD97901D946EDED89B8ADC8DC7BEE6EBD5F486691D776682157",
-      "size": 14119
+      "size": 14119,
+      "thumbnailUrl": null
     }
   ],
   "checksum": "DD8076ED4D90BA850535F9987D7C7F20F4FEC2AA32C847A324F276C79EE920B5"
@@ -102,6 +105,8 @@ kısaltıldı):
 
 > Gerçek yanıtta `media` dizisinde 93 öğe var (kitaptaki tüm görseller).
 > Kitap ilk yayınlandığında henüz medyası yoksa bu dizi boş (`[]`) gelir.
+> `thumbnailUrl` hepsinde `null` — bu 93 medya Faz 12.7'den (WebP+thumbnail,
+> mobil optimizasyon) ÖNCE içe aktarıldı, geriye dönük dönüştürülmedi.
 
 **Alan tablosu:**
 
@@ -111,8 +116,16 @@ kısaltıldı):
 | `version` | int | Son yayının sürüm numarası |
 | `publishedAt` | string (ISO 8601 UTC) | Yayının yapıldığı an |
 | `contentCount` | int | Bu yayında **hayatta olan** (silinmemiş) content sayısı |
-| `media` | array | Bu yayında referans verilen medya özetleri: `id`, `url`, `checksum`, `size` |
+| `media` | array | Bu yayında referans verilen medya özetleri: `id`, `url`, `checksum`, `size`, `thumbnailUrl` |
 | `checksum` | string (hex, 64 karakter) | `snapshot` yanıtının SHA-256'sı — §5'teki doğrulama için |
+
+> **`thumbnailUrl` (Faz 12.7, additive):** küçük bir WebP önizleme dosyasının
+> göreli yolu — `url` ile **aynı kural** geçerli (aynı host köküne göreli,
+> doğrudan servis edilir). Bu özellikten ÖNCE yüklenmiş medyada `null` —
+> istemci bunu "önizleme yok, `url`'i kullan" olarak ele almalı. `url`'in
+> kendisi (ana dosya) de bu özellikten sonra yüklenen medya için her zaman
+> `.webp` ile biter (`contentType` her zaman `image/webp`) — orijinal
+> yükleme formatı ne olursa olsun.
 
 **Notlar:**
 - Kitap hiç yoksa veya hiç yayınlanmamışsa bkz. §6 (hata sözleşmesi).
@@ -219,7 +232,8 @@ sonraki güncellemeler `changes` ile gelir.
             "id": 13,
             "url": "media/kentsel-arama-kurtarma-el-kitabi/figur8-dugum.png",
             "checksum": "72209E6CB6E7FF6BA83E3216BC443F5BA60930527A1504F4D35347FD0B9B3BEF",
-            "size": 48522
+            "size": 48522,
+            "thumbnailUrl": null
           },
           "displayOrder": 1
         }
@@ -243,7 +257,8 @@ sonraki güncellemeler `changes` ile gelir.
 
 **Notlar:**
 - `contents` içindeki her blok, `media` alanı doluysa `MediaSummaryDto`
-  şeklinde bir obje taşır (`id`, `url`, `checksum`, `size`); boşsa `null`.
+  şeklinde bir obje taşır (`id`, `url`, `checksum`, `size`, `thumbnailUrl` —
+  bkz. §3.1); boşsa `null`.
 - Silinmiş content'ler bu listede **hiç yer almaz** — snapshot her zaman
   o anki hayatta-olan durumu temsil eder.
 - **`variantGroupKey` / `variantLabel` (v1.1, additive):** Çoğu content'te
@@ -322,7 +337,7 @@ yeni/değişen content yok):
 | `upsertedContents` | array | **Sadece değişen** content'ler — şekli `snapshot.contents[]` ile birebir aynı |
 | `deletedContentIds` | array\<int\> | Silinen content id'leri |
 | `modules` | array | **Her zaman güncel modül listesinin TAMAMI** (§8) |
-| `addedMedia` | array | Yeni eklenen veya checksum'ı değişen medya (`id`, `url`, `checksum`, `size`) |
+| `addedMedia` | array | Yeni eklenen veya checksum'ı değişen medya (`id`, `url`, `checksum`, `size`, `thumbnailUrl` — bkz. §3.1) |
 | `removedMediaIds` | array\<int\> | Artık referans verilmeyen medya id'leri |
 
 **Notlar:**
@@ -360,7 +375,8 @@ Döngü Düğüm" content'inden):
     "id": 13,
     "url": "media/kentsel-arama-kurtarma-el-kitabi/figur8-dugum.png",
     "checksum": "72209E6CB6E7FF6BA83E3216BC443F5BA60930527A1504F4D35347FD0B9B3BEF",
-    "size": 48522
+    "size": 48522,
+    "thumbnailUrl": null
   },
   "displayOrder": 1
 }

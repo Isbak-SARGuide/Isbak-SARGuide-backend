@@ -17,53 +17,84 @@ namespace Isbak_SAR_Guide.Tests.Integration;
 /// Faz 6 (Media Pipeline) guvenlik/davranis testleri - ApiFactory gercek
 /// Postgres + izole bir temp storage klasoru kullanir (bkz. ApiFactory),
 /// bu yuzden LocalFileStorageService gercekten diske yazar/siler; mock yok.
-/// PNG govdeleri ImageSignatureDetectorTests'teki BuildMinimalPng ile
-/// uretilir - gercek bir imaj kutuphanesi gerekmez, sadece Detect/IHDR
-/// okumasinin ihtiyac duydugu baytlar dolu olsun yeter.
+/// Faz 12.7'den beri gorsel govdeleri TestImageFactory ile uretilir -
+/// UploadAsync artik SkiaSharp'la GERCEKTEN decode/encode ettigi icin
+/// (WebP donusumu + thumbnail) ImageSignatureDetectorTests.BuildMinimalPng
+/// gibi sahte-header-gercek-piksel-yok yardimcilar yeterli degil (o
+/// yardimcilar hala ImageSignatureDetector'in KENDI hand-rolled parser'ini
+/// test etmeye devam ediyor, sadece burada kullanilmiyorlar).
 /// </summary>
 [Collection("Api")]
 public class MediaServiceTests(ApiFactory factory)
 {
     [Fact]
-    public async Task UploadAsync_WithValidPng_CreatesMediaAndWritesFileToDisk()
+    public async Task UploadAsync_WithValidPng_CreatesWebPMediaAndWritesFileToDisk()
     {
-        var bytes = ImageSignatureDetectorTests.BuildMinimalPng(10, 20);
+        // Faz 12.7: STORAGE'A YAZILAN dosya artik her zaman WebP - orijinal
+        // yukleme formati (burada PNG) sadece giris dogrulamasi icin onemli,
+        // ContentType/StoragePath donusum SONRASI degerleri yansitir.
+        var bytes = TestImageFactory.BuildRealPng(10, 20);
 
         var result = await UploadAsync(bytes, "foto.png");
 
         result.IsSuccess.ShouldBeTrue();
-        result.Value.ContentType.ShouldBe("image/png");
+        result.Value.ContentType.ShouldBe("image/webp");
+        result.Value.StoragePath.ShouldEndWith(".webp");
         result.Value.Width.ShouldBe(10);
         result.Value.Height.ShouldBe(20);
-        result.Value.FileSize.ShouldBe(bytes.LongLength);
+        result.Value.FileSize.ShouldBeGreaterThan(0);
+        result.Value.ThumbnailStoragePath.ShouldNotBeNull();
+        result.Value.ThumbnailStoragePath.ShouldEndWith("-thumb.webp");
 
         PhysicalFileExists(result.Value.StoragePath).ShouldBeTrue();
+        PhysicalFileExists(result.Value.ThumbnailStoragePath!).ShouldBeTrue();
     }
 
     [Fact]
-    public async Task UploadAsync_WithValidJpeg_DetectsTypeAndReadsDimensions()
+    public async Task UploadAsync_WithValidJpeg_DetectsDimensionsAndConvertsToWebP()
     {
-        var bytes = ImageSignatureDetectorTests.BuildMinimalJpeg(640, 480);
+        var bytes = TestImageFactory.BuildRealJpeg(640, 480);
 
         var result = await UploadAsync(bytes, "foto.jpg");
 
         result.IsSuccess.ShouldBeTrue();
-        result.Value.ContentType.ShouldBe("image/jpeg");
+        result.Value.ContentType.ShouldBe("image/webp");
         result.Value.Width.ShouldBe(640);
         result.Value.Height.ShouldBe(480);
     }
 
     [Fact]
-    public async Task UploadAsync_WithValidGif_DetectsTypeAndReadsDimensions()
+    public async Task UploadAsync_WithValidGif_DetectsDimensionsAndConvertsToWebP()
     {
-        var bytes = ImageSignatureDetectorTests.BuildMinimalGif(64, 32);
+        var bytes = TestImageFactory.BuildRealGif1X1();
 
         var result = await UploadAsync(bytes, "animasyon.gif");
 
         result.IsSuccess.ShouldBeTrue();
-        result.Value.ContentType.ShouldBe("image/gif");
-        result.Value.Width.ShouldBe(64);
-        result.Value.Height.ShouldBe(32);
+        result.Value.ContentType.ShouldBe("image/webp");
+        result.Value.Width.ShouldBe(1);
+        result.Value.Height.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task UploadAsync_ThumbnailIsSmallerThanFullDimensionSource()
+    {
+        // Kaynak, varsayilan ThumbnailMaxDimension'i (400) asan bir boyutta -
+        // thumbnail dosyasinin fiziksel olarak ana dosyadan kucuk oldugunu
+        // (yeniden boyutlandirmanin gercekten calistigini) kanitlar.
+        var bytes = TestImageFactory.BuildRealPng(1200, 800);
+
+        var result = await UploadAsync(bytes, "buyuk-foto.png");
+        result.IsSuccess.ShouldBeTrue();
+
+        using var scope = factory.Services.CreateScope();
+        var storageOptions = scope.ServiceProvider.GetRequiredService<IOptions<StorageOptions>>();
+        var basePath = storageOptions.Value.BasePath;
+
+        var mainFileSize = new FileInfo(Path.Combine(basePath, result.Value.StoragePath)).Length;
+        var thumbnailFileSize = new FileInfo(Path.Combine(basePath, result.Value.ThumbnailStoragePath!)).Length;
+
+        thumbnailFileSize.ShouldBeLessThan(mainFileSize);
     }
 
     [Fact]
@@ -78,16 +109,36 @@ public class MediaServiceTests(ApiFactory factory)
     }
 
     [Fact]
+    public async Task UploadAsync_WithSignatureValidButUndecodableBytes_ReturnsValidationErrorNotServerError()
+    {
+        // Faz 12.7 kod inceleme bulgusu: ImageSignatureDetectorTests.BuildMinimalPng
+        // gercek bir imaj DEGIL - sadece Detect/IHDR'in ihtiyac duydugu baytlari
+        // (sahte header, gercek piksel/zlib verisi yok) icerir. SKBitmap.Decode
+        // boyle "imza dogru ama govde bozuk" bir dosyada BEKLENENIN AKSINE null
+        // degil ArgumentNullException firlatiyordu - MediaService bunu
+        // yakalamazsa saldirgan kontrollu boyle bir dosya 500'e (global exception
+        // handler) duserdi, temiz bir 400 Validation yerine. Bu test dogrudan
+        // o yakalamayi kanitlar.
+        var bytes = ImageSignatureDetectorTests.BuildMinimalPng(10, 10);
+
+        var result = await UploadAsync(bytes, "sahte-ama-imzali.png");
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error!.Type.ShouldBe(ErrorType.Validation);
+    }
+
+    [Fact]
     public async Task UploadAsync_IgnoresDeclaredFileNameExtension_TrustsDetectedContentType()
     {
         // Dosya adi ".txt" diyor ama baytlar gercek bir PNG - detector'in
-        // uzantiyi degil imzayi esas aldigini kanitlar.
-        var bytes = ImageSignatureDetectorTests.BuildMinimalPng(4, 4);
+        // uzantiyi degil imzayi esas aldigini kanitlar. ContentType donusum
+        // SONRASI degeri (webp) yansitir, orijinal PNG'yi degil.
+        var bytes = TestImageFactory.BuildRealPng(4, 4);
 
         var result = await UploadAsync(bytes, "aslinda-metin.txt");
 
         result.IsSuccess.ShouldBeTrue();
-        result.Value.ContentType.ShouldBe("image/png");
+        result.Value.ContentType.ShouldBe("image/webp");
     }
 
     [Fact]
@@ -119,7 +170,7 @@ public class MediaServiceTests(ApiFactory factory)
     [Fact]
     public async Task UploadAsync_DuplicateContent_ReturnsSameMediaWithoutWritingSecondFile()
     {
-        var bytes = ImageSignatureDetectorTests.BuildMinimalPng(2, 2);
+        var bytes = TestImageFactory.BuildRealPng(2, 2);
 
         var first = await UploadAsync(bytes, "birinci.png");
         var second = await UploadAsync(bytes, "ikinci.png");
@@ -149,7 +200,7 @@ public class MediaServiceTests(ApiFactory factory)
     [Fact]
     public async Task DeleteAsync_WhenNotReferenced_RemovesRowAndPhysicalFile()
     {
-        var bytes = ImageSignatureDetectorTests.BuildMinimalPng(1, 1);
+        var bytes = TestImageFactory.BuildRealPng(1, 1);
         var uploaded = await UploadAsync(bytes, "silinecek.png");
         uploaded.IsSuccess.ShouldBeTrue();
 
@@ -157,6 +208,7 @@ public class MediaServiceTests(ApiFactory factory)
         deleteResult.IsSuccess.ShouldBeTrue();
 
         PhysicalFileExists(uploaded.Value.StoragePath).ShouldBeFalse();
+        PhysicalFileExists(uploaded.Value.ThumbnailStoragePath!).ShouldBeFalse();
 
         var getResult = await GetByIdAsync(uploaded.Value.Id);
         getResult.IsFailure.ShouldBeTrue();
@@ -211,7 +263,7 @@ public class MediaServiceTests(ApiFactory factory)
 
     private async Task<int> UploadAndBackdateAsync(string fileName, int width, int hoursAgo)
     {
-        var bytes = ImageSignatureDetectorTests.BuildMinimalPng(width, height: 1);
+        var bytes = TestImageFactory.BuildRealPng(width, height: 1);
         var uploaded = await UploadAsync(bytes, fileName);
         uploaded.IsSuccess.ShouldBeTrue();
 
