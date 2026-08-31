@@ -18,58 +18,30 @@ anonim bir endpoint) baştan tasarlanmalı.
 
 ---
 
-## 2. Modül/İçerik `isPublished` flag'i publish davranışını etkilemiyor
+## 2. ~~Modül/İçerik `isPublished` flag'i publish davranışını etkilemiyor~~ — ÇÖZÜLDÜ (13.3)
 
-Test edildi (2026-08-28, gerçek backend'e karşı): `BSAFE` modülü draft tarafında
-`isPublished: false` iken, kitabın zaten yayınlanmış v17 sürümünde de mevcut. Yani
-`POST /books/{id}/publish` çağrıldığında modül/içerik seviyesindeki `isPublished` durumları
-**hiç süzülmüyor** — o anki draft ağacının tamamı (flag'ler ne olursa olsun) donup yeni
-sürüm oluyor.
-
-Bu muhtemelen kafa karıştırıcı: admin panelinde bir içeriği "Taslak" işaretlemek, kullanıcının
-"bu henüz yayınlanmasın" diye düşünmesine yol açabilir, ama pratikte publish anında yine gidiyor.
-
-**Olası çözümler (backend kararı gerekir):**
-- Publish sırasında gerçekten `isPublished: false` olan modül/içerikleri hariç tutmak (asıl
-  beklenen davranış muhtemelen bu), veya
-- Frontend'de bu flag'in adını/açıklamasını değiştirip ("yayında/taslak" yerine "gözden
-  geçirildi" gibi) yanıltıcı olmaktan çıkarmak.
-
-Şu an frontend hiçbir varsayımda bulunmuyor, flag'i olduğu gibi gösterip gönderiyor — davranış
-backend'in gerçek mantığına bağlı.
+`SnapshotBuilder.BuildSnapshot` artık Module/Content'i kendi `IsPublished` bayrağına göre
+süzüyor — beklenen davranış ("Taslak" işaretli içerik publish'te hariç tutulur) artık gerçek.
+Filtre eklenmeden önce canlı kitaptaki 8/10 Modül ve 85/97 Content'in `IsPublished=false`
+olduğu (zaten servis ediliyor olmasına rağmen) tespit edilip kapsamlı bir SQL backfill'le
+düzeltildi — filtre önce eklenseydi bu içerikler sessizce tombstone'lanırdı.
 
 ---
 
-## 3. CORS izin listesi çok dar, sessizce hata veriyor
+## 3. ~~CORS izin listesi çok dar, sessizce hata veriyor~~ — ÇÖZÜLDÜ
 
-Backend şu an sadece `http://localhost:5173` ve `http://localhost:3000` origin'lerine
-`Access-Control-Allow-Origin` dönüyor (test edildi, 2026-08-28). Bunun dışındaki hiçbir origin
-(örn. Vite başka bir portta açılırsa — `5174`, `5175`... — veya `vite preview`'in kullandığı
-`4173`, ya da ileride production domain) **hiç CORS header'ı almıyor**, tarayıcı isteği sessizce
-engelliyor. Bu, geliştiriciye "neden her şey hata veriyor" diye saatler kaybettirebilecek türden
-bir hata — tarayıcı konsolunda CORS hatası görünür ama network sekmesinde istek "başarılı" (200)
-görünebildiği için ilk bakışta backend'in çalıştığı, frontend'in bozuk olduğu sanılabiliyor.
-
-**Önerilir:**
-- Prod domain'i CORS allowlist'ine eklemeyi unutmamak (deploy öncesi kritik).
-- Dev ortamı için allowlist'i env değişkeninden okunan, virgülle ayrılmış bir liste yapmak
-  (`Cors:AllowedOrigins`), böylece her yeni port için kod değişikliği gerekmez.
-- İzin verilmeyen bir origin'den istek geldiğinde CORS'un kendisi zaten sessiz kalıyor
-  (tarayıcı standardı), bu değiştirilemez — ama en azından dokümantasyonda "izinli origin
-  listesi X'tir, değişmesi gerekiyorsa backend ekibine söyleyin" notu bırakmak faydalı olur.
+`Cors:AllowedOrigins` zaten config-driven'dı (env değişkeninden okunuyor, `CORS_ALLOWED_ORIGIN_0..`
+ile de override edilebiliyor — 13.1'de netleştirildi). Dev listesine `5174`/`4173` de eklendi
+(`appsettings.Development.json`). **Prod domain'i allowlist'e eklemeyi unutmamak hâlâ deploy
+öncesi kritik bir adım** — bu backend tarafında otomatikleşmiyor, deploy checklist'inde kalmalı.
 
 ---
 
-## 4. Login başarısız olduğunda 401'in gövdesi dolu — ama sözleşme dokümanı bunu netleştirmiyor
+## 4. ~~Login başarısız olduğunda 401'in gövdesi dolu — ama sözleşme dokümanı bunu netleştirmiyor~~ — ÇÖZÜLDÜ (13.1)
 
-`CMS-API-Sozlesmesi-v1.md` §3.4, 401'i "gövdesi boş, ProblemDetails değil" diye tanımlıyor —
-ama bu tanım sadece **token yok/geçersiz** durumuna (JWT middleware'in kendi challenge'ı) ait.
-Test ettim: `POST /auth/login`'e yanlış şifre/kullanıcı adıyla gidildiğinde dönen 401'in gövdesi
-**dolu bir ProblemDetails** (`title: "Auth.InvalidCredentials"`, `detail: "Kullanıcı adı veya
-şifre hatalı."`) — yani domain seviyesinde bir 401. Sözleşme dokümanına "login'deki 401 farklıdır,
-gövdesi doludur" diye bir netleştirme eklenmesi iyi olur; frontend tarafında bunu ayırt eden bir
-düzeltme zaten yaptık (önce boş gövde mi diye bakıp öyle karar veriyoruz) ama dokümanda bu ayrım
-yoktu, başka bir istemci (mobil, vs.) aynı yanlışa düşebilir.
+`CMS-API-Sozlesmesi-v1.md` §3.4'e istisna notu eklendi: "`/auth/login` hariç her uçtaki 401 boş
+gövdelidir" — login'in kendi 401'inin (yanlış kullanıcı adı/şifre) dolu bir ProblemDetails
+döndüğü artık açıkça yazılı, başka bir istemci (mobil vs.) aynı yanlış varsayıma düşmez.
 
 ---
 
@@ -85,24 +57,14 @@ Eski N+1 akışı (`GET /books/{id}/modules` + her modül için ayrı `GET
 
 ---
 
-## 6. Blok "reorder" işlemi, sırası değişmeyen blokların `dataJson`'ını da yeniden biçimlendiriyor
+## 6. ~~Blok "reorder" işlemi, sırası değişmeyen blokların `dataJson`'ını da yeniden biçimlendiriyor~~ — ÇÖZÜLDÜ (13.5)
 
-Test ettim: bir Table bloğu oluşturulduğunda `dataJson` `{"headers":[...],"rows":[...]}` şeklinde
-(boşluksuz, sıralı) kaydediliyor. Sonra o bloğu **içeriğine hiç dokunmadan**, sadece
-`PUT /contents/{id}/blocks/reorder` ile başka bir bloğun önüne/arkasına taşıdığımda, geri
-gelen `dataJson` `{"rows": [...], "headers": [...]}` haline dönüyor — anahtar sırası değişmiş,
-boşluklar eklenmiş, `updatedAt` de bump'lanmış. Yani reorder endpoint'i muhtemelen etkilenen
-blokları deserialize edip tekrar serialize ederek kaydediyor, sadece `displayOrder` kolonunu
-güncellemek yerine.
-
-Fonksiyonel bir bozukluk değil (JSON hâlâ geçerli, aynı veri), ama iki açıdan dikkat çekici:
-- `updatedAt`'in içerik değişmediği halde değişmesi, ileride "son değişiklik ne zaman oldu"
-  gibi bir mantık kurulursa yanıltıcı olabilir.
-- Sync tarafının checksum/entegrity hikâyesi (`Sync-Sozlesmesi-v2.md` §5) "ham baytlar" üzerinden
-  çalışıyor; bir reorder'ın alakasız bir bloğun byte'larını değiştirmesi, `/sync/changes`
-  delta'sının gereğinden büyük/gereksiz diff üretmesine yol açabilir (içerik aynı olsa bile
-  formatı değiştiği için "değişti" sayılabilir). Şimdilik bir sorun yaratmıyor ama backend
-  ekibinin bilmesi iyi olur.
+`ReorderHelper`'ın `markDirty`'si artık tüm entity'yi değil sadece `DisplayOrder` kolonunu kirli
+işaretliyor (`IRepository<T>.UpdateProperty`) — reorder artık `ContentBlock.DataJson`'a hiç
+dokunmuyor, `updatedAt` de gereksiz bump'lanmıyor. Düzeltme sırasında bir yan bulgu: Postgres
+jsonb kolonu zaten İLK INSERT'te kendi kanonik biçimine dönüştürüyor (anahtar sırası uzunluğa
+göre değişiyor) — yani `dataJson`'ın gönderilen string'le birebir aynı kalacağı garantisi hiç
+olmamıştı, sadece reorder'ın onu GEREKSİZ YERE tekrar yeniden yazması önlendi.
 
 ---
 
@@ -174,3 +136,35 @@ gelmiyor, kullanıcı yeniden login olmak zorunda — beklenen).
 checksum}` şeklinde döner, `SnapshotJson` hiç taşımaz (küçük payload). Kitap hiç
 yayınlanmamışsa boş dizi (hata değil). Rollback UI'ı artık gerçek bir "sürüm geçmişi"
 dropdown'ına çevrilebilir — `toVersion`'ı elle yazmaya gerek kalmadı.
+
+---
+
+## 10. "Oturum süresi doldu" bazen sebepsiz çıkıyor, elle tekrar login gerekiyor (2026-08-31)
+
+Kullanıcı geri bildirimi: bazen (deterministik değil, ara sıra) uygulama oturumun bittiğini
+söylüyor ve elle çıkış yapıp tekrar login olmak gerekiyor — normal şartlarda access token
+süresi dolduğunda (`Jwt:ExpiryMinutes=60`) frontend'in sessizce `POST /auth/refresh` çağırıp
+kullanıcıyı hiç rahatsız etmemesi beklenir.
+
+**Backend tarafında araştırılan muhtemel kök neden — bkz. roadmap doc 13.10 için tam teknik
+detay:** `AuthService.RefreshAsync` refresh token'ı **tek kullanımlık rotasyon** ile çalıştırıyor
+ve zaten iptal edilmiş bir token tekrar sunulursa bunu "çalınmış olabilir" sayıp kullanıcının
+TÜM token'larını (yeni alınanlar dahil) iptal ediyor — bu, **eşzamanlı iki refresh isteği**
+(iki sekme, ya da access token süresi dolduğunda birden fazla API çağrısının aynı anda refresh
+tetiklemesi) durumunda YANLIŞLIKLA tetiklenip kullanıcıyı hatasızken zorla login'e düşürebilir.
+"Bazen" olması (zamanlamaya bağlı bir yarış durumu) bu teoriyle örtüşüyor — henüz doğrulanmadı.
+
+**Frontend tarafında kontrol edilmesi gereken iki şey:**
+- Web dashboard'ın 401 yakalayıp otomatik `refresh` + orijinal isteği tekrar deneme mantığı
+  (interceptor) var mı, yoksa her 401'de direkt kullanıcıya mı gösteriliyor? Yoksa bu daha basit
+  ve daha olası açıklama — backend'in refresh mekanizması hiç devreye girmiyor demektir.
+- Varsa, bu interceptor **tek-uçuşlu (single-flight)** mi — yani aynı anda birden fazla istek
+  401 alırsa hepsi TEK bir refresh çağrısını mı bekliyor, yoksa her biri kendi refresh'ini mi
+  tetikliyor? İkincisi yukarıdaki race'i doğrudan tetikler. Çözüm: ilk 401 refresh'i başlatır,
+  diğerleri onun sonucunu bekler, ayrı ayrı refresh çağırmaz.
+- Sadece refresh de başarısız olursa (gerçek oturum sonu) kullanıcıyı **otomatik** `/login`'e
+  yönlendirmek — "oturum süresi doldu" diye bir mesaj gösterip elle çıkışı beklemek yerine.
+
+Backend tarafında bir düzeltme (rotasyona kısa bir grace window eklemek) mümkün ama kök neden
+doğrulanmadan (loglarla ya da tekrar üretilerek) yapılırsa yarım çözüm olur — önce yukarıdaki
+frontend kontrolü yapılmalı.
