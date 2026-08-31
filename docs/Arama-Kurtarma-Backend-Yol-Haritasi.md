@@ -1067,28 +1067,24 @@ her alt görevin kendi commit mesajında ve §5.13'teki WBS tablosunda.
 - 13.8 Acil Durum Bandı (web #1) — backend desteği (Book'a alan + Admin PUT + manifest'e
       ek alan ya da yeni anonim endpoint) ERTELENDİ, kullanıcı onayıyla: şu an öncelik değil,
       sonradan eklenebilir additive bir özellik.
-- 13.10 (2026-08-31, web'in "bazen oturum süresi doldu diyor, elle çıkış yapmam gerekiyor"
-      geri bildirimi) — **muhtemel kök neden bulundu, henüz DOĞRULANMADI, düzeltme YAPILMADI.**
-      `AuthService.RefreshAsync` (`Isbak_SAR_Guide.Business/Services/Concrete/AuthService.cs:63-107`)
-      refresh token'ı **tek kullanımlık rotasyon** ile çalıştırıyor: sunulan token okunur, eğer
-      `RevokedAtUtc` doluysa (daha önce rotasyonla iptal edilmiş) bu "çalınmış olabilir" (reuse)
-      sayılıp kullanıcının TÜM aktif token'ları anında iptal edilir (`RevokeAllActiveForUserAsync`)
-      — kasıtlı bir güvenlik önlemi (12.6 öncesi tasarım), ama **eşzamanlı iki refresh isteği**
-      (iki sekme, ya da web app'in access token süresi dolduğunda birden fazla API çağrısının
-      aynı anda refresh tetiklemesi) bu mekanizmayı YANLIŞLIKLA tetikleyebilir: A isteği token'ı
-      rotasyonla iptal edip yeni bir çift alırken, B isteği (A'nın commit'inden hemen sonra aynı
-      eski token'la gelirse) bunu "hırsızlık" sanıp kullanıcının A'nın YENİ aldığı token dahil
-      HER ŞEYİNİ iptal eder — kullanıcı hiçbir hata yapmamışken zorla login'e düşer. "Bazen"
-      olması (deterministik değil, zamanlamaya bağlı bir yarış) bu teoriyle örtüşüyor.
-      **Doğrulama adımı:** gerçek kullanım sırasında `AuthService.RefreshAsync`'teki reuse-tespit
-      log satırı (`LogInformation`, "Eszamanli reuse tespiti" benzeri — şu an sadece
-      `RefreshTokenRepository`'de yorum var, ayrı bir log satırı eklenmesi gerekebilir) izlenip
-      şikayetin zamanlamasıyla eşleşip eşleşmediği kontrol edilmeli. **Olası düzeltme (backend,
-      doğrulanırsa):** rotasyonda kısa bir "grace window" (örn. 5-10 sn) tanımak — bu sürede
-      eski token tekrar sunulursa hata vermek yerine AYNI (zaten üretilmiş) yeni çifti tekrar
-      döndürmek, gerçek hırsızlık senaryosunu hâlâ yakalarken (asıl çalıntı token çok daha sonra
-      kullanılır) meşru eşzamanlı istekleri cezalandırmaz — yaygın bir endüstri deseni. **Frontend
-      tarafı da ayrıca kontrol edilmeli** — bkz. `Frontend-Notlar-ve-Oneriler.md` madde 10, web
-      dashboard'ın refresh çağrılarını tek-uçuşlu (single-flight) yapıp yapmadığı bilinmiyor;
-      bu doğrulanmadan backend tarafı düzeltmek yarı çözüm olur. Bu madde bilerek checkbox değil
-      bullet — planlı bir görev değil, araştırma/doğrulama bekleyen bir bulgu.
+- [x] 13.10 (2026-08-31, web'in "bazen oturum süresi doldu diyor, elle çıkış yapmam gerekiyor"
+      geri bildirimi) — **backend tarafı düzeltildi: rotasyona kısa bir grace window eklendi.**
+      Kök neden hipotezi doğrulanmadan (log/gerçek kullanım kanıtı olmadan) ama zararsız ve
+      geriye dönük güvenli olduğu için uygulandı: `AuthService.RefreshAsync`'in tek kullanımlık
+      rotasyonu, zaten iptal edilmiş bir token tekrar sunulduğunda artık koşulsuz "hırsızlık"
+      saymıyor — `RefreshToken.RevokedByRotation` (yeni kolon, migration
+      `AddRefreshTokenRevokedByRotation`) bu iptalin rotasyondan mı (grace window uygulanabilir)
+      yoksa açık logout/toplu iptalden mi (`RevokeAsync`, `RevokeAllActiveForUserAsync` —
+      deaktivasyon/reuse-cezası) geldiğini ayırt ediyor; **sadece rotasyon kaynaklı ve
+      `Jwt:RefreshTokenRotationGraceSeconds` (varsayılan 10 sn) içindeki** iptaller için yeni bir
+      çift üretilip kullanıcı zorla logout edilmiyor — açık logout'tan hemen sonra aynı token'la
+      "tekrar giriş" gibi bir güvenlik açığı oluşmuyor (grace window'un bilerek rotasyona özel
+      tutulma gerekçesi). Grace window dışında ya da rotasyon-dışı bir iptalse davranış
+      değişmedi: tüm aktif token'lar iptal edilir. Mevcut iki reuse testi
+      (`AuthServiceTests`/`AuthTests`) yeni davranışa göre güncellendi + iki yeni test eklendi
+      (grace window içinde başarı, grace window dışında hâlâ toplu iptal — zaman aşımını
+      gerçekten beklemek yerine `RevokedAtUtc`'yi geriye alarak deterministik simüle edilir).
+      206/206 test yeşil. **Hâlâ doğrulanmadı/tamamlanmadı:** web dashboard'ın refresh
+      çağrılarını tek-uçuşlu (single-flight) yapıp yapmadığı ve otomatik 401→login
+      yönlendirmesi olup olmadığı — bkz. `Frontend-Notlar-ve-Oneriler.md` madde 10, bu backend
+      repo'sunun dışında, web ekibinin kendi kontrol etmesi gerekiyor.
