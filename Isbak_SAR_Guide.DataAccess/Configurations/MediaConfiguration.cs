@@ -13,6 +13,7 @@ public class MediaConfiguration : IEntityTypeConfiguration<Media>
 
         builder.Property(m => m.FileName).HasMaxLength(260).IsRequired();
         builder.Property(m => m.StoragePath).HasMaxLength(500).IsRequired();
+        builder.Property(m => m.ThumbnailStoragePath).HasMaxLength(500);
         builder.Property(m => m.ContentType).HasMaxLength(100).IsRequired();
         builder.Property(m => m.Checksum).HasMaxLength(128).IsRequired();
 

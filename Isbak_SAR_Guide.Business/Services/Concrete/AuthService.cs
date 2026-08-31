@@ -4,14 +4,19 @@ using Isbak_SAR_Guide.Business.Services.Abstract;
 using Isbak_SAR_Guide.DataAccess.Repositories.Abstract;
 using Isbak_SAR_Guide.Entities.Identity;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Options;
 
 namespace Isbak_SAR_Guide.Business.Services.Concrete;
 
 public class AuthService(
     UserManager<ApplicationUser> userManager,
     ITokenService tokenService,
-    IUnitOfWork unitOfWork) : IAuthService
+    IUnitOfWork unitOfWork,
+    IOptions<JwtOptions> jwtOptions) : IAuthService
 {
+    private readonly JwtOptions _jwtOptions = jwtOptions.Value;
+
+
     private static readonly Error _invalidCredentialsError =
         Error.Unauthorized("Auth.InvalidCredentials", "Kullanıcı adı veya şifre hatalı.");
 
@@ -72,13 +77,33 @@ public class AuthService(
 
         if (existing.RevokedAtUtc is not null)
         {
-            // Reuse tespiti: rotasyonla iptal edilmis bir token tekrar sunuldu -
-            // calinmis olabilir. Kullanicinin TUM aktif token'larini hemen iptal et.
-            await unitOfWork.RefreshTokens.RevokeAllActiveForUserAsync(existing.UserId, cancellationToken);
-            return Result.Failure<LoginResponseDto>(_invalidRefreshTokenError);
-        }
+            var elapsedSinceRevocation = DateTime.UtcNow - existing.RevokedAtUtc.Value;
 
-        if (existing.ExpiresAtUtc <= DateTime.UtcNow)
+            // Grace window SADECE rotasyon kaynakli iptallerde gecerli -
+            // RevokedByRotation false ise (acik logout / RevokeAllActiveForUserAsync
+            // ile toplu iptal: deaktivasyon, sifre degisimi, ya da bu bloktaki
+            // reuse-cezasi) grace penceresi HIC uygulanmaz, aksi halde acik bir
+            // logout'tan hemen sonra ayni token'la "tekrar giris" mumkun olurdu.
+            var withinRotationGraceWindow = existing.RevokedByRotation
+                && elapsedSinceRevocation <= TimeSpan.FromSeconds(_jwtOptions.RefreshTokenRotationGraceSeconds);
+
+            if (!withinRotationGraceWindow)
+            {
+                // Gercek reuse tespiti (ya da grace penceresi disinda): calinmis
+                // olabilir. Kullanicinin TUM aktif token'larini hemen iptal et.
+                await unitOfWork.RefreshTokens.RevokeAllActiveForUserAsync(existing.UserId, cancellationToken);
+                return Result.Failure<LoginResponseDto>(_invalidRefreshTokenError);
+            }
+
+            // Grace window icinde VE rotasyon kaynakli: roadmap doc §13.10'daki
+            // hipotezin duzeltmesi. Ayni token'i esizamanli birden fazla istek
+            // (iki sekme, ya da access token suresi dolunca birden fazla API
+            // cagrisinin ayni anda refresh tetiklemesi) sunmus olabilir - bu
+            // zararsiz bir yaris, hirsizlik degil. Asagidaki normal akisla (yeni
+            // cift uret) devam eder, TUM token'lari IPTAL ETMEZ; existing zaten
+            // iptal oldugu icin asagida tekrar RevokedAtUtc atanmaz.
+        }
+        else if (existing.ExpiresAtUtc <= DateTime.UtcNow)
         {
             return Result.Failure<LoginResponseDto>(_invalidRefreshTokenError);
         }
@@ -99,7 +124,14 @@ public class AuthService(
         }
 
         // Rotasyon: eskisi iptal, yenisi uretilir - ikisi de ayni SaveChanges'te.
-        existing.RevokedAtUtc = DateTime.UtcNow;
+        // Grace window icindeki yaris durumunda existing zaten iptal edilmis
+        // olabilir - o zaman ne zaman damgasina ne de RevokedByRotation'a
+        // DOKUNULMAZ (ilk rotasyonun gercek anini/nedenini korur).
+        if (existing.RevokedAtUtc is null)
+        {
+            existing.RevokedAtUtc = DateTime.UtcNow;
+            existing.RevokedByRotation = true;
+        }
 
         var roles = await userManager.GetRolesAsync(user);
         var accessToken = tokenService.GenerateAccessToken(user, roles);

@@ -13,4 +13,7 @@ public sealed record MediaDto(
     int? Width,
     int? Height,
     double? Duration,
-    DateTime CreatedAt);
+    DateTime CreatedAt,
+    // Faz 12.7, additive: null = bu medyanin thumbnail'i yok (backfill yok,
+    // sadece bu ozellikten sonraki yuklemeler doldurur).
+    string? ThumbnailStoragePath = null);

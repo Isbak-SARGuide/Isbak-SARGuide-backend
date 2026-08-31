@@ -21,5 +21,16 @@ public class RefreshToken
     /// <summary>Null = hala aktif. Rotasyonda veya acik logout'ta doldurulur.</summary>
     public DateTime? RevokedAtUtc { get; set; }
 
+    /// <summary>
+    /// RevokedAtUtc'nin NEDENini ayirt eder - sadece rotasyon (RefreshAsync'in
+    /// kendi tek-kullanimlik rotasyonu) bunu true yapar; acik logout
+    /// (RevokeAsync) ve toplu iptal (RevokeAllActiveForUserAsync - reuse
+    /// tespiti/deaktivasyon) false birakir (varsayilan). AuthService.RefreshAsync'in
+    /// rotasyon grace window'u (roadmap doc §13.10) SADECE bu true iken devreye
+    /// girer - aksi halde acik bir logout'tan hemen sonra ayni token'la tekrar
+    /// giris yapilabilir gibi bir guvenlik acigi olurdu.
+    /// </summary>
+    public bool RevokedByRotation { get; set; }
+
     public ApplicationUser User { get; set; } = null!;
 }

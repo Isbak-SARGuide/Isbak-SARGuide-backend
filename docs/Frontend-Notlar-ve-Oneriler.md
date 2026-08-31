@@ -146,25 +146,25 @@ söylüyor ve elle çıkış yapıp tekrar login olmak gerekiyor — normal şar
 süresi dolduğunda (`Jwt:ExpiryMinutes=60`) frontend'in sessizce `POST /auth/refresh` çağırıp
 kullanıcıyı hiç rahatsız etmemesi beklenir.
 
-**Backend tarafında araştırılan muhtemel kök neden — bkz. roadmap doc 13.10 için tam teknik
-detay:** `AuthService.RefreshAsync` refresh token'ı **tek kullanımlık rotasyon** ile çalıştırıyor
-ve zaten iptal edilmiş bir token tekrar sunulursa bunu "çalınmış olabilir" sayıp kullanıcının
-TÜM token'larını (yeni alınanlar dahil) iptal ediyor — bu, **eşzamanlı iki refresh isteği**
-(iki sekme, ya da access token süresi dolduğunda birden fazla API çağrısının aynı anda refresh
-tetiklemesi) durumunda YANLIŞLIKLA tetiklenip kullanıcıyı hatasızken zorla login'e düşürebilir.
-"Bazen" olması (zamanlamaya bağlı bir yarış durumu) bu teoriyle örtüşüyor — henüz doğrulanmadı.
+**Backend tarafı düzeltildi (2026-08-31) — bkz. roadmap doc 13.10 için tam teknik detay:**
+`AuthService.RefreshAsync`'in tek kullanımlık rotasyonu artık zaten rotasyonla iptal edilmiş bir
+token'ın **kısa bir grace window** (varsayılan 10 sn, `Jwt:RefreshTokenRotationGraceSeconds`)
+içinde tekrar sunulmasını hırsızlık saymıyor — eşzamanlı iki refresh isteği (iki sekme, ya da
+access token süresi dolduğunda birden fazla API çağrısının aynı anda refresh tetiklemesi) artık
+kullanıcıyı zorla login'e düşürmüyor, sadece yeni bir token çifti alıyor. Açık logout'tan sonra
+grace window UYGULANMIYOR (ayrı bir `RevokedByRotation` bayrağıyla ayırt ediliyor) — bu değişiklik
+mevcut logout/deaktivasyon güvenliğini gevşetmiyor. **Kök neden hipotezi hâlâ doğrulanmadı**
+(gerçek log/kullanım kanıtı yok), ama düzeltme zararsız ve geriye dönük güvenli olduğu için
+doğrulama beklenmeden uygulandı.
 
-**Frontend tarafında kontrol edilmesi gereken iki şey:**
+**Frontend tarafında hâlâ kontrol edilmesi gereken iki şey (backend'in düzeltmesi bunları
+kapsamıyor):**
 - Web dashboard'ın 401 yakalayıp otomatik `refresh` + orijinal isteği tekrar deneme mantığı
-  (interceptor) var mı, yoksa her 401'de direkt kullanıcıya mı gösteriliyor? Yoksa bu daha basit
-  ve daha olası açıklama — backend'in refresh mekanizması hiç devreye girmiyor demektir.
+  (interceptor) var mı, yoksa her 401'de direkt kullanıcıya mı gösteriliyor? Yoksa asıl sorun
+  backend'in refresh mekanizmasıyla hiç ilgisiz demektir.
 - Varsa, bu interceptor **tek-uçuşlu (single-flight)** mi — yani aynı anda birden fazla istek
   401 alırsa hepsi TEK bir refresh çağrısını mı bekliyor, yoksa her biri kendi refresh'ini mi
-  tetikliyor? İkincisi yukarıdaki race'i doğrudan tetikler. Çözüm: ilk 401 refresh'i başlatır,
-  diğerleri onun sonucunu bekler, ayrı ayrı refresh çağırmaz.
+  tetikliyor? İkincisi hâlâ gereksiz token üretimine yol açar (artık kullanıcıyı logout etmiyor
+  ama yine de temiz değil). Çözüm: ilk 401 refresh'i başlatır, diğerleri onun sonucunu bekler.
 - Sadece refresh de başarısız olursa (gerçek oturum sonu) kullanıcıyı **otomatik** `/login`'e
   yönlendirmek — "oturum süresi doldu" diye bir mesaj gösterip elle çıkışı beklemek yerine.
-
-Backend tarafında bir düzeltme (rotasyona kısa bir grace window eklemek) mümkün ama kök neden
-doğrulanmadan (loglarla ya da tekrar üretilerek) yapılırsa yarım çözüm olur — önce yukarıdaki
-frontend kontrolü yapılmalı.

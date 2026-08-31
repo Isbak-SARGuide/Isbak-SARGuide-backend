@@ -64,9 +64,13 @@ public class AuthTests(ApiFactory factory)
         var refreshResult = await refreshResponse.Content.ReadFromJsonAsync<LoginResponseDto>();
         refreshResult!.RefreshToken.ShouldNotBe(loginResult.RefreshToken);
 
-        // Rotasyon: eski token artik gecersiz.
-        var reuseResponse = await client.PostAsJsonAsync("/api/v1/auth/refresh", new { refreshToken = loginResult.RefreshToken });
-        reuseResponse.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+        // Rotasyon grace window'u (roadmap doc §13.10) icinde ayni token'in
+        // HEMEN tekrar sunulmasi artik reddedilmiyor - esizamanli bir yaris
+        // olabilecegi icin yeni bir cift verilir, tum token'lar iptal edilmez.
+        // Bkz. AuthServiceTests.cs'teki grace-window/reuse testleri, ayrintili
+        // senaryolar orada.
+        var racingRetryResponse = await client.PostAsJsonAsync("/api/v1/auth/refresh", new { refreshToken = loginResult.RefreshToken });
+        racingRetryResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
     }
 
     [Fact]

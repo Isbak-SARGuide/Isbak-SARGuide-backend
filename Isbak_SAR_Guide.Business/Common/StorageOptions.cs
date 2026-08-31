@@ -29,4 +29,15 @@ public sealed class StorageOptions
 
     /// <summary>Yetim medya temizliginde bir dosyanin "yeterince eski" sayilmasi icin gereken sure.</summary>
     public int OrphanGraceHours { get; init; } = 24;
+
+    /// <summary>
+    /// Faz 12.7 (WebP + thumbnail, mobil optimizasyon): yeni yuklenen her
+    /// gorsel bu kaliteyle WebP'ye cevrilip STORAGE'A YAZILAN asil dosya
+    /// olur (orijinal PNG/JPEG/GIF baytlari saklanmaz) - mobilin indirdigi
+    /// dosya boyutu kuculur. 0-100 arasi, WebP'nin kendi olcegi.
+    /// </summary>
+    public int WebPQuality { get; init; } = 85;
+
+    /// <summary>Thumbnail'in en uzun kenari bu degeri asmayacak sekilde (en-boy orani korunarak) kucultulur.</summary>
+    public int ThumbnailMaxDimension { get; init; } = 400;
 }

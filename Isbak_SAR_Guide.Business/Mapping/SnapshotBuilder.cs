@@ -149,7 +149,7 @@ public static class SnapshotBuilder
     {
         var mediaDto = block.Media is null
             ? null
-            : new MediaSummaryDto(block.Media.Id, block.Media.StoragePath, block.Media.Checksum, block.Media.FileSize);
+            : new MediaSummaryDto(block.Media.Id, block.Media.StoragePath, block.Media.Checksum, block.Media.FileSize, block.Media.ThumbnailStoragePath);
 
         return new SyncContentBlockDto(block.Id, block.Type, block.Text, block.DataJson, mediaDto, block.DisplayOrder);
     }
