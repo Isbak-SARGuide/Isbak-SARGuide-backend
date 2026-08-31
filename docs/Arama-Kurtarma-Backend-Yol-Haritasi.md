@@ -366,7 +366,7 @@ düzeltme, kırılma değil.
 | 13.7 | Video/Animation `dataJson` taslak şeması (provisional) | mobil #3 | 1,0 |
 
 **Bilinçli olarak kapsam dışı:** Acil Durum Bandı backend desteği (web #1,
-bkz. §14 Faz 10 notu — sonradan eklenebilir, şimdi öncelik değil); web
+bkz. §14 Faz 10 notu — 2026-08-31 itibarıyla İPTAL EDİLDİ, yapılmayacak); web
 frontend'in kendi kod tabanındaki ölü kod/kitap seçici notları (web #8) —
 backend'i ilgilendirmiyor.
 
@@ -1088,8 +1088,8 @@ her alt görevin kendi commit mesajında ve §5.13'teki WBS tablosunda.
       Animation için `dataJson.steps` dizisi (her adım kendi `text` + opsiyonel `mediaId`'si).
       Zamanlama/süre bilgisi bilerek dışarıda bırakıldı (YAGNI, gerçek ihtiyaç yok).
 - 13.8 Acil Durum Bandı (web #1) — backend desteği (Book'a alan + Admin PUT + manifest'e
-      ek alan ya da yeni anonim endpoint) ERTELENDİ, kullanıcı onayıyla: şu an öncelik değil,
-      sonradan eklenebilir additive bir özellik.
+      ek alan ya da yeni anonim endpoint) İPTAL EDİLDİ (2026-08-31, kullanıcı onayıyla):
+      önceki not "ERTELENDİ" diyordu, artık backlog'da da değil — yapılmayacak.
 - [x] 13.10 (2026-08-31, web'in "bazen oturum süresi doldu diyor, elle çıkış yapmam gerekiyor"
       geri bildirimi) — **backend tarafı düzeltildi: rotasyona kısa bir grace window eklendi.**
       Kök neden hipotezi doğrulanmadan (log/gerçek kullanım kanıtı olmadan) ama zararsız ve
