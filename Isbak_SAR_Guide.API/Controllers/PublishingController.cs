@@ -64,4 +64,15 @@ public class PublishingController(IPublishingService publishingService) : Contro
 
         return result.ToActionResult(this);
     }
+
+    // Rollback ile ayni gerekce: mutlak route, sinif template'inin "/publish"
+    // ile bitmesinden bagimsiz bir kardes kaynak. Web ekibinin geri bildirimi
+    // (Frontend-Notlar-ve-Oneriler.md madde 9b) - rollback'in toVersion girdisi
+    // elle ezberlenen bir sayiydi, bu uc gercek bir surum listesi saglar.
+    [HttpGet("/api/v{version:apiVersion}/books/{bookId:int}/publications")]
+    public async Task<IActionResult> GetHistory(int bookId, CancellationToken cancellationToken)
+    {
+        var result = await publishingService.GetHistoryAsync(bookId, cancellationToken);
+        return result.ToActionResult(this);
+    }
 }

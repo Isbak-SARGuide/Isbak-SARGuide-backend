@@ -125,6 +125,68 @@ public class ContentServiceTests(ApiFactory factory)
         result.Error!.Type.ShouldBe(ErrorType.Validation);
     }
 
+    [Fact]
+    public async Task GetPagedByBookIdAsync_ReturnsContentsAcrossAllModulesOrderedByModuleThenDisplayOrder()
+    {
+        // Web ekibinin geri bildirimi (Frontend-Notlar-ve-Oneriler.md madde 5):
+        // admin panelin "Icerikler" ekrani N+1 yapiyordu (her modul icin ayri
+        // GET). Bu duz (flat) uc, tek cagriyla TUM modullerin icerigini
+        // modul sirasi -> content sirasi ile doner.
+        using var scope = factory.Services.CreateScope();
+        var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+
+        var book = new Book { Title = "Flat İçerik Testi", Slug = $"flat-contents-{Guid.NewGuid():N}" };
+        var moduleA = new Module { Name = "A Modülü", DisplayOrder = 0 };
+        var moduleB = new Module { Name = "B Modülü", DisplayOrder = 1 };
+        moduleA.Contents.Add(new Content { Title = "A1", DisplayOrder = 0 });
+        moduleA.Contents.Add(new Content { Title = "A2", DisplayOrder = 1 });
+        moduleB.Contents.Add(new Content { Title = "B1", DisplayOrder = 0 });
+        book.Modules.Add(moduleA);
+        book.Modules.Add(moduleB);
+        await unitOfWork.Books.AddAsync(book);
+        await unitOfWork.SaveChangesAsync();
+
+        var contentService = scope.ServiceProvider.GetRequiredService<IContentService>();
+        var result = await contentService.GetPagedByBookIdAsync(book.Id, page: 1, pageSize: 10, isPublished: null);
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.TotalCount.ShouldBe(3);
+        result.Value.Items.Select(c => c.Title).ShouldBe(["A1", "A2", "B1"]);
+    }
+
+    [Fact]
+    public async Task GetPagedByBookIdAsync_WithIsPublishedFilter_FiltersAcrossModules()
+    {
+        using var scope = factory.Services.CreateScope();
+        var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+
+        var book = new Book { Title = "Flat Filtre Testi", Slug = $"flat-contents-filter-{Guid.NewGuid():N}" };
+        var moduleA = new Module { Name = "A Modülü", DisplayOrder = 0 };
+        moduleA.Contents.Add(new Content { Title = "Yayında", DisplayOrder = 0, IsPublished = true });
+        moduleA.Contents.Add(new Content { Title = "Taslak", DisplayOrder = 1, IsPublished = false });
+        book.Modules.Add(moduleA);
+        await unitOfWork.Books.AddAsync(book);
+        await unitOfWork.SaveChangesAsync();
+
+        var contentService = scope.ServiceProvider.GetRequiredService<IContentService>();
+        var result = await contentService.GetPagedByBookIdAsync(book.Id, page: 1, pageSize: 10, isPublished: true);
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.Items.Select(c => c.Title).ShouldBe(["Yayında"]);
+    }
+
+    [Fact]
+    public async Task GetPagedByBookIdAsync_WithNonExistentBook_ReturnsNotFound()
+    {
+        using var scope = factory.Services.CreateScope();
+        var contentService = scope.ServiceProvider.GetRequiredService<IContentService>();
+
+        var result = await contentService.GetPagedByBookIdAsync(999_999, page: 1, pageSize: 10, isPublished: null);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error!.Type.ShouldBe(ErrorType.NotFound);
+    }
+
     // ---- Yardımcılar ----
 
     private async Task<Result<ContentDto>> CreateAsync(int moduleId, CreateContentDto dto)

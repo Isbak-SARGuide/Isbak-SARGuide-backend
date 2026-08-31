@@ -37,4 +37,13 @@ public interface IPublishingService
         int toVersion,
         string publishedById,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Follow-up (web ekibi geri bildirimi, Frontend-Notlar-ve-Oneriler.md
+    /// madde 9b): kitabin tum yayin gecmisini (en yeniden eskiye) doner -
+    /// RollbackAsync'in "toVersion" girdisini elle ezberlemek yerine gercek
+    /// bir dropdown'a cevirir. Sozlesme: kitap yoksa NotFound; hic yayin
+    /// yoksa bos liste (ilk yayindan once gecerli bir durum, hata degil).
+    /// </summary>
+    Task<Result<IReadOnlyList<PublicationSummaryDto>>> GetHistoryAsync(int bookId, CancellationToken cancellationToken = default);
 }

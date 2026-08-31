@@ -67,6 +67,23 @@ public class UserServiceTests(ApiFactory factory)
     }
 
     [Fact]
+    public async Task CreateAsync_WithWeakPassword_ReturnsTurkishErrorMessage()
+    {
+        // Web ekibinin ChangeOwnPassword'de fark ettigi "Incorrect password."
+        // (Ingilizce) sorununun kokeni: TurkishIdentityErrorDescriber
+        // eklenmeden once UserManager'in TUM IdentityResult mesajlari
+        // Ingilizce'ydi - API'nin geri kalani Turkce oldugu icin tutarsizdi.
+        // Bu test, describer'in gercekten devrede oldugunu dogrudan kanitlar.
+        var dto = new CreateUserDto($"weakpass-{Guid.NewGuid():N}", "abc", "Kullanıcı", RoleNames.Editor);
+
+        var result = await CreateAsync(dto);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error!.Message.ShouldNotContain("Passwords must", Case.Insensitive);
+        result.Error!.Message.ShouldContain("şifre", Case.Insensitive);
+    }
+
+    [Fact]
     public async Task GetAllAsync_ReturnsCreatedUserWithRoleAndLockoutStatus()
     {
         var dto = new CreateUserDto($"list-{Guid.NewGuid():N}", "Editor!2026Pass", "Listelenecek Kullanıcı", RoleNames.Editor);
@@ -186,6 +203,57 @@ public class UserServiceTests(ApiFactory factory)
     }
 
     [Fact]
+    public async Task ActivateAsync_ReactivatesADeactivatedUser()
+    {
+        const string password = "Editor!2026Pass";
+        var dto = new CreateUserDto($"reactivate-{Guid.NewGuid():N}", password, "Yeniden Aktive Edilecek", RoleNames.Editor);
+        var created = await CreateAsync(dto);
+
+        using var scope = factory.Services.CreateScope();
+        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        var admin = await userManager.FindByNameAsync("admin");
+        var userService = scope.ServiceProvider.GetRequiredService<IUserService>();
+
+        (await userService.DeactivateAsync(created.Value.Id, actingUserId: admin!.Id)).IsSuccess.ShouldBeTrue();
+        var lockedUser = await userManager.FindByIdAsync(created.Value.Id);
+        (await userManager.IsLockedOutAsync(lockedUser!)).ShouldBeTrue();
+
+        var activateResult = await userService.ActivateAsync(created.Value.Id);
+
+        activateResult.IsSuccess.ShouldBeTrue();
+        var reactivatedUser = await userManager.FindByIdAsync(created.Value.Id);
+        (await userManager.IsLockedOutAsync(reactivatedUser!)).ShouldBeFalse();
+
+        var authService = scope.ServiceProvider.GetRequiredService<IAuthService>();
+        var loginResult = await authService.LoginAsync(new LoginDto(dto.UserName, password));
+        loginResult.IsSuccess.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task ActivateAsync_WithAlreadyActiveUser_IsIdempotent()
+    {
+        var dto = new CreateUserDto($"already-active-{Guid.NewGuid():N}", "Editor!2026Pass", "Zaten Aktif", RoleNames.Editor);
+        var created = await CreateAsync(dto);
+
+        using var scope = factory.Services.CreateScope();
+        var userService = scope.ServiceProvider.GetRequiredService<IUserService>();
+        var result = await userService.ActivateAsync(created.Value.Id);
+
+        result.IsSuccess.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task ActivateAsync_WithNonExistentUser_ReturnsNotFound()
+    {
+        using var scope = factory.Services.CreateScope();
+        var userService = scope.ServiceProvider.GetRequiredService<IUserService>();
+        var result = await userService.ActivateAsync(Guid.NewGuid().ToString());
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error!.Type.ShouldBe(ErrorType.NotFound);
+    }
+
+    [Fact]
     public async Task ChangeOwnPasswordAsync_WithCorrectCurrentPassword_Succeeds()
     {
         const string oldPassword = "Editor!2026Pass";
@@ -242,6 +310,9 @@ public class UserServiceTests(ApiFactory factory)
     [Fact]
     public async Task ChangeOwnPasswordAsync_WithWrongCurrentPassword_ReturnsValidationError()
     {
+        // Web ekibinin canli testte fark ettigi tam senaryo: yanlis
+        // currentPassword eskiden "Incorrect password." (Ingilizce) donuyordu -
+        // TurkishIdentityErrorDescriber sonrasi Turkce olmali.
         var dto = new CreateUserDto($"pwdwrong-{Guid.NewGuid():N}", "Editor!2026Pass", "Şifre", RoleNames.Editor);
         var created = await CreateAsync(dto);
 
@@ -251,6 +322,8 @@ public class UserServiceTests(ApiFactory factory)
 
         result.IsFailure.ShouldBeTrue();
         result.Error!.Type.ShouldBe(ErrorType.Validation);
+        result.Error!.Message.ShouldNotContain("Incorrect password", Case.Insensitive);
+        result.Error!.Message.ShouldContain("şifre", Case.Insensitive);
     }
 
     private async Task<Result<UserDto>> CreateAsync(CreateUserDto dto)

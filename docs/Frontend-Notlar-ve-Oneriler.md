@@ -73,20 +73,15 @@ yoktu, başka bir istemci (mobil, vs.) aynı yanlışa düşebilir.
 
 ---
 
-## 5. İçerik listesi book/modül seviyesinde toplu çekilemiyor (N+1 sorunu)
+## 5. ~~İçerik listesi book/modül seviyesinde toplu çekilemiyor (N+1 sorunu)~~ — ÇÖZÜLDÜ (2026-08-31)
 
-Admin panelindeki "İçerikler" listesi (tüm modüllerdeki tüm içerikleri tek ekranda göstermek)
-ve Dashboard'daki içerik sayısı istatistiği, backend'de kitap/modül genelinde tek bir "tüm
-içerikleri getir" ya da "modül başına içerik sayısı" endpoint'i olmadığı için N+1 sorgu ile
-çalışıyor: önce `GET /books/{id}/modules`, sonra her modül için ayrı ayrı
-`GET /modules/{moduleId}/contents`. Şu an 10 modülle sorun değil ama modül sayısı arttıkça
-admin panel yavaşlayacak.
-
-**Önerilir (öncelik değil, backend'in planına bağlı):**
-- `GET /books/{bookId}/contents` gibi düz (flat), opsiyonel modül filtresi olan bir liste
-  endpoint'i, veya
-- `GET /books/{bookId}/modules` yanıtına her modül için `contentCount` alanı eklemek — bu tek
-  başına Dashboard'daki N+1'i tamamen ortadan kaldırır.
+Dashboard'daki içerik sayısı istatistiği daha önce (13.4) `GET /books/{bookId}/modules`
+yanıtına eklenen `contentCount` alanıyla çözülmüştü. Kalan parça — admin panelin "İçerikler"
+ekranının tüm modüllerdeki tüm içerikleri tek listede göstermesi — artık `GET
+/books/{bookId}/contents` ile çözüldü: aynı `ContentDto` şeklini (aynı sayfalama zarfı,
+`isPublished` filtresi dahil) tek çağrıda, modül sırası → modül içi `displayOrder` ile döner.
+Eski N+1 akışı (`GET /books/{id}/modules` + her modül için ayrı `GET
+/modules/{moduleId}/contents`) artık gerekli değil.
 
 ---
 
@@ -128,8 +123,10 @@ temizlendi) `Settings.jsx`'e bağlandı:
   belirtilmiyor — güvenlik açısından doğru davranış). Frontend'de bu geri alınamazlığı
   onay diyaloğunda açıkça belirtiyoruz.
 - **Kendi şifreni değiştir** (herkes, Editor dahil) — `PUT /users/me/password`, 204. Yanlış
-  `currentPassword` → 400 `User.PasswordChangeFailed` (`detail` İngilizce geliyor: "Incorrect
-  password." — diğer hata mesajları Türkçe, bu tek İngilizce kalmış, backend'e küçük bir not).
+  `currentPassword` → 400 `User.PasswordChangeFailed`. ~~`detail` İngilizce geliyor~~ —
+  **ÇÖZÜLDÜ**: backend'e `TurkishIdentityErrorDescriber` eklendi, `UserManager`'dan gelen tüm
+  `IdentityResult` mesajları (şifre politikası, "already in role" vb. dahil, sadece bu tek örnek
+  değil) artık Türkçe. `detail` artık "Mevcut şifre hatalı." döner.
 
 **Rol kısıtlamaları canlı test edildi:** `GET/POST /users`, `PUT .../role`, `POST .../deactivate`,
 `POST /media/cleanup-orphans`, `POST /books/{id}/rollback` → Editor token'ıyla hepsi **403**.
@@ -164,18 +161,16 @@ obje değil.
 Kullanıcı yönetimini frontend'e bağlarken canlı testte karşıma çıkan, backend'e sorulmaya
 değer iki nokta:
 
-**a) Pasifleştirilen bir kullanıcıyı geri aktive etmenin yolu yok.**
-`POST /users/{id}/deactivate` var ama tersi (`activate`) yok. Test ettim: pasifleştirilen
-kullanıcı bir daha hiç giriş yapamıyor, API üzerinden geri döndürecek hiçbir uç nokta yok.
-Bu kasıtlı bir tasarım mı (örn. "pasifleştirme kalıcıdır, yanlışlıkla basmayın" gibi bir
-güvenlik kararı), yoksa `PUT /users/{id}/role` gibi bir "reactivate" endpoint'i eksik mi
-kaldı, netleşse iyi olur — çünkü frontend'de bu işlemi "geri alınamaz" diye çok sert bir
-uyarıyla sunuyoruz şu an, gerçekten öyleyse doğru, değilse gereksiz korkutuyoruz.
+**a) ~~Pasifleştirilen bir kullanıcıyı geri aktive etmenin yolu yok~~ — ÇÖZÜLDÜ (2026-08-30).**
+`POST /users/{id}/activate` eklendi (Admin-only, gövde yok, `LockoutEnd`'i kaldırır,
+idempotent). Kasıtlı bir "kalıcı pasifleştirme" tasarımı değilmiş — eksik kalmış bir
+uç noktaymış, tamamlandı. Frontend'deki "geri alınamaz" uyarısı artık kaldırılabilir/
+yumuşatılabilir; kullanıcı `activate` ile geri getirilebiliyor (refresh token'ları geri
+gelmiyor, kullanıcı yeniden login olmak zorunda — beklenen).
 
-**b) Rollback için hangi sürümlerin var olduğunu görecek bir endpoint yok.**
-`POST /books/{bookId}/rollback` bir `toVersion` sayısı istiyor ama geçmiş yayınları
-(hangi sürümler var, ne zaman yayınlanmış, kaç içerik içeriyordu) listeleyen bir
-`GET /books/{bookId}/publications` gibi bir endpoint yok. Şu an admin panelinde rollback
-inputu "elle bir sayı yaz" şeklinde — kullanılabilir değil, admin'in versiyon numaralarını
-ezbere bilmesi gerekiyor. Böyle bir liste endpoint'i eklenirse UI'ı gerçek bir "sürüm geçmişi"
-dropdown'ına çevirebiliriz.
+**b) ~~Rollback için hangi sürümlerin var olduğunu görecek bir endpoint yok~~ — ÇÖZÜLDÜ (2026-08-30).**
+`GET /books/{bookId}/publications` eklendi (Admin-only) — kitabın tüm yayın geçmişini
+(en yeniden eskiye) `{publicationId, version, publishedAt, publishedByUserName, contentCount,
+checksum}` şeklinde döner, `SnapshotJson` hiç taşımaz (küçük payload). Kitap hiç
+yayınlanmamışsa boş dizi (hata değil). Rollback UI'ı artık gerçek bir "sürüm geçmişi"
+dropdown'ına çevrilebilir — `toVersion`'ı elle yazmaya gerek kalmadı.

@@ -138,6 +138,55 @@ public class PublishingEndpointTests(ApiFactory factory)
         response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
     }
 
+    [Fact]
+    public async Task GetHistory_WithoutToken_ReturnsUnauthorized()
+    {
+        // Arrange - mutlak route override'in gercekten "/api/v1/books/{bookId}/publications"a
+        // cozuldugunu de kanitlar (bkz. Rollback_WithoutToken_ReturnsUnauthorized'daki not).
+        var client = factory.CreateClient();
+        var bookId = await CreateBookAsync();
+
+        // Act
+        var response = await client.GetAsync($"/api/v1/books/{bookId}/publications");
+
+        // Assert
+        response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task GetHistory_AsAdmin_ReturnsOkWithPublications()
+    {
+        // Arrange
+        var client = factory.CreateClient();
+        var bookId = await CreateBookAsync();
+        await AuthenticateAsync(client, "admin", "Admin!Dev123");
+        await client.PostAsync($"/api/v1/books/{bookId}/publish", content: null);
+
+        // Act
+        var response = await client.GetAsync($"/api/v1/books/{bookId}/publications");
+
+        // Assert
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var result = await response.Content.ReadFromJsonAsync<List<PublicationSummaryDto>>();
+        result!.Single().Version.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task GetHistory_AsEditor_ReturnsForbidden()
+    {
+        // Arrange - PublishingController sinif seviyesinde Admin-only, GetHistory dahil.
+        var client = factory.CreateClient();
+        var bookId = await CreateBookAsync();
+        var (userName, password) = await CreateEditorUserAsync();
+        await AuthenticateAsync(client, userName, password);
+
+        // Act
+        var response = await client.GetAsync($"/api/v1/books/{bookId}/publications");
+
+        // Assert
+        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+    }
+
     // ---- Yardimcilar ----
 
     private async Task<int> CreateBookAsync()

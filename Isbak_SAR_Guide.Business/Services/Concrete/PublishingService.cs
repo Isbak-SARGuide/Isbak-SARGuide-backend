@@ -123,6 +123,32 @@ public class PublishingService(IUnitOfWork unitOfWork, ILogger<PublishingService
         return await FinalizeAsync(bookId, newVersion, snapshot, publication, publishedAt, transaction, cancellationToken);
     }
 
+    public async Task<Result<IReadOnlyList<PublicationSummaryDto>>> GetHistoryAsync(int bookId, CancellationToken cancellationToken = default)
+    {
+        var book = await _unitOfWork.Books.FindByIdAsync(bookId, cancellationToken);
+        if (book is null)
+        {
+            return Result.Failure<IReadOnlyList<PublicationSummaryDto>>(
+                Error.NotFound("Publishing.BookNotFound", $"Id={bookId} olan kitap bulunamadı."));
+        }
+
+        var rows = await _unitOfWork.Publications.GetHistoryAsync(bookId, cancellationToken);
+
+        // ManifestJson zaten PublishedAt/ContentCount/Checksum tasiyor -
+        // ayrica BookPublication kolonu olarak tekrar projekte etmek yerine
+        // tek bir deserialize ile cikariliyor (SnapshotBuilder.Deserialize,
+        // RollbackAsync'in eski SnapshotJson'i actigi ayni kanonik yol).
+        IReadOnlyList<PublicationSummaryDto> summaries = rows
+            .Select(r =>
+            {
+                var manifest = SnapshotBuilder.Deserialize<SyncManifestDto>(r.ManifestJson);
+                return new PublicationSummaryDto(r.PublicationId, r.Version, manifest.PublishedAt, r.PublishedByUserName, manifest.ContentCount, manifest.Checksum);
+            })
+            .ToList();
+
+        return Result.Success(summaries);
+    }
+
     /// <summary>
     /// PublishAsync ve RollbackAsync'in ortak kuyrugu: journal diff'i (degisen +
     /// tombstone), yazma/commit, eszamanli versiyon yarisi -> Conflict, basari
