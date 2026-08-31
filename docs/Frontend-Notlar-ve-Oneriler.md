@@ -136,3 +136,35 @@ gelmiyor, kullanıcı yeniden login olmak zorunda — beklenen).
 checksum}` şeklinde döner, `SnapshotJson` hiç taşımaz (küçük payload). Kitap hiç
 yayınlanmamışsa boş dizi (hata değil). Rollback UI'ı artık gerçek bir "sürüm geçmişi"
 dropdown'ına çevrilebilir — `toVersion`'ı elle yazmaya gerek kalmadı.
+
+---
+
+## 10. "Oturum süresi doldu" bazen sebepsiz çıkıyor, elle tekrar login gerekiyor (2026-08-31)
+
+Kullanıcı geri bildirimi: bazen (deterministik değil, ara sıra) uygulama oturumun bittiğini
+söylüyor ve elle çıkış yapıp tekrar login olmak gerekiyor — normal şartlarda access token
+süresi dolduğunda (`Jwt:ExpiryMinutes=60`) frontend'in sessizce `POST /auth/refresh` çağırıp
+kullanıcıyı hiç rahatsız etmemesi beklenir.
+
+**Backend tarafında araştırılan muhtemel kök neden — bkz. roadmap doc 13.10 için tam teknik
+detay:** `AuthService.RefreshAsync` refresh token'ı **tek kullanımlık rotasyon** ile çalıştırıyor
+ve zaten iptal edilmiş bir token tekrar sunulursa bunu "çalınmış olabilir" sayıp kullanıcının
+TÜM token'larını (yeni alınanlar dahil) iptal ediyor — bu, **eşzamanlı iki refresh isteği**
+(iki sekme, ya da access token süresi dolduğunda birden fazla API çağrısının aynı anda refresh
+tetiklemesi) durumunda YANLIŞLIKLA tetiklenip kullanıcıyı hatasızken zorla login'e düşürebilir.
+"Bazen" olması (zamanlamaya bağlı bir yarış durumu) bu teoriyle örtüşüyor — henüz doğrulanmadı.
+
+**Frontend tarafında kontrol edilmesi gereken iki şey:**
+- Web dashboard'ın 401 yakalayıp otomatik `refresh` + orijinal isteği tekrar deneme mantığı
+  (interceptor) var mı, yoksa her 401'de direkt kullanıcıya mı gösteriliyor? Yoksa bu daha basit
+  ve daha olası açıklama — backend'in refresh mekanizması hiç devreye girmiyor demektir.
+- Varsa, bu interceptor **tek-uçuşlu (single-flight)** mi — yani aynı anda birden fazla istek
+  401 alırsa hepsi TEK bir refresh çağrısını mı bekliyor, yoksa her biri kendi refresh'ini mi
+  tetikliyor? İkincisi yukarıdaki race'i doğrudan tetikler. Çözüm: ilk 401 refresh'i başlatır,
+  diğerleri onun sonucunu bekler, ayrı ayrı refresh çağırmaz.
+- Sadece refresh de başarısız olursa (gerçek oturum sonu) kullanıcıyı **otomatik** `/login`'e
+  yönlendirmek — "oturum süresi doldu" diye bir mesaj gösterip elle çıkışı beklemek yerine.
+
+Backend tarafında bir düzeltme (rotasyona kısa bir grace window eklemek) mümkün ama kök neden
+doğrulanmadan (loglarla ya da tekrar üretilerek) yapılırsa yarım çözüm olur — önce yukarıdaki
+frontend kontrolü yapılmalı.

@@ -945,6 +945,10 @@ ve deploy edilemeyen bir sistem kalır.
 - 12.2 (cache), 12.4 (ETag), 12.7 (WebP), 12.9 (Public read) — roadmap'in kendi ön
       koşulları (ölçüm/mobil stabilite/lisans/müşteri talebi) karşılanmadığı için bu
       fazda bilinçli olarak ERTELENDİ, görev-görev karar verildi.
+- 12.7 (WebP + thumbnail) yeniden gündeme geldi (2026-08-31, mobil optimizasyon
+      sorusu) — **hâlâ ERTELENDİ**, kullanıcı onayıyla: iki ön koşuldan hiçbiri (medya hacmi
+      artışı, WebP encoding kütüphanesinin lisans doğrulaması) henüz karşılanmadı. Sadece not
+      düşüldü, tetiklenmedi.
 
 ### PHASE 10 — Mobil & Web Uyumluluk Düzeltmeleri → M10
 
@@ -1063,3 +1067,28 @@ her alt görevin kendi commit mesajında ve §5.13'teki WBS tablosunda.
 - 13.8 Acil Durum Bandı (web #1) — backend desteği (Book'a alan + Admin PUT + manifest'e
       ek alan ya da yeni anonim endpoint) ERTELENDİ, kullanıcı onayıyla: şu an öncelik değil,
       sonradan eklenebilir additive bir özellik.
+- 13.10 (2026-08-31, web'in "bazen oturum süresi doldu diyor, elle çıkış yapmam gerekiyor"
+      geri bildirimi) — **muhtemel kök neden bulundu, henüz DOĞRULANMADI, düzeltme YAPILMADI.**
+      `AuthService.RefreshAsync` (`Isbak_SAR_Guide.Business/Services/Concrete/AuthService.cs:63-107`)
+      refresh token'ı **tek kullanımlık rotasyon** ile çalıştırıyor: sunulan token okunur, eğer
+      `RevokedAtUtc` doluysa (daha önce rotasyonla iptal edilmiş) bu "çalınmış olabilir" (reuse)
+      sayılıp kullanıcının TÜM aktif token'ları anında iptal edilir (`RevokeAllActiveForUserAsync`)
+      — kasıtlı bir güvenlik önlemi (12.6 öncesi tasarım), ama **eşzamanlı iki refresh isteği**
+      (iki sekme, ya da web app'in access token süresi dolduğunda birden fazla API çağrısının
+      aynı anda refresh tetiklemesi) bu mekanizmayı YANLIŞLIKLA tetikleyebilir: A isteği token'ı
+      rotasyonla iptal edip yeni bir çift alırken, B isteği (A'nın commit'inden hemen sonra aynı
+      eski token'la gelirse) bunu "hırsızlık" sanıp kullanıcının A'nın YENİ aldığı token dahil
+      HER ŞEYİNİ iptal eder — kullanıcı hiçbir hata yapmamışken zorla login'e düşer. "Bazen"
+      olması (deterministik değil, zamanlamaya bağlı bir yarış) bu teoriyle örtüşüyor.
+      **Doğrulama adımı:** gerçek kullanım sırasında `AuthService.RefreshAsync`'teki reuse-tespit
+      log satırı (`LogInformation`, "Eszamanli reuse tespiti" benzeri — şu an sadece
+      `RefreshTokenRepository`'de yorum var, ayrı bir log satırı eklenmesi gerekebilir) izlenip
+      şikayetin zamanlamasıyla eşleşip eşleşmediği kontrol edilmeli. **Olası düzeltme (backend,
+      doğrulanırsa):** rotasyonda kısa bir "grace window" (örn. 5-10 sn) tanımak — bu sürede
+      eski token tekrar sunulursa hata vermek yerine AYNI (zaten üretilmiş) yeni çifti tekrar
+      döndürmek, gerçek hırsızlık senaryosunu hâlâ yakalarken (asıl çalıntı token çok daha sonra
+      kullanılır) meşru eşzamanlı istekleri cezalandırmaz — yaygın bir endüstri deseni. **Frontend
+      tarafı da ayrıca kontrol edilmeli** — bkz. `Frontend-Notlar-ve-Oneriler.md` madde 10, web
+      dashboard'ın refresh çağrılarını tek-uçuşlu (single-flight) yapıp yapmadığı bilinmiyor;
+      bu doğrulanmadan backend tarafı düzeltmek yarı çözüm olur. Bu madde bilerek checkbox değil
+      bullet — planlı bir görev değil, araştırma/doğrulama bekleyen bir bulgu.
