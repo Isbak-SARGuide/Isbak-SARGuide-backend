@@ -53,23 +53,45 @@ public class AuthServiceTests(ApiFactory factory)
     }
 
     [Fact]
-    public async Task RefreshAsync_WithValidToken_RotatesAndInvalidatesOldToken()
+    public async Task RefreshAsync_WithValidToken_RotatesToNewToken()
     {
         var (userName, password) = await CreateUserAsync();
         var login = await LoginAsync(userName, password);
 
         var refreshed = await RefreshAsync(login.Value.RefreshToken);
+
         refreshed.IsSuccess.ShouldBeTrue();
         refreshed.Value.RefreshToken.ShouldNotBe(login.Value.RefreshToken);
-
-        // Eski token artik gecersiz - rotasyon tek kullanimlik olmali.
-        var reuseOldToken = await RefreshAsync(login.Value.RefreshToken);
-        reuseOldToken.IsFailure.ShouldBeTrue();
-        reuseOldToken.Error!.Type.ShouldBe(ErrorType.Unauthorized);
     }
 
     [Fact]
-    public async Task RefreshAsync_ReusingRevokedToken_RevokesAllActiveTokensForUser()
+    public async Task RefreshAsync_ReusingJustRotatedToken_ReturnsNewPairWithoutRevokingActiveTokens()
+    {
+        // roadmap doc §13.10 fix: esizamanli iki refresh istegi (iki sekme, ya da
+        // access token suresi dolunca birden fazla API cagrisinin ayni anda
+        // refresh tetiklemesi) ayni token'i rotasyondan hemen SONRA tekrar
+        // sunabilir - bu zararsiz bir yaris, hirsizlik degil. Grace window
+        // icinde (varsayilan 10 sn) bu artik kullaniciyi zorla logout etmiyor.
+        var (userName, password) = await CreateUserAsync();
+        var login = await LoginAsync(userName, password);
+
+        var afterFirstRefresh = await RefreshAsync(login.Value.RefreshToken);
+        afterFirstRefresh.IsSuccess.ShouldBeTrue();
+
+        // Ayni (zaten rotasyonla iptal edilmis) token HEMEN tekrar sunuluyor.
+        var racingRetry = await RefreshAsync(login.Value.RefreshToken);
+
+        racingRetry.IsSuccess.ShouldBeTrue();
+        racingRetry.Value.RefreshToken.ShouldNotBe(login.Value.RefreshToken);
+
+        // KRITIK: ilk refresh'ten gelen aktif token hala calisiyor olmali -
+        // eski (hirsizlik varsayan) davranista bu da iptal edilirdi.
+        var stillActiveTokenFromFirstRefresh = await RefreshAsync(afterFirstRefresh.Value.RefreshToken);
+        stillActiveTokenFromFirstRefresh.IsSuccess.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task RefreshAsync_ReusingTokenAfterGraceWindowElapsed_RevokesAllActiveTokensForUser()
     {
         var (userName, password) = await CreateUserAsync();
         var login = await LoginAsync(userName, password);
@@ -80,7 +102,12 @@ public class AuthServiceTests(ApiFactory factory)
         var afterFirstRefresh = await RefreshAsync(login.Value.RefreshToken);
         afterFirstRefresh.IsSuccess.ShouldBeTrue();
 
-        // Simdi ilk (zaten iptal edilmis) token TEKRAR sunuluyor - calinti sinyali.
+        // Grace window'u (varsayilan 10 sn) gercekten beklemek yerine, iptal
+        // zaman damgasini geriye alarak "cok sonra tekrar sunuldu" durumunu
+        // deterministik simule ediyoruz.
+        await BackdateRefreshTokenRevocationAsync(login.Value.RefreshToken, TimeSpan.FromMinutes(1));
+
+        // Simdi ilk (uzun sure once iptal edilmis) token TEKRAR sunuluyor - calinti sinyali.
         var reuseAttempt = await RefreshAsync(login.Value.RefreshToken);
         reuseAttempt.IsFailure.ShouldBeTrue();
 
@@ -198,6 +225,23 @@ public class AuthServiceTests(ApiFactory factory)
         var tokenHash = tokenService.HashRefreshToken(rawRefreshToken);
         var token = await dbContext.RefreshTokens.SingleAsync(t => t.TokenHash == tokenHash);
         token.ExpiresAtUtc = DateTime.UtcNow.AddDays(-1);
+        await dbContext.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Rotasyon grace window'unu (varsayilan 10 sn) gercekten beklemeden test
+    /// etmek icin - RevokedAtUtc'yi geriye alarak "rotasyondan uzun sure sonra
+    /// tekrar sunuldu" durumunu deterministik simule eder.
+    /// </summary>
+    private async Task BackdateRefreshTokenRevocationAsync(string rawRefreshToken, TimeSpan howLongAgo)
+    {
+        using var scope = factory.Services.CreateScope();
+        var tokenService = scope.ServiceProvider.GetRequiredService<ITokenService>();
+        var dbContext = scope.ServiceProvider.GetRequiredService<Isbak_SAR_GuideDbContext>();
+
+        var tokenHash = tokenService.HashRefreshToken(rawRefreshToken);
+        var token = await dbContext.RefreshTokens.SingleAsync(t => t.TokenHash == tokenHash);
+        token.RevokedAtUtc = DateTime.UtcNow - howLongAgo;
         await dbContext.SaveChangesAsync();
     }
 }
