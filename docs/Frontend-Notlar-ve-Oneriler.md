@@ -73,20 +73,15 @@ yoktu, başka bir istemci (mobil, vs.) aynı yanlışa düşebilir.
 
 ---
 
-## 5. İçerik listesi book/modül seviyesinde toplu çekilemiyor (N+1 sorunu)
+## 5. ~~İçerik listesi book/modül seviyesinde toplu çekilemiyor (N+1 sorunu)~~ — ÇÖZÜLDÜ (2026-08-31)
 
-Admin panelindeki "İçerikler" listesi (tüm modüllerdeki tüm içerikleri tek ekranda göstermek)
-ve Dashboard'daki içerik sayısı istatistiği, backend'de kitap/modül genelinde tek bir "tüm
-içerikleri getir" ya da "modül başına içerik sayısı" endpoint'i olmadığı için N+1 sorgu ile
-çalışıyor: önce `GET /books/{id}/modules`, sonra her modül için ayrı ayrı
-`GET /modules/{moduleId}/contents`. Şu an 10 modülle sorun değil ama modül sayısı arttıkça
-admin panel yavaşlayacak.
-
-**Önerilir (öncelik değil, backend'in planına bağlı):**
-- `GET /books/{bookId}/contents` gibi düz (flat), opsiyonel modül filtresi olan bir liste
-  endpoint'i, veya
-- `GET /books/{bookId}/modules` yanıtına her modül için `contentCount` alanı eklemek — bu tek
-  başına Dashboard'daki N+1'i tamamen ortadan kaldırır.
+Dashboard'daki içerik sayısı istatistiği daha önce (13.4) `GET /books/{bookId}/modules`
+yanıtına eklenen `contentCount` alanıyla çözülmüştü. Kalan parça — admin panelin "İçerikler"
+ekranının tüm modüllerdeki tüm içerikleri tek listede göstermesi — artık `GET
+/books/{bookId}/contents` ile çözüldü: aynı `ContentDto` şeklini (aynı sayfalama zarfı,
+`isPublished` filtresi dahil) tek çağrıda, modül sırası → modül içi `displayOrder` ile döner.
+Eski N+1 akışı (`GET /books/{id}/modules` + her modül için ayrı `GET
+/modules/{moduleId}/contents`) artık gerekli değil.
 
 ---
 

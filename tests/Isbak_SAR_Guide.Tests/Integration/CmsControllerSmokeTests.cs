@@ -48,6 +48,38 @@ public class CmsControllerSmokeTests(ApiFactory factory)
     }
 
     [Fact]
+    public async Task GetContentsByBook_WithValidToken_ReturnsOk()
+    {
+        // Mutlak route override'in gercekten "/api/v1/books/{bookId}/contents"a
+        // cozuldugunu kanitlar (bkz. Rollback_WithoutToken_ReturnsUnauthorized'daki not).
+        var client = await CreateAuthenticatedClientAsync();
+
+        var response = await client.GetAsync("/api/v1/books/1/contents");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task GetContentsByBook_WithoutToken_ReturnsUnauthorized()
+    {
+        var client = factory.CreateClient();
+
+        var response = await client.GetAsync("/api/v1/books/1/contents");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task GetContentsByBook_ForNonExistentBook_ReturnsNotFound()
+    {
+        var client = await CreateAuthenticatedClientAsync();
+
+        var response = await client.GetAsync("/api/v1/books/999999/contents");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
     public async Task GetBlocks_ForNonExistentContent_ReturnsNotFound()
     {
         var client = await CreateAuthenticatedClientAsync();

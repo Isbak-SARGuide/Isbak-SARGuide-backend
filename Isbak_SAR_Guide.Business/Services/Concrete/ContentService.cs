@@ -31,6 +31,20 @@ public class ContentService(
         return Result.Success(pagedResult);
     }
 
+    public async Task<Result<PagedResult<ContentDto>>> GetPagedByBookIdAsync(
+        int bookId, int page, int pageSize, bool? isPublished, CancellationToken cancellationToken = default)
+    {
+        var book = await unitOfWork.Books.FindByIdAsync(bookId, cancellationToken);
+        if (book is null)
+        {
+            return Result.Failure<PagedResult<ContentDto>>(Error.NotFound("Book.NotFound", $"Id={bookId} olan kitap bulunamadı."));
+        }
+
+        var (items, totalCount) = await unitOfWork.Contents.GetPagedByBookIdAsync(bookId, page, pageSize, isPublished, cancellationToken);
+        var pagedResult = new PagedResult<ContentDto>(items.Adapt<List<ContentDto>>(), totalCount, page, pageSize);
+        return Result.Success(pagedResult);
+    }
+
     public async Task<Result<ContentDto>> GetByIdAsync(int moduleId, int id, CancellationToken cancellationToken = default)
     {
         var content = await unitOfWork.Contents.FindByIdAsync(id, cancellationToken);

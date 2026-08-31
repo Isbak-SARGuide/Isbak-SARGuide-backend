@@ -501,6 +501,20 @@ var):
 > görmek için §7'ye ayrı bir istek atmanız gerekir (liste ekranı hafif
 > kalsın diye bilinçli ayrım).
 
+### `GET /books/{bookId}/contents?page=&pageSize=&isPublished=`
+
+Yukarıdakinin **kitap genelinde düz (flat)** hâli — web ekibinin geri
+bildirimi (Frontend-Notlar-ve-Oneriler.md madde 5): admin panelin
+"İçerikler" ekranı tüm modüllerdeki tüm content'leri tek listede
+göstermek için önce `GET /books/{bookId}/modules`, sonra her modül için
+ayrı `GET /modules/{moduleId}/contents` çağırıyordu (N+1). Bu uç aynı
+`ContentDto` şeklini (yanıt zarfı dahil) tek çağrıda, **modül sırası →
+modül içi `displayOrder`** ile döner — hangi modülden geldiği `moduleId`
+alanından okunur, ayrıca bir gruplama alanı eklenmedi. Route sınıf
+şablonunun (`/modules/{moduleId}/contents`) altında değil, aynı kaynağın
+(Content) kitap-scope kardeşi — mutlak route override (`PublishingController`
+ile aynı desen). `bookId` yoksa `404`, kod: `Book.NotFound`.
+
 ### `GET /modules/{moduleId}/contents/{id}` — tekil
 
 Yukarıdaki şeklin tekil hâli, yine `blocks[]` içermez.

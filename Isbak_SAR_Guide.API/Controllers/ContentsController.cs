@@ -20,6 +20,18 @@ public class ContentsController(IContentService contentService) : ControllerBase
         return result.ToActionResult(this);
     }
 
+    // Mutlak route: sinif seviyesindeki template moduld-scope ("/modules/{moduleId}/contents")
+    // - bu, ayni kaynagin (Content) kitap-scope kardesi (web ekibinin geri
+    // bildirimi, madde 5 - N+1 onleme). PublishingController.Rollback/GetHistory
+    // ile ayni mutlak-override deseni.
+    [HttpGet("/api/v{version:apiVersion}/books/{bookId:int}/contents")]
+    public async Task<IActionResult> GetAllByBook(
+        int bookId, [FromQuery] int page, [FromQuery] int pageSize, [FromQuery] bool? isPublished, CancellationToken cancellationToken)
+    {
+        var result = await contentService.GetPagedByBookIdAsync(bookId, page <= 0 ? 1 : page, pageSize <= 0 ? 50 : pageSize, isPublished, cancellationToken);
+        return result.ToActionResult(this);
+    }
+
     [HttpGet("{id:int}")]
     public async Task<IActionResult> GetById(int moduleId, int id, CancellationToken cancellationToken)
     {
