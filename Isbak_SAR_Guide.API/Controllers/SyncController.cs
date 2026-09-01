@@ -21,7 +21,10 @@ public class SyncController(ISyncService syncService) : ControllerBase
     {
         var result = await syncService.GetManifestAsync(bookId, cancellationToken);
         // Verbatim: ManifestJson kolonu deserialize edilmeden aynen gecirilir.
-        return result.ToJsonContentResult(this);
+        // ETag = bookId + govdedeki "version" - yayin immutable oldugu icin
+        // ayni versiyon = ayni govde (12.4).
+        return result.ToJsonContentResultWithETag(
+            this, json => $"{bookId}.{ResultExtensions.ExtractJsonIntProperty(json, "version")}");
     }
 
     [HttpGet("snapshot")]
@@ -30,7 +33,11 @@ public class SyncController(ISyncService syncService) : ControllerBase
         var result = await syncService.GetSnapshotAsync(bookId, cancellationToken);
         // Verbatim: SnapshotJson kolonu deserialize edilmeden aynen gecirilir -
         // istemci SHA256(govde) == manifest.checksum dogrulamasi yapar.
-        return result.ToJsonContentResult(this);
+        // ETag manifest'le ayni semadan turetilir (bookId + version) - snapshot
+        // govdesinin kendi ust-seviye checksum alani yok, versiyon zaten tek
+        // basina govdeyi tekil olarak belirliyor (immutable publication).
+        return result.ToJsonContentResultWithETag(
+            this, json => $"{bookId}.{ResultExtensions.ExtractJsonIntProperty(json, "version")}");
     }
 
     [HttpGet("changes")]
@@ -41,6 +48,10 @@ public class SyncController(ISyncService syncService) : ControllerBase
     {
         var result = await syncService.GetChangesAsync(bookId, fromVersion, cancellationToken);
         // Verbatim zarf: envelope elle yazilir, content/modul/medya parcalari ham kopyalanir.
-        return result.ToJsonContentResult(this);
+        // ETag = bookId + fromVersion + govdedeki "toVersion" - immutable
+        // yayin defterinde bu ucu (bookId, fromVersion, toVersion) her zaman
+        // ayni delta govdesini uretir.
+        return result.ToJsonContentResultWithETag(
+            this, json => $"{bookId}.{fromVersion}-{ResultExtensions.ExtractJsonIntProperty(json, "toVersion")}");
     }
 }

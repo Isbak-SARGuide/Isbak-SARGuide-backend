@@ -57,6 +57,15 @@ Her indirilen paketin bozulmadığı SHA-256 checksum ile doğrulanır (§5).
   ASCII-dışı karakterleri kaçış dizisine çevirir — bu API öyle yapmaz.
   Çoğu JSON kütüphanesi ikisini de doğru parse eder, ama loglarda ve
   veritabanında karşılaşacağınız gerçek bayt dizisi düz UTF-8'dir.
+- **ETag / `If-None-Match` (v1.3, additive, opsiyonel):** Üç uç da artık
+  yanıtla birlikte bir `ETag` başlığı döner (ör. `W/"1.16"` — kitap id'si +
+  yayın versiyonu; `changes` için ayrıca `fromVersion` de dahildir). Bu üç
+  uç immutable bir yayın defterine karşı okuduğu için aynı ETag = aynı
+  gövde garantisi vardır. İstemci bir sonraki istekte aynı değeri
+  `If-None-Match` başlığıyla geri gönderirse ve içerik hâlâ güncelse sunucu
+  gövdesiz `304 Not Modified` döner — mobil için bant genişliği tasarrufu.
+  Başlığı hiç göndermeyen istemciler için davranış tamamen aynıdır (`200` +
+  tam gövde); bu yüzden sözleşmeyi bozmayan, tamamen opsiyonel bir eklemedir.
 
 ---
 
@@ -630,3 +639,4 @@ süre paralel yaşamaya devam eder.
 | v1.1 | 2026-08-26 | Additive: `contents[]`'e `variantGroupKey`/`variantLabel` eklendi — çok-varyantlı konuların (düğüm türleri gibi) mobilde string ayrıştırma yapılmadan sekmeli tek sayfada birleştirilebilmesi için (§3.2) |
 | — | 2026-08-28 | **Sözleşme değişmedi** (hâlâ v1.1) — tüm örnekler, kitabın tamamı yayınlandıktan sonraki gerçek v16 API yanıtlarıyla yenilendi (önceki örnekler 4 modüllük eski yer tutucu veriye aitti). İlk kez gerçek bir Image blok örneği (§3.2, §4) ve gerçek bir `changes` deltası (§3.3) eklendi. |
 | v1.2 | 2026-08-29 | Additive: `changes`'e `book` alanı eklendi (§3.3) — `manifest`/`snapshot`'ın aksine kitabın kendi meta verisini hiç taşımıyordu, `modules`'la aynı gerekçeyle (Faz 13.2, mobil ekip geri bildirimi #4) koşulsuz eklendi. §2'ye medya base URL netleştirmesi, §3.2'ye varyant grubu üst-liste title/summary kuralı eklendi (mobil ekip geri bildirimi #1, #2) — ikisi de mevcut davranışın dokümantasyonu, sözleşme değişikliği değil. |
+| v1.3 | 2026-09-01 | Additive: üç uca da `ETag` yanıt başlığı + `If-None-Match` desteği eklendi (§2, Faz 12.4) — JSON gövde şekli değişmedi, sadece opsiyonel bir HTTP önbellekleme başlığı. |

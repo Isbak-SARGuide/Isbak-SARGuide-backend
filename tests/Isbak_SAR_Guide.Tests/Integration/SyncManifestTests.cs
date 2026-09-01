@@ -51,6 +51,47 @@ public class SyncManifestTests(ApiFactory factory)
     }
 
     [Fact]
+    public async Task GetManifest_MatchingIfNoneMatch_Returns304WithoutBody()
+    {
+        // Arrange
+        var bookId = await CreateBookAsync();
+        await PublishAsync(bookId);
+        var client = factory.CreateClient();
+        var firstResponse = await client.GetAsync($"/api/v1/sync/manifest?bookId={bookId}");
+        var eTag = firstResponse.Headers.ETag!.ToString();
+
+        // Act - ayni ETag'i If-None-Match olarak geri gonder
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"/api/v1/sync/manifest?bookId={bookId}");
+        request.Headers.TryAddWithoutValidation("If-None-Match", eTag);
+        var response = await client.SendAsync(request);
+
+        // Assert - 304, govde yok
+        response.StatusCode.ShouldBe(HttpStatusCode.NotModified);
+        var body = await response.Content.ReadAsStringAsync();
+        body.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task GetManifest_StaleIfNoneMatch_Returns200WithBody()
+    {
+        // Arrange
+        var bookId = await CreateBookAsync();
+        await PublishAsync(bookId);
+        var client = factory.CreateClient();
+
+        // Act - eski/uydurma bir ETag gonder
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"/api/v1/sync/manifest?bookId={bookId}");
+        request.Headers.TryAddWithoutValidation("If-None-Match", "W/\"999999.999999\"");
+        var response = await client.SendAsync(request);
+
+        // Assert - normal 200 + govde, yeni ETag baslikta
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        response.Headers.ETag.ShouldNotBeNull();
+        var body = await response.Content.ReadAsStringAsync();
+        body.ShouldNotBeEmpty();
+    }
+
+    [Fact]
     public async Task GetManifest_BookNeverPublished_Returns404WithNotPublishedCode()
     {
         // Arrange - kendi kitabini yarat, publish ETME. (Seed kitap artik

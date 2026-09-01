@@ -658,7 +658,7 @@ PHASE 10 — Mobil & Web Uyumluluk Düzeltmeleri    9,0 sa   → M10
 | WebP + thumbnail | 2,0 | Checksum değişir → versiyonlama halleder | Medya hacmi artınca |
 | Global rate limiting | 0,5 | Anonim sync endpoint'i tek risk | İlk prod yayından önce |
 | Public read endpoint'leri | 1,5 | Önce müşterisi olduğunu doğrula | Somut talep gelirse |
-| MinIO geçişi | 1,5 | `IStorageService` sayesinde tek sınıf | Disk/ölçek baskısı olunca |
+| ~~MinIO geçişi~~ | 1,5 | **İPTAL EDİLDİ (2026-09-01, kullanıcı onayıyla)** — `IStorageService` sayesinde teknik olarak tek sınıflık iş olsa da yapılmayacak | — |
 
 ### Test coverage duruşu
 
@@ -1111,3 +1111,18 @@ her alt görevin kendi commit mesajında ve §5.13'teki WBS tablosunda.
       çağrılarını tek-uçuşlu (single-flight) yapıp yapmadığı ve otomatik 401→login
       yönlendirmesi olup olmadığı — bkz. `Frontend-Notlar-ve-Oneriler.md` madde 10, bu backend
       repo'sunun dışında, web ekibinin kendi kontrol etmesi gerekiyor.
+- [x] 12.4 (2026-09-01) — ETag + `If-None-Match` desteği eklendi, kullanıcı onayıyla
+      **artık ERTELENMİYOR, uygulandı** (ön koşul — "sözleşme oturması" — resmi bir tetiklenme
+      şartı olmaktan çıktı, doğrudan yapıldı; 12.7'deki karar deseniyle aynı). Sadece API
+      katmanında (`ResultExtensions.ToJsonContentResultWithETag` + `SyncController`) — Business
+      katmanına, `SnapshotBuilder`'a, frozen canonical serialization sözleşmesine hiç
+      dokunulmadı, sıfır risk. ETag, zaten dönen JSON gövdesinin içindeki `version` (manifest/
+      snapshot) veya `fromVersion`+`toVersion` (changes) alanlarından `bookId` ile birlikte
+      türetiliyor (`"{bookId}.{version}"` biçiminde, weak ETag `W/"..."`) — yayın defteri
+      immutable olduğu için aynı ETag = aynı gövde garantisi var, yeni bir DB sorgusu
+      gerekmiyor. İstemci `If-None-Match` ile aynı değeri geri gönderirse gövdesiz
+      `304 Not Modified` döner (mobil bant genişliği tasarrufu); başlığı hiç göndermeyen eski
+      istemciler için davranış birebir aynı kalıyor (tam additive). `docs/Sync-Sozlesmesi-v2.md`
+      §2'ye additive not + §10 sürüm geçmişine v1.3 satırı eklendi. 213/213 test yeşil (5 yeni:
+      manifest'te eşleşen/eşleşmeyen If-None-Match, snapshot'ta eşleşen, changes'te eşleşen +
+      farklı `fromVersion`'ların farklı ETag ürettiği).
