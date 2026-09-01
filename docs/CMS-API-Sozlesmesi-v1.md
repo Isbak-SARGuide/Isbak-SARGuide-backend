@@ -418,13 +418,16 @@ modülü sayan ayrı bir sorgu çalıştırmaz).
 ### `POST /books/{bookId}/modules` — oluştur
 
 Gövde (`CreateModuleDto`) — **`displayOrder` yok, göndermeyin**, sunucu
-otomatik atar (mevcut son sıradan +1):
+otomatik atar (mevcut son sıradan +1). **`isPublished` gönderilmezse
+varsayılan `true`'dur** (2026-09-01'de `false`'tan değiştirildi —
+`Backend-Yapilacaklar.md` #3: aksi halde yeni oluşturulan içerik, elle
+işaretlenmediği sürece bir sonraki yayına sessizce dahil olmuyordu):
 
 ```json
 {
   "name": "Yeni Modül",
   "description": "opsiyonel, max 2000 karakter",
-  "isPublished": false
+  "isPublished": true
 }
 ```
 
@@ -521,13 +524,15 @@ Yukarıdaki şeklin tekil hâli, yine `blocks[]` içermez.
 
 ### `POST /modules/{moduleId}/contents` — oluştur
 
-Gövde (`CreateContentDto`) — `displayOrder` yine otomatik:
+Gövde (`CreateContentDto`) — `displayOrder` yine otomatik. `isPublished`
+gönderilmezse varsayılan `true`'dur (bkz. §5'teki modül notu — aynı
+gerekçe):
 
 ```json
 {
   "title": "Yeni Konu",
   "summary": "opsiyonel, max 500 karakter",
-  "isPublished": false,
+  "isPublished": true,
   "variantGroupKey": null,
   "variantLabel": null
 }
@@ -798,7 +803,11 @@ Modules/Contents/ContentBlocks liste uçlarının hepsi aynı zarfı kullanır
 | `items` | array | O sayfadaki kayıtlar |
 | `totalCount` | int | Filtre uygulanmış toplam kayıt sayısı (sayfa boyutundan bağımsız) |
 | `page` | int | Yankı — istekte verdiğiniz (veya varsayılan `1`) |
-| `pageSize` | int | Yankı — istekte verdiğiniz (veya varsayılan `50`) |
+| `pageSize` | int | Yankı — istekte verdiğiniz, **200 ile sınırlı** (veya varsayılan `50`) |
+
+`pageSize` 200'ü aşan bir değer sessizce 200'e kırpılır (400 dönmez) —
+`page`/`pageSize` ≤0 olduğunda varsayılana düşmesiyle aynı "normalize et,
+reddetme" ilkesi.
 
 `isPublished` query parametresi (Modules/Contents'te) opsiyonel bir
 filtredir — verilmezse hem yayınlanmış hem taslak kayıtlar gelir.

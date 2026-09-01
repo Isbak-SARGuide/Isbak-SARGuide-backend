@@ -1142,3 +1142,53 @@ her alt görevin kendi commit mesajında ve §5.13'teki WBS tablosunda.
       invalidation'dan geliyor. 219/219 test yeşil (6 yeni: `MemoryCacheSyncCache` için 5 saf
       birim testi + republish sonrası manifest'in bayat değil taze versiyonu döndüğünü kanıtlayan
       1 entegrasyon testi — asıl kritik regresyon senaryosu budur).
+- 12.9 (2026-09-01) — İPTAL EDİLDİ, bkz. §12 erteleme tablosu.
+
+### `Backend-Yapilacaklar.md` incelemesi (2026-09-01, web ekibinin entegrasyon bulguları)
+
+Web frontend ekibi 6 maddelik yeni bir doküman gönderdi (`docs/Backend-Yapilacaklar.md`).
+Her madde koda karşı tek tek doğrulandı — sonuç beklenenden farklı çıktı: **3 madde zaten
+kod incelemesiyle/testle sağlam bulundu (muhtemelen bulgular eski bir deploy'a karşı test
+edilmiş), 2 madde gerçek ve aksiyon gerektiren bug, 1 madde bilinçli olarak ertelendi.**
+
+- [x] **pageSize üst sınırı** (#2, GÜVENLİK) — doğrulandı, gerçek gap. `Modules`/`Contents`
+      (x2)/`ContentBlocks`/`Users` controller'larının hepsinde aynı `pageSize <= 0 ? 50 :
+      pageSize` deseni tekrarlanıyordu, üst sınır yoktu. Yeni `Isbak_SAR_Guide.API.Common.
+      PagingDefaults` (`NormalizePage`/`NormalizePageSize`, max 200) 5 controller'a da
+      uygulandı — reddetmek yerine KIRPMA tercih edildi (page≤0'ın zaten "sessizce normalize
+      et" davranışıyla tutarlı). `CMS-API-Sozlesmesi-v1.md` §10 güncellendi.
+- [x] **Aynı içerikli medya soft-delete sonrası kalıcı 500** (#5, BUG) — **root cause
+      bulundu ve doğrulandı.** `Media.Checksum`'ın unique index'i `Module`/`Content`'in
+      `(ParentId, DisplayOrder)` indexinin aksine partial DEĞİLDİ (`WHERE NOT "IsDeleted"`
+      yok). Soft-delete edilen bir medyanın checksum'ı tabloyu kalıcı işgal ediyordu; aynı
+      içerik tekrar yüklenince unique violation'a çarpıyor, "eşzamanlı yükleme yarışı"
+      kurtarma kodu devreye giriyordu, ama `FindByChecksumAsync` da soft-delete filtresine
+      tabi olduğu için "kazananı" hiç bulamıyordu → kalıcı (retry'la düzelmeyen)
+      `Media.ConcurrentUploadUnresolved` 500. Migration `MakeMediaChecksumIndexPartial` —
+      index artık `ContentConfiguration`/`ModuleConfiguration` ile aynı desende, sadece
+      silinmemiş satırlar arasında tekil. Regresyon testi eklendi (soft-delete + aynı içerik
+      tekrar yükleme → başarı, yeni satır).
+- [x] **isPublished varsayılan değeri** (#3'ün gerçek kök nedeni) — doküman "publish'e dahil
+      edilenlerin isPublished'i true'ya çevrilsin" diye öneriyordu, ama bu zaten tanım gereği
+      no-op (13.3 filtresi zaten sadece true olanları dahil ediyor, dahil edilen küme
+      tanım gereği hep true). Kod incelemesiyle asıl tuzak bulundu: `CreateModuleDto`/
+      `CreateContentDto`'da `IsPublished` varsayılanı **false**'tu — yani editör yeni bir
+      modül/içerik oluşturup hemen kitabı yayınlarsa, o içerik sessizce dışarıda kalıyordu
+      (elle bir checkbox işaretlemediği sürece). Kullanıcı onayıyla varsayılan **true**'ya
+      çevrildi ("opt-out draft" modeli — sürpriz daha az). `CMS-API-Sozlesmesi-v1.md` §5/§6
+      güncellendi.
+- **CORS, currentPassword mesajı, ContentBlocks reorder `dataJson` mutasyonu, login 401
+      dokümantasyonu** (#1, #4'ün üç alt maddesi) — hepsi kod/test incelemesiyle **zaten
+      doğru/çözülmüş** bulundu: CORS zaten config-driven (13.1), `TurkishIdentityErrorDescriber.
+      PasswordMismatch` zaten Türkçe ve DI'a bağlı, `ReorderAsync_DoesNotAlterSiblingsDataJson`
+      regresyon testi hâlâ yeşil (13.5 sağlam), `CMS-API-Sozlesmesi-v1.md` §3.4 zaten login
+      401 istisnasını belgeliyor (13.1). Muhtemel açıklama: web ekibi eski bir deploy'a karşı
+      test etmiş. Kod değişikliği yapılmadı.
+- **`POST /media` 200 vs 201** (#6) — doğrulandı ama kullanıcı onayıyla **atlandı**: sadece
+      `/media`'ya özgü değil, `ResultExtensions.ToActionResult` sayesinde TÜM API'de sistemik
+      (Books/Modules/Contents/ContentBlocks/Users/Media hepsi 200 dönüyor). Düşük öncelikli bir
+      REST-purity notu için tüm controller'ları, testleri ve sözleşme dokümanlarını değiştirmek
+      orantısız risk — bilinçli olarak dokunulmadı.
+
+230/230 test yeşil (11 yeni: 9 `PagingDefaults` birim testi + 1 `pageSize` kırpma HTTP testi +
+1 medya soft-delete/re-upload regresyon testi).

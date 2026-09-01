@@ -1,4 +1,5 @@
 using Asp.Versioning;
+using Isbak_SAR_Guide.API.Common;
 using Isbak_SAR_Guide.API.Extensions;
 using Isbak_SAR_Guide.Business.DTOs.Common;
 using Isbak_SAR_Guide.Business.DTOs.Contents;
@@ -16,7 +17,8 @@ public class ContentsController(IContentService contentService) : ControllerBase
     public async Task<IActionResult> GetAll(
         int moduleId, [FromQuery] int page, [FromQuery] int pageSize, [FromQuery] bool? isPublished, CancellationToken cancellationToken)
     {
-        var result = await contentService.GetPagedAsync(moduleId, page <= 0 ? 1 : page, pageSize <= 0 ? 50 : pageSize, isPublished, cancellationToken);
+        var result = await contentService.GetPagedAsync(
+            moduleId, PagingDefaults.NormalizePage(page), PagingDefaults.NormalizePageSize(pageSize), isPublished, cancellationToken);
         return result.ToActionResult(this);
     }
 
@@ -28,7 +30,8 @@ public class ContentsController(IContentService contentService) : ControllerBase
     public async Task<IActionResult> GetAllByBook(
         int bookId, [FromQuery] int page, [FromQuery] int pageSize, [FromQuery] bool? isPublished, CancellationToken cancellationToken)
     {
-        var result = await contentService.GetPagedByBookIdAsync(bookId, page <= 0 ? 1 : page, pageSize <= 0 ? 50 : pageSize, isPublished, cancellationToken);
+        var result = await contentService.GetPagedByBookIdAsync(
+            bookId, PagingDefaults.NormalizePage(page), PagingDefaults.NormalizePageSize(pageSize), isPublished, cancellationToken);
         return result.ToActionResult(this);
     }
 

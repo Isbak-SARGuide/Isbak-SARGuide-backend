@@ -68,6 +68,21 @@ public class UsersControllerTests(ApiFactory factory)
     }
 
     [Fact]
+    public async Task GetAll_OversizedPageSize_IsClampedToMax()
+    {
+        // Backend-Yapilacaklar.md #2: pageSize=100000 gibi bir deger sunucuyu
+        // gereksiz buyuk bir sorguya zorlamamali - kirpilmis (200) etkin
+        // pageSize, PagedResult zarfinda geri yansimali.
+        var client = await CreateAuthenticatedAdminClientAsync();
+
+        var response = await client.GetAsync("/api/v1/users?page=1&pageSize=100000");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        body.RootElement.GetProperty("pageSize").GetInt32().ShouldBe(200);
+    }
+
+    [Fact]
     public async Task ChangeRole_WithEditorToken_ReturnsForbidden()
     {
         // Rol degistirme, ayricalik yukseltme (privilege escalation) riski
