@@ -13,14 +13,14 @@ namespace Isbak_SAR_Guide.Business.Services.Concrete;
 /// parcalari, modul listesi ve eklenen medya HAM KOPYADIR (WriteRawValue) -
 /// donmus baytlara hicbir deserialize/re-serialize adimi dokunmaz.
 /// </summary>
-public class SyncService(IUnitOfWork unitOfWork) : ISyncService
+public class SyncService(IUnitOfWork unitOfWork, ISyncCache syncCache) : ISyncService
 {
     private static readonly Error _invalidFromVersionError = Error.Validation(
         "Sync.InvalidFromVersion", "Geçersiz sürüm numarası; tam senkronizasyon (snapshot) gerekli.");
 
     public async Task<Result<string>> GetManifestAsync(int bookId, CancellationToken cancellationToken = default)
     {
-        var manifestJson = await unitOfWork.Publications.GetLatestManifestJsonAsync(bookId, cancellationToken);
+        var manifestJson = await GetLatestManifestJsonCachedAsync(bookId, cancellationToken);
 
         return manifestJson is not null
             ? Result.Success(manifestJson)
@@ -29,7 +29,7 @@ public class SyncService(IUnitOfWork unitOfWork) : ISyncService
 
     public async Task<Result<string>> GetSnapshotAsync(int bookId, CancellationToken cancellationToken = default)
     {
-        var snapshotJson = await unitOfWork.Publications.GetLatestSnapshotJsonAsync(bookId, cancellationToken);
+        var snapshotJson = await GetLatestSnapshotJsonCachedAsync(bookId, cancellationToken);
 
         return snapshotJson is not null
             ? Result.Success(snapshotJson)
@@ -68,8 +68,12 @@ public class SyncService(IUnitOfWork unitOfWork) : ISyncService
 
         // Guvenli null-forgiving: currentVersion > 0, ayni tablonun
         // MAX(Version)'undan geliyor - en az bir yayin satiri var demektir.
-        var currentSnapshotJson = (await unitOfWork.Publications.GetLatestSnapshotJsonAsync(bookId, cancellationToken))!;
-        var currentManifestJson = (await unitOfWork.Publications.GetLatestManifestJsonAsync(bookId, cancellationToken))!;
+        // Cache-aware yardimcilardan geciyor: changes'in kendisi cache'lenmez
+        // (fromVersion'a gore degisken), ama "kitabin guncel manifest/snapshot'i"
+        // sorusu GetManifestAsync/GetSnapshotAsync ile AYNI veri - tekrar DB'ye
+        // gitmenin bir anlami yok.
+        var currentSnapshotJson = (await GetLatestSnapshotJsonCachedAsync(bookId, cancellationToken))!;
+        var currentManifestJson = (await GetLatestManifestJsonCachedAsync(bookId, cancellationToken))!;
 
         var bookRawJson = ExtractRawProperty(currentSnapshotJson, "book");
         var modulesRawJson = ExtractRawProperty(currentSnapshotJson, "modules");
@@ -88,6 +92,53 @@ public class SyncService(IUnitOfWork unitOfWork) : ISyncService
             fromVersion, currentVersion, bookRawJson, upsertedPayloads, deletedContentIds, modulesRawJson, addedMedia, removedMediaIds);
 
         return Result.Success(json);
+    }
+
+    /// <summary>
+    /// "bookId'nin guncel manifest'i" sorusunun cache-aware tek giris noktasi
+    /// (12.2) - hem GetManifestAsync hem GetChangesAsync buradan gecer, DB'ye
+    /// inen kod TEK yerde yazilir. Isabet yoksa DB'den okur, cache'e yazar,
+    /// sonucu doner; yayin yoksa null (cagiran taraf NotFound'u kendi kararlastirir).
+    /// </summary>
+    private async Task<string?> GetLatestManifestJsonCachedAsync(int bookId, CancellationToken cancellationToken)
+    {
+        var cached = syncCache.GetManifest(bookId);
+
+        if (cached is not null)
+        {
+            return cached;
+        }
+
+        var manifestJson = await unitOfWork.Publications.GetLatestManifestJsonAsync(bookId, cancellationToken);
+
+        if (manifestJson is not null)
+        {
+            syncCache.SetManifest(bookId, manifestJson);
+        }
+
+        return manifestJson;
+    }
+
+    /// <summary>
+    /// GetLatestManifestJsonCachedAsync'in snapshot icin aynasi.
+    /// </summary>
+    private async Task<string?> GetLatestSnapshotJsonCachedAsync(int bookId, CancellationToken cancellationToken)
+    {
+        var cached = syncCache.GetSnapshot(bookId);
+
+        if (cached is not null)
+        {
+            return cached;
+        }
+
+        var snapshotJson = await unitOfWork.Publications.GetLatestSnapshotJsonAsync(bookId, cancellationToken);
+
+        if (snapshotJson is not null)
+        {
+            syncCache.SetSnapshot(bookId, snapshotJson);
+        }
+
+        return snapshotJson;
     }
 
     /// <summary>

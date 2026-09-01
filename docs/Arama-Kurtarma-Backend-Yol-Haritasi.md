@@ -1126,3 +1126,19 @@ her alt görevin kendi commit mesajında ve §5.13'teki WBS tablosunda.
       §2'ye additive not + §10 sürüm geçmişine v1.3 satırı eklendi. 213/213 test yeşil (5 yeni:
       manifest'te eşleşen/eşleşmeyen If-None-Match, snapshot'ta eşleşen, changes'te eşleşen +
       farklı `fromVersion`'ların farklı ETag ürettiği).
+- [x] 12.2 (2026-09-01) — Manifest/snapshot cache eklendi, kullanıcı onayıyla **artık
+      ERTELENMİYOR, uygulandı** — roadmap'in kendi 12.1 ölçümü bunu YAGNI bulmuştu (yanıt süresi
+      zaten 5-115ms, çoğu <15ms, compression zaten devrede); yine de 12.4/12.7 karar desenindeki
+      gibi kullanıcı bilerek ön koşulu es geçip ilerletti. Yeni `ISyncCache` arayüzü +
+      `MemoryCacheSyncCache` (`IMemoryCache`, tek instance'lik dağıtıma uygun — Redis YOK,
+      `IStorageService`/Strategy deseniyle aynı mantıkla ileride tek yeni sınıfla geçilebilir).
+      `SyncService.GetManifestAsync`/`GetSnapshotAsync` VE `GetChangesAsync`'in içindeki
+      "güncel manifest/snapshot" okumaları (üçü de aynı veriye bakıyor) artık ortak bir
+      cache-aware yardımcıdan geçiyor — `changes`'in kendisi cache'lenmiyor (fromVersion'a göre
+      değişken), ama içindeki güncel-durum okuması cache'den faydalanıyor. **Invalidation
+      event-driven:** `PublishingService.FinalizeAsync` (publish VE rollback'in ortak tek commit
+      noktası, Faz 9 review'de çıkarılmıştı) başarılı commit'ten hemen sonra o kitabın cache'ini
+      temizliyor — TTL (30dk) sadece savunma amaçlı bir güvenlik ağı, asıl tazelik garantisi bu
+      invalidation'dan geliyor. 219/219 test yeşil (6 yeni: `MemoryCacheSyncCache` için 5 saf
+      birim testi + republish sonrası manifest'in bayat değil taze versiyonu döndüğünü kanıtlayan
+      1 entegrasyon testi — asıl kritik regresyon senaryosu budur).

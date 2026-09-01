@@ -12,7 +12,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Isbak_SAR_Guide.Business.Services.Concrete;
 
-public class PublishingService(IUnitOfWork unitOfWork, ILogger<PublishingService> logger) : IPublishingService
+public class PublishingService(IUnitOfWork unitOfWork, ILogger<PublishingService> logger, ISyncCache syncCache) : IPublishingService
 {
     /// <summary>
     /// Tombstone satirinin payload'i: icerik artik yok, kimligi ContentId
@@ -186,6 +186,10 @@ public class PublishingService(IUnitOfWork unitOfWork, ILogger<PublishingService
         {
             await _unitOfWork.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
+
+            // Commit basarili - bu kitabin "guncel yayin" cache'i artik bayat.
+            // Publish/rollback'in TEK ortak cikis noktasi burasi (12.2).
+            syncCache.Invalidate(bookId);
         }
         catch (DbUpdateException ex) when (DbErrors.IsUniqueViolation(ex))
         {

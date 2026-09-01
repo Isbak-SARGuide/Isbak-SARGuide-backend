@@ -92,6 +92,29 @@ public class SyncManifestTests(ApiFactory factory)
     }
 
     [Fact]
+    public async Task GetManifest_AfterRepublish_ReturnsFreshVersionNotStale()
+    {
+        // Arrange - 12.2 cache'in asil kritik ozelligi: republish sonrasi
+        // bayat (v1) degil taze (v2) manifest gelmeli.
+        var bookId = await CreateBookAsync();
+        await PublishAsync(bookId);
+        var client = factory.CreateClient();
+
+        var firstResponse = await client.GetAsync($"/api/v1/sync/manifest?bookId={bookId}");
+        var firstBody = await firstResponse.Content.ReadAsStringAsync();
+        firstBody.ShouldContain("\"version\":1");
+
+        // Act - tekrar yayinla (icerik degismese bile versiyon her zaman +1 olur)
+        await PublishAsync(bookId);
+        var secondResponse = await client.GetAsync($"/api/v1/sync/manifest?bookId={bookId}");
+        var secondBody = await secondResponse.Content.ReadAsStringAsync();
+
+        // Assert - cache invalidation calismasaydi burasi hala v1 dönerdi.
+        secondBody.ShouldContain("\"version\":2");
+        secondBody.ShouldNotBe(firstBody);
+    }
+
+    [Fact]
     public async Task GetManifest_BookNeverPublished_Returns404WithNotPublishedCode()
     {
         // Arrange - kendi kitabini yarat, publish ETME. (Seed kitap artik
