@@ -657,7 +657,7 @@ PHASE 10 — Mobil & Web Uyumluluk Düzeltmeleri    9,0 sa   → M10
 | Rollback / restore | 1,5 | Immutable model rollback'i mümkün kılıyor; endpoint ayrı iş | İlk prod yayından önce |
 | WebP + thumbnail | 2,0 | Checksum değişir → versiyonlama halleder | Medya hacmi artınca |
 | Global rate limiting | 0,5 | Anonim sync endpoint'i tek risk | İlk prod yayından önce |
-| Public read endpoint'leri | 1,5 | Önce müşterisi olduğunu doğrula | Somut talep gelirse |
+| ~~Public read endpoint'leri~~ | 1,5 | **İPTAL EDİLDİ (2026-09-01, kullanıcı onayıyla)** — 13.8'de olduğu gibi somut bir müşteri/kullanım senaryosu yok, netleştirme sorusuna verilen cevap "belirsiz, iptal edelim" oldu | — |
 | ~~MinIO geçişi~~ | 1,5 | **İPTAL EDİLDİ (2026-09-01, kullanıcı onayıyla)** — `IStorageService` sayesinde teknik olarak tek sınıflık iş olsa da yapılmayacak | — |
 
 ### Test coverage duruşu
