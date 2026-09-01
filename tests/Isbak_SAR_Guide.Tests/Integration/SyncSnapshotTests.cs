@@ -53,6 +53,27 @@ public class SyncSnapshotTests(ApiFactory factory)
     }
 
     [Fact]
+    public async Task GetSnapshot_MatchingIfNoneMatch_Returns304WithoutBody()
+    {
+        // Arrange
+        var bookId = await CreateBookAsync();
+        await PublishAsync(bookId);
+        var client = factory.CreateClient();
+        var firstResponse = await client.GetAsync($"/api/v1/sync/snapshot?bookId={bookId}");
+        var eTag = firstResponse.Headers.ETag!.ToString();
+
+        // Act - ayni ETag'i If-None-Match olarak geri gonder
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"/api/v1/sync/snapshot?bookId={bookId}");
+        request.Headers.TryAddWithoutValidation("If-None-Match", eTag);
+        var response = await client.SendAsync(request);
+
+        // Assert - 304, govde yok
+        response.StatusCode.ShouldBe(HttpStatusCode.NotModified);
+        var body = await response.Content.ReadAsStringAsync();
+        body.ShouldBeEmpty();
+    }
+
+    [Fact]
     public async Task GetSnapshot_BookNeverPublished_Returns404WithNotPublishedCode()
     {
         // Arrange - kendi kitabini yarat, publish ETME. (Seed kitap artik

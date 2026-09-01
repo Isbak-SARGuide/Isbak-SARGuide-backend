@@ -657,8 +657,8 @@ PHASE 10 — Mobil & Web Uyumluluk Düzeltmeleri    9,0 sa   → M10
 | Rollback / restore | 1,5 | Immutable model rollback'i mümkün kılıyor; endpoint ayrı iş | İlk prod yayından önce |
 | WebP + thumbnail | 2,0 | Checksum değişir → versiyonlama halleder | Medya hacmi artınca |
 | Global rate limiting | 0,5 | Anonim sync endpoint'i tek risk | İlk prod yayından önce |
-| Public read endpoint'leri | 1,5 | Önce müşterisi olduğunu doğrula | Somut talep gelirse |
-| MinIO geçişi | 1,5 | `IStorageService` sayesinde tek sınıf | Disk/ölçek baskısı olunca |
+| ~~Public read endpoint'leri~~ | 1,5 | **İPTAL EDİLDİ (2026-09-01, kullanıcı onayıyla)** — 13.8'de olduğu gibi somut bir müşteri/kullanım senaryosu yok, netleştirme sorusuna verilen cevap "belirsiz, iptal edelim" oldu | — |
+| ~~MinIO geçişi~~ | 1,5 | **İPTAL EDİLDİ (2026-09-01, kullanıcı onayıyla)** — `IStorageService` sayesinde teknik olarak tek sınıflık iş olsa da yapılmayacak | — |
 
 ### Test coverage duruşu
 
@@ -1111,3 +1111,124 @@ her alt görevin kendi commit mesajında ve §5.13'teki WBS tablosunda.
       çağrılarını tek-uçuşlu (single-flight) yapıp yapmadığı ve otomatik 401→login
       yönlendirmesi olup olmadığı — bkz. `Frontend-Notlar-ve-Oneriler.md` madde 10, bu backend
       repo'sunun dışında, web ekibinin kendi kontrol etmesi gerekiyor.
+- [x] 12.4 (2026-09-01) — ETag + `If-None-Match` desteği eklendi, kullanıcı onayıyla
+      **artık ERTELENMİYOR, uygulandı** (ön koşul — "sözleşme oturması" — resmi bir tetiklenme
+      şartı olmaktan çıktı, doğrudan yapıldı; 12.7'deki karar deseniyle aynı). Sadece API
+      katmanında (`ResultExtensions.ToJsonContentResultWithETag` + `SyncController`) — Business
+      katmanına, `SnapshotBuilder`'a, frozen canonical serialization sözleşmesine hiç
+      dokunulmadı, sıfır risk. ETag, zaten dönen JSON gövdesinin içindeki `version` (manifest/
+      snapshot) veya `fromVersion`+`toVersion` (changes) alanlarından `bookId` ile birlikte
+      türetiliyor (`"{bookId}.{version}"` biçiminde, weak ETag `W/"..."`) — yayın defteri
+      immutable olduğu için aynı ETag = aynı gövde garantisi var, yeni bir DB sorgusu
+      gerekmiyor. İstemci `If-None-Match` ile aynı değeri geri gönderirse gövdesiz
+      `304 Not Modified` döner (mobil bant genişliği tasarrufu); başlığı hiç göndermeyen eski
+      istemciler için davranış birebir aynı kalıyor (tam additive). `docs/Sync-Sozlesmesi-v2.md`
+      §2'ye additive not + §10 sürüm geçmişine v1.3 satırı eklendi. 213/213 test yeşil (5 yeni:
+      manifest'te eşleşen/eşleşmeyen If-None-Match, snapshot'ta eşleşen, changes'te eşleşen +
+      farklı `fromVersion`'ların farklı ETag ürettiği).
+- [x] 12.2 (2026-09-01) — Manifest/snapshot cache eklendi, kullanıcı onayıyla **artık
+      ERTELENMİYOR, uygulandı** — roadmap'in kendi 12.1 ölçümü bunu YAGNI bulmuştu (yanıt süresi
+      zaten 5-115ms, çoğu <15ms, compression zaten devrede); yine de 12.4/12.7 karar desenindeki
+      gibi kullanıcı bilerek ön koşulu es geçip ilerletti. Yeni `ISyncCache` arayüzü +
+      `MemoryCacheSyncCache` (`IMemoryCache`, tek instance'lik dağıtıma uygun — Redis YOK,
+      `IStorageService`/Strategy deseniyle aynı mantıkla ileride tek yeni sınıfla geçilebilir).
+      `SyncService.GetManifestAsync`/`GetSnapshotAsync` VE `GetChangesAsync`'in içindeki
+      "güncel manifest/snapshot" okumaları (üçü de aynı veriye bakıyor) artık ortak bir
+      cache-aware yardımcıdan geçiyor — `changes`'in kendisi cache'lenmiyor (fromVersion'a göre
+      değişken), ama içindeki güncel-durum okuması cache'den faydalanıyor. **Invalidation
+      event-driven:** `PublishingService.FinalizeAsync` (publish VE rollback'in ortak tek commit
+      noktası, Faz 9 review'de çıkarılmıştı) başarılı commit'ten hemen sonra o kitabın cache'ini
+      temizliyor — TTL (30dk) sadece savunma amaçlı bir güvenlik ağı, asıl tazelik garantisi bu
+      invalidation'dan geliyor. 219/219 test yeşil (6 yeni: `MemoryCacheSyncCache` için 5 saf
+      birim testi + republish sonrası manifest'in bayat değil taze versiyonu döndüğünü kanıtlayan
+      1 entegrasyon testi — asıl kritik regresyon senaryosu budur).
+- 12.9 (2026-09-01) — İPTAL EDİLDİ, bkz. §12 erteleme tablosu.
+
+### `Backend-Yapilacaklar.md` incelemesi (2026-09-01, web ekibinin entegrasyon bulguları)
+
+Web frontend ekibi 6 maddelik yeni bir doküman gönderdi (`docs/Backend-Yapilacaklar.md`).
+Her madde koda karşı tek tek doğrulandı — sonuç beklenenden farklı çıktı: **3 madde zaten
+kod incelemesiyle/testle sağlam bulundu (muhtemelen bulgular eski bir deploy'a karşı test
+edilmiş), 2 madde gerçek ve aksiyon gerektiren bug, 1 madde bilinçli olarak ertelendi.**
+
+- [x] **pageSize üst sınırı** (#2, GÜVENLİK) — doğrulandı, gerçek gap. `Modules`/`Contents`
+      (x2)/`ContentBlocks`/`Users` controller'larının hepsinde aynı `pageSize <= 0 ? 50 :
+      pageSize` deseni tekrarlanıyordu, üst sınır yoktu. Yeni `Isbak_SAR_Guide.API.Common.
+      PagingDefaults` (`NormalizePage`/`NormalizePageSize`, max 200) 5 controller'a da
+      uygulandı — reddetmek yerine KIRPMA tercih edildi (page≤0'ın zaten "sessizce normalize
+      et" davranışıyla tutarlı). `CMS-API-Sozlesmesi-v1.md` §10 güncellendi.
+- [x] **Aynı içerikli medya soft-delete sonrası kalıcı 500** (#5, BUG) — **root cause
+      bulundu ve doğrulandı.** `Media.Checksum`'ın unique index'i `Module`/`Content`'in
+      `(ParentId, DisplayOrder)` indexinin aksine partial DEĞİLDİ (`WHERE NOT "IsDeleted"`
+      yok). Soft-delete edilen bir medyanın checksum'ı tabloyu kalıcı işgal ediyordu; aynı
+      içerik tekrar yüklenince unique violation'a çarpıyor, "eşzamanlı yükleme yarışı"
+      kurtarma kodu devreye giriyordu, ama `FindByChecksumAsync` da soft-delete filtresine
+      tabi olduğu için "kazananı" hiç bulamıyordu → kalıcı (retry'la düzelmeyen)
+      `Media.ConcurrentUploadUnresolved` 500. Migration `MakeMediaChecksumIndexPartial` —
+      index artık `ContentConfiguration`/`ModuleConfiguration` ile aynı desende, sadece
+      silinmemiş satırlar arasında tekil. Regresyon testi eklendi (soft-delete + aynı içerik
+      tekrar yükleme → başarı, yeni satır).
+- [x] **isPublished varsayılan değeri** (#3'ün gerçek kök nedeni) — doküman "publish'e dahil
+      edilenlerin isPublished'i true'ya çevrilsin" diye öneriyordu, ama bu zaten tanım gereği
+      no-op (13.3 filtresi zaten sadece true olanları dahil ediyor, dahil edilen küme
+      tanım gereği hep true). Kod incelemesiyle asıl tuzak bulundu: `CreateModuleDto`/
+      `CreateContentDto`'da `IsPublished` varsayılanı **false**'tu — yani editör yeni bir
+      modül/içerik oluşturup hemen kitabı yayınlarsa, o içerik sessizce dışarıda kalıyordu
+      (elle bir checkbox işaretlemediği sürece). Kullanıcı onayıyla varsayılan **true**'ya
+      çevrildi ("opt-out draft" modeli — sürpriz daha az). `CMS-API-Sozlesmesi-v1.md` §5/§6
+      güncellendi.
+- **CORS, currentPassword mesajı, ContentBlocks reorder `dataJson` mutasyonu, login 401
+      dokümantasyonu** (#1, #4'ün üç alt maddesi) — hepsi kod/test incelemesiyle **zaten
+      doğru/çözülmüş** bulundu: CORS zaten config-driven (13.1), `TurkishIdentityErrorDescriber.
+      PasswordMismatch` zaten Türkçe ve DI'a bağlı, `ReorderAsync_DoesNotAlterSiblingsDataJson`
+      regresyon testi hâlâ yeşil (13.5 sağlam), `CMS-API-Sozlesmesi-v1.md` §3.4 zaten login
+      401 istisnasını belgeliyor (13.1). Muhtemel açıklama: web ekibi eski bir deploy'a karşı
+      test etmiş. Kod değişikliği yapılmadı.
+- **`POST /media` 200 vs 201** (#6) — doğrulandı ama kullanıcı onayıyla **atlandı**: sadece
+      `/media`'ya özgü değil, `ResultExtensions.ToActionResult` sayesinde TÜM API'de sistemik
+      (Books/Modules/Contents/ContentBlocks/Users/Media hepsi 200 dönüyor). Düşük öncelikli bir
+      REST-purity notu için tüm controller'ları, testleri ve sözleşme dokümanlarını değiştirmek
+      orantısız risk — bilinçli olarak dokunulmadı.
+
+230/230 test yeşil (11 yeni: 9 `PagingDefaults` birim testi + 1 `pageSize` kırpma HTTP testi +
+1 medya soft-delete/re-upload regresyon testi).
+
+### Yayınla — değişiklik yoksa no-op (2026-09-01, kullanıcı bulgusu)
+
+Kullanıcı gözlemi: "Yayınla butonu değişiklik olmasa da yayınlama yapıyor ve version
+değişiyor." Doğrulandı — mevcut, kasıtlı, test edilmiş bir davranıştı (`PublishAsync`
+her çağrıda `newVersion = max(versiyon) + 1` yapıyordu, içerik değişmiş olsun olmasın;
+"publish bir komuttur" felsefesi, journal boş kalsa da). Kullanıcı onayıyla davranış
+değiştirildi: **artık içerikte gerçek bir değişiklik yoksa (Book/Module/Content'ten
+hiçbiri) `PublishAsync` yeni bir `BookPublication`/versiyon üretmiyor, mevcut son
+yayının sonucunu aynen dönüyor.**
+
+**Nasıl:** Yeni `IPublicationRepository.GetLatestSummaryAsync` (dar projeksiyon: Id,
+Version, Checksum, PublishedAt). `PublishingService.PublishAsync`, transaction'a hiç
+girmeden önce `book.Version`'i son yayının GERÇEK versiyonuna eşitleyip (`Book.Version`
+"gerçeğin kaynağı" değil, drift edebilir) bir aday snapshot kurar, checksum'ini son
+yayının saklı checksum'ıyla kıyaslar — eşitse mevcut son yayının sonucunu aynen döner
+(`TryBuildNoOpResult`), transaction hiç açılmaz. Değiştiyse normal akışa (yeni versiyon,
+transaction, journal yazımı) devam eder. **Rollback'e dokunulmadı** — o zaten adı üstünde
+kasıtlı bir versiyon eylemi, no-op'a tabi tutulması admin'in "şu versiyona dön" kararını
+sessizce yok sayardı.
+
+**Etkilenen testler:** `PublishAsync_UnchangedContent_WritesNoContentRows` artık
+`PublishAsync_NoRealChangeSinceLastPublish_IsNoOpAndDoesNotBumpVersion` — eski davranışı
+(v2 üretilir ama journal boş) değil yeni davranışı (v2 hiç üretilmez) kanıtlıyor.
+`PublishingEndpointTests.Rollback_AsAdmin_ReturnsOkWithNewVersion` ve
+`SyncManifestTests.GetManifest_AfterRepublish_ReturnsFreshVersionNotStale` — ikisi de
+"içerik aynı olsa bile ikinci publish yeni versiyon üretir" varsayımıyla yazılmıştı, artık
+araya gerçek bir değişiklik (başlık/içerik mutasyonu) eklenerek düzeltildi.
+`PublishAsync_ContentDeleted_WritesTombstoneOnce`'daki üçüncü (değişikliksiz) publish
+çağrısı artık hiç v3 üretmiyor — testin "tombstone tekrarlanmadı" assert'i (v3'te ilgili
+content'e ait satır yok) bu durumda da doğal olarak geçerli kalıyor, dokunulmadı.
+
+230/230 test yeşil.
+
+**Yan bulgu — commit'lenmemiş WIP:** `Program.cs`'te, bu oturumun yazmadığı, önceki bir
+oturumdan kalma commit'lenmemiş bir değişiklik bulundu (`AddRateLimiter`'ın `OnRejected`
+callback'i — 429 yanıtına artık boş gövde yerine dolu bir `ProblemDetails` gövdesi
+ekliyor). Derlemeyi bozuyordu (`using Microsoft.AspNetCore.Mvc;` eksikti) — bu satırın
+kendisi eklenip derlenebilir hale getirildi, ama özelliğin kendisi bu oturumun kapsamı
+dışında, ayrıca gözden geçirilip onaylanmalı.

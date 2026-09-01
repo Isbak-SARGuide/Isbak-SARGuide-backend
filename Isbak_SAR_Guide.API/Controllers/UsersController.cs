@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Asp.Versioning;
+using Isbak_SAR_Guide.API.Common;
 using Isbak_SAR_Guide.API.Extensions;
 using Isbak_SAR_Guide.Business.DTOs.Users;
 using Isbak_SAR_Guide.Business.Services.Abstract;
@@ -39,7 +40,8 @@ public class UsersController(IUserService userService) : ControllerBase
     [Authorize(Roles = RoleNames.Admin)]
     public async Task<IActionResult> GetAll([FromQuery] int page, [FromQuery] int pageSize, CancellationToken cancellationToken)
     {
-        var result = await userService.GetAllAsync(page <= 0 ? 1 : page, pageSize <= 0 ? 50 : pageSize, cancellationToken);
+        var result = await userService.GetAllAsync(
+            PagingDefaults.NormalizePage(page), PagingDefaults.NormalizePageSize(pageSize), cancellationToken);
         return result.ToActionResult(this);
     }
 

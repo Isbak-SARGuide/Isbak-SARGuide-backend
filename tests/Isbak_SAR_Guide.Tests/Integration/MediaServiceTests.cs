@@ -216,6 +216,31 @@ public class MediaServiceTests(ApiFactory factory)
     }
 
     [Fact]
+    public async Task UploadAsync_SameContentAfterSoftDelete_SucceedsWithNewRow()
+    {
+        // Backend-Yapilacaklar.md #5: Checksum'un unique index'i eskiden
+        // partial DEGILDI - soft-delete edilen bir Media'nin checksum'i
+        // tabloyu isgal etmeye devam ediyordu. Ayni icerik tekrar yuklenince
+        // unique violation'a carpiyor, "eszamanli yukleme yarisi" kurtarma
+        // yolu devreye giriyordu, ama FindByChecksumAsync soft-delete
+        // filtresine tabi oldugu icin "kazanani" hic bulamiyor, kalici
+        // (retry'la duzelmeyen) Media.ConcurrentUploadUnresolved 500'u
+        // uretiyordu. MakeMediaChecksumIndexPartial migration'i bunu cozer:
+        // index artik sadece silinmemis satirlar arasinda tekil.
+        var bytes = TestImageFactory.BuildRealPng(3, 3);
+        var first = await UploadAsync(bytes, "tekrar-yuklenecek.png");
+        first.IsSuccess.ShouldBeTrue();
+
+        var deleteResult = await DeleteAsync(first.Value.Id);
+        deleteResult.IsSuccess.ShouldBeTrue();
+
+        var second = await UploadAsync(bytes, "tekrar-yuklenecek.png");
+
+        second.IsSuccess.ShouldBeTrue(second.Error?.Message);
+        second.Value.Id.ShouldNotBe(first.Value.Id);
+    }
+
+    [Fact]
     public async Task CleanupOrphansAsync_RemovesOnlyOldUnreferencedMedia()
     {
         // Farkli boyutlar kasitli: BuildMinimalPng'in urettigi baytlar sadece

@@ -3,6 +3,7 @@ using Asp.Versioning;
 using Isbak_SAR_Guide.API.Middleware;
 using Isbak_SAR_Guide.Business.Common;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Options;
@@ -76,6 +77,31 @@ builder.Services.Configure<GlobalRateLimitOptions>(builder.Configuration.GetSect
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    // OnRejected olmadan middleware sadece status code'u 429 yapip govdeyi bos
+    // birakiyordu - frontend anlamli bir hata govdesi bulamayinca kendi
+    // generic "Istek basarisiz (HTTP 429)" fallback'ine dusuyordu. Burada
+    // GlobalExceptionHandler'daki ile ayni RFC 7807 ProblemDetails formatini
+    // kullaniyoruz ki istemci tarafi diger hatalarla ayni sekilde parse edebilsin.
+    options.OnRejected = async (context, cancellationToken) =>
+    {
+        if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
+        {
+            context.HttpContext.Response.Headers.RetryAfter =
+                ((int)retryAfter.TotalSeconds).ToString();
+        }
+
+        var problemDetails = new ProblemDetails
+        {
+            Status = StatusCodes.Status429TooManyRequests,
+            Title = "Istek siniri asildi. Lutfen birazdan tekrar deneyin.",
+            Type = "https://tools.ietf.org/html/rfc6585#section-4",
+        };
+
+        context.HttpContext.Response.StatusCode = problemDetails.Status.Value;
+
+        await context.HttpContext.Response.WriteAsJsonAsync(problemDetails, cancellationToken);
+    };
 
     // Deger IOptions'tan istek-zamaninda okunur (Program.cs baslarken bir kez
     // degil) - ApiFactory testlerde PostConfigure<LoginRateLimitOptions> ile

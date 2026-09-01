@@ -1,4 +1,5 @@
 using Asp.Versioning;
+using Isbak_SAR_Guide.API.Common;
 using Isbak_SAR_Guide.API.Extensions;
 using Isbak_SAR_Guide.Business.DTOs.Common;
 using Isbak_SAR_Guide.Business.DTOs.ContentBlocks;
@@ -15,7 +16,8 @@ public class ContentBlocksController(IContentBlockService contentBlockService) :
     [HttpGet]
     public async Task<IActionResult> GetAll(int contentId, [FromQuery] int page, [FromQuery] int pageSize, CancellationToken cancellationToken)
     {
-        var result = await contentBlockService.GetPagedAsync(contentId, page <= 0 ? 1 : page, pageSize <= 0 ? 50 : pageSize, cancellationToken);
+        var result = await contentBlockService.GetPagedAsync(
+            contentId, PagingDefaults.NormalizePage(page), PagingDefaults.NormalizePageSize(pageSize), cancellationToken);
         return result.ToActionResult(this);
     }
 

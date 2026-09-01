@@ -59,6 +59,13 @@ public class PublicationRepository(Isbak_SAR_GuideDbContext dbContext) : IPublic
             .Select(p => p.SnapshotJson)
             .FirstOrDefaultAsync(cancellationToken);
 
+    public async Task<LatestPublicationSummary?> GetLatestSummaryAsync(int bookId, CancellationToken cancellationToken = default) =>
+        await _publications
+            .Where(p => p.BookId == bookId)
+            .OrderByDescending(p => p.Version)
+            .Select(p => new LatestPublicationSummary(p.Id, p.Version, p.Checksum, p.PublishedAt))
+            .FirstOrDefaultAsync(cancellationToken);
+
     public async Task<IReadOnlyList<PublishedContentState>> GetLatestContentStatesAsync(int bookId, CancellationToken cancellationToken = default)
     {
         var rows = dbContext.Set<PublishedContent>();
