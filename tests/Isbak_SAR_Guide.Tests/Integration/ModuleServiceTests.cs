@@ -1,5 +1,6 @@
 using Isbak_SAR_Guide.Business.Common;
 using Isbak_SAR_Guide.Business.DTOs.Common;
+using Isbak_SAR_Guide.Business.DTOs.Contents;
 using Isbak_SAR_Guide.Business.DTOs.Modules;
 using Isbak_SAR_Guide.Business.Services.Abstract;
 using Isbak_SAR_Guide.DataAccess.Repositories.Abstract;
@@ -117,6 +118,29 @@ public class ModuleServiceTests(ApiFactory factory)
         result.Value.TotalCount.ShouldBe(3);
         result.Value.Items.Count.ShouldBe(1);
         result.Value.Items[0].Name.ShouldBe("M3");
+    }
+
+    [Fact]
+    public async Task GetPagedAsync_ReturnsContentCount_ExcludingSoftDeletedContent()
+    {
+        var bookId = await CreateBookAsync();
+        var module = await CreateAsync(bookId, new CreateModuleDto("Modül", null));
+
+        using var scope = factory.Services.CreateScope();
+        var contentService = scope.ServiceProvider.GetRequiredService<IContentService>();
+
+        var content1 = await contentService.CreateAsync(module.Value.Id, new CreateContentDto("C1", null));
+        var content2 = await contentService.CreateAsync(module.Value.Id, new CreateContentDto("C2", null));
+        await contentService.CreateAsync(module.Value.Id, new CreateContentDto("C3", null));
+        (await contentService.DeleteAsync(module.Value.Id, content2.Value.Id)).IsSuccess.ShouldBeTrue();
+
+        var moduleService = scope.ServiceProvider.GetRequiredService<IModuleService>();
+        var result = await moduleService.GetPagedAsync(bookId, page: 1, pageSize: 10, isPublished: null);
+
+        result.IsSuccess.ShouldBeTrue();
+        var dto = result.Value.Items.Single(m => m.Id == module.Value.Id);
+        // C2 soft-delete edildi - sayilmamali. C1 ve C3 kalir.
+        dto.ContentCount.ShouldBe(2);
     }
 
     [Fact]

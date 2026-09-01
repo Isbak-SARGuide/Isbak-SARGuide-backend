@@ -19,6 +19,7 @@ public class ContentBlockRepository(Isbak_SAR_GuideDbContext dbContext)
         var totalCount = await query.CountAsync(cancellationToken);
 
         var items = await query
+            .AsNoTracking()
             .OrderBy(b => b.DisplayOrder)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
@@ -27,8 +28,10 @@ public class ContentBlockRepository(Isbak_SAR_GuideDbContext dbContext)
         return (items, totalCount);
     }
 
+    // AsNoTracking: bkz. ModuleRepository.FindAllByBookIdAsync - ayni gerekce.
     public async Task<IReadOnlyList<ContentBlock>> FindAllByContentIdAsync(int contentId, CancellationToken cancellationToken = default) =>
         await DbSet
+            .AsNoTracking()
             .Where(b => b.ContentId == contentId)
             .OrderBy(b => b.DisplayOrder)
             .ToListAsync(cancellationToken);

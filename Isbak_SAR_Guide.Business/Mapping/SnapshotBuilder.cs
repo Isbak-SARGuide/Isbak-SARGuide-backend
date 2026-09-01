@@ -44,7 +44,17 @@ public static class SnapshotBuilder
         var bookDto = new SyncBookDto(
             book.Id, book.Title, book.Slug, book.Description, book.LanguageCode, book.Version);
 
+        // Faz 13.3: IsPublished=false olan Module/Content publish'e HIC girmez -
+        // "Taslak" isaretlemenin CMS'te tasidigi anlam artik gercekten publish
+        // davranisini etkiliyor. Modul disarida kalirsa cocuk Content'lerinin
+        // kendi flag'i ne olursa olsun hepsi disarida kalir (SelectMany zaten
+        // filtrelenmis orderedModules'tan besleniyor); Content kendi flag'iyle
+        // AYRICA filtrelenir - yayinlanmis bir modulun icinde taslak content
+        // olabilir. AppendTombstones (PublishingService) bu filtreden dusen,
+        // daha once yayinda olan bir Module/Content'i otomatik tombstone'lar -
+        // ozel bir dal gerekmez.
         var orderedModules = book.Modules
+            .Where(m => m.IsPublished)
             .OrderBy(m => m.DisplayOrder).ThenBy(m => m.Id)
             .ToList();
 
@@ -53,7 +63,7 @@ public static class SnapshotBuilder
             .ToList();
 
         var contents = orderedModules
-            .SelectMany(m => m.Contents.OrderBy(c => c.DisplayOrder).ThenBy(c => c.Id))
+            .SelectMany(m => m.Contents.Where(c => c.IsPublished).OrderBy(c => c.DisplayOrder).ThenBy(c => c.Id))
             .Select(BuildContentDto)
             .ToList();
 
@@ -107,6 +117,15 @@ public static class SnapshotBuilder
         JsonSerializer.Serialize(value, _canonicalOptions);
 
     /// <summary>
+    /// Serialize'in tersi - ayni kanonik options ile. Faz 12.6 rollback icin:
+    /// gecmis bir BookPublication.SnapshotJson'ini geri okuyup yeni bir versiyon
+    /// olarak tekrar yayinlamak icin gerekli.
+    /// </summary>
+    public static T Deserialize<T>(string json) =>
+        JsonSerializer.Deserialize<T>(json, _canonicalOptions)
+            ?? throw new InvalidOperationException("Kanonik JSON deserialize edilemedi (null sonuc).");
+
+    /// <summary>
     /// Kanonik JSON'un SHA-256 ozeti (hex). Iceride Serialize'i cagirir -
     /// "checksum, payload'in ozetidir" sozu ancak ikisi ayni serilestirmeyi
     /// paylastigi surece dogru kalir; ayri serialize cagrisina izin verme.
@@ -130,7 +149,7 @@ public static class SnapshotBuilder
     {
         var mediaDto = block.Media is null
             ? null
-            : new MediaSummaryDto(block.Media.Id, block.Media.StoragePath, block.Media.Checksum, block.Media.FileSize);
+            : new MediaSummaryDto(block.Media.Id, block.Media.StoragePath, block.Media.Checksum, block.Media.FileSize, block.Media.ThumbnailStoragePath);
 
         return new SyncContentBlockDto(block.Id, block.Type, block.Text, block.DataJson, mediaDto, block.DisplayOrder);
     }

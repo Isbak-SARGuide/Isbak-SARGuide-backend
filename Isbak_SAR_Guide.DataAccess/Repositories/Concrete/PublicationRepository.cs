@@ -39,6 +39,12 @@ public class PublicationRepository(Isbak_SAR_GuideDbContext dbContext) : IPublic
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<string?> GetSnapshotJsonAsync(int bookId, int version, CancellationToken cancellationToken = default) =>
+        await _publications
+            .Where(p => p.BookId == bookId && p.Version == version)
+            .Select(p => p.SnapshotJson)
+            .FirstOrDefaultAsync(cancellationToken);
+
     public async Task<string?> GetLatestManifestJsonAsync(int bookId, CancellationToken cancellationToken = default) =>
         await _publications
             .Where(p => p.BookId == bookId)
@@ -51,6 +57,13 @@ public class PublicationRepository(Isbak_SAR_GuideDbContext dbContext) : IPublic
             .Where(p => p.BookId == bookId)
             .OrderByDescending(p => p.Version)
             .Select(p => p.SnapshotJson)
+            .FirstOrDefaultAsync(cancellationToken);
+
+    public async Task<LatestPublicationSummary?> GetLatestSummaryAsync(int bookId, CancellationToken cancellationToken = default) =>
+        await _publications
+            .Where(p => p.BookId == bookId)
+            .OrderByDescending(p => p.Version)
+            .Select(p => new LatestPublicationSummary(p.Id, p.Version, p.Checksum, p.PublishedAt))
             .FirstOrDefaultAsync(cancellationToken);
 
     public async Task<IReadOnlyList<PublishedContentState>> GetLatestContentStatesAsync(int bookId, CancellationToken cancellationToken = default)
@@ -70,4 +83,11 @@ public class PublicationRepository(Isbak_SAR_GuideDbContext dbContext) : IPublic
 
     public async Task AddAsync(BookPublication publication, CancellationToken cancellationToken = default) =>
         await _publications.AddAsync(publication, cancellationToken);
+
+    public async Task<IReadOnlyList<PublicationHistoryRow>> GetHistoryAsync(int bookId, CancellationToken cancellationToken = default) =>
+        await _publications
+            .Where(p => p.BookId == bookId)
+            .OrderByDescending(p => p.Version)
+            .Select(p => new PublicationHistoryRow(p.Id, p.Version, p.PublishedBy.UserName!, p.ManifestJson))
+            .ToListAsync(cancellationToken);
 }

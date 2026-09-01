@@ -2,9 +2,11 @@
 
 Kentsel arama-kurtarma el kitabı için ASP.NET Core REST API'sinin mimari kararları, iş kırılımı ve uygulama sırası.
 
-**Durum:** Faz 0-7 tamamlandı (M0-M4 kritik yol + M5 CMS + M6 Media + M7 Auth, paralel dallar
-dahil) · Faz 8 (Release Readiness — 11.1-11.4, M8) sırada
-**Son güncelleme:** 27 Ağustos 2026
+**Durum:** Faz 0-8 tamamlandı (M0-M4 kritik yol + M5 CMS + M6 Media + M7 Auth + M8 Release
+Readiness — Dockerfile/compose.prod.yaml, health check'ler, güvenlik başlıkları, rate limiting
+hepsi kodda doğrulandı) · Sırada Faz 9/M9 Hardening (ETag, cache, rollback, coverage denetimi —
+**post-MVP**, MVP'nin kendisi tamam)
+**Son güncelleme:** 28 Ağustos 2026
 
 ---
 
@@ -343,6 +345,31 @@ atomic switch mobil geliştiricinin sorumluluğu.
 | 12.8 | Global rate limiting | 0,5 |
 | 12.9 | Public read endpoint'leri (**gerekliliği önce doğrula**) | 1,5 |
 
+### 13. Mobil & Web Frontend Uyumluluk Düzeltmeleri — ~9,0 sa (post-MVP)
+
+Mobil ekip (`docs/mobil_ekip_geri_bildirim_v1.1.md`) ve web frontend ekibi
+(`docs/Web-Frontend-Geri-Bildirim-v2.md` + `docs/Frontend-Notlar-ve-Oneriler.md`)
+gerçek çalışan backend'e karşı entegrasyon yaparken bulduğu, sözleşmeyi
+bozmayan (additive) küçük boşluk/uyumsuzluklar. İki ekip de temel
+sözleşmenin (alan adları, endpoint'ler, hata kodları, blok tipleri)
+tamamen uyumlu olduğunu doğruladı — aşağıdakiler netleştirme/küçük
+düzeltme, kırılma değil.
+
+| ID | Görev | Kaynak | Sa |
+|---|---|---|---|
+| 13.1 | Sync/CMS sözleşme netleştirmeleri (medya base URL, varyant grup başlığı, CORS notu, login 401 gövdesi) | mobil #1,#2 / web #3,#4 | 1,0 |
+| 13.2 | `/sync/changes`'e `book` alanı ekle | mobil #4 | 0,5 |
+| 13.3 | Publish `IsPublished`'a göre süzsün + tek seferlik backfill + `Book.IsPublished` bugfix'i | web #2 | 1,5 |
+| 13.4 | `ModuleDto.ContentCount` (admin panel N+1 düzeltmesi) | web #5 | 1,0 |
+| 13.5 | Reorder'ın alakasız bloğun `dataJson`'ını bozmasını önle | web #6 | 1,0 |
+| 13.6 | Tam `/users` CRUD (liste, rol değiştirme, pasifleştirme, kendi şifresini değiştirme) | web #7 | 3,0 |
+| 13.7 | Video/Animation `dataJson` taslak şeması (provisional) | mobil #3 | 1,0 |
+
+**Bilinçli olarak kapsam dışı:** Acil Durum Bandı backend desteği (web #1,
+bkz. §14 Faz 10 notu — 2026-08-31 itibarıyla İPTAL EDİLDİ, yapılmayacak); web
+frontend'in kendi kod tabanındaki ölü kod/kitap seçici notları (web #8) —
+backend'i ilgilendirmiyor.
+
 ---
 
 ## 6. Bağımlılık Grafiği
@@ -567,6 +594,8 @@ PHASE 8 — Release Readiness                     3,5 sa   → M8
                                            ══ MVP TAMAM: 56 sa ══
 PHASE 9 — Hardening & Optimization             12,0 sa   → M9
                                         ══ PRODUCTION: ~68 sa ══
+PHASE 10 — Mobil & Web Uyumluluk Düzeltmeleri    9,0 sa   → M10
+                                    ══ TOPLAM: ~77 sa ══
 ```
 
 ### Orijinal plana göre değişenler
@@ -628,8 +657,8 @@ PHASE 9 — Hardening & Optimization             12,0 sa   → M9
 | Rollback / restore | 1,5 | Immutable model rollback'i mümkün kılıyor; endpoint ayrı iş | İlk prod yayından önce |
 | WebP + thumbnail | 2,0 | Checksum değişir → versiyonlama halleder | Medya hacmi artınca |
 | Global rate limiting | 0,5 | Anonim sync endpoint'i tek risk | İlk prod yayından önce |
-| Public read endpoint'leri | 1,5 | Önce müşterisi olduğunu doğrula | Somut talep gelirse |
-| MinIO geçişi | 1,5 | `IStorageService` sayesinde tek sınıf | Disk/ölçek baskısı olunca |
+| ~~Public read endpoint'leri~~ | 1,5 | **İPTAL EDİLDİ (2026-09-01, kullanıcı onayıyla)** — 13.8'de olduğu gibi somut bir müşteri/kullanım senaryosu yok, netleştirme sorusuna verilen cevap "belirsiz, iptal edelim" oldu | — |
+| ~~MinIO geçişi~~ | 1,5 | **İPTAL EDİLDİ (2026-09-01, kullanıcı onayıyla)** — `IStorageService` sayesinde teknik olarak tek sınıflık iş olsa da yapılmayacak | — |
 
 ### Test coverage duruşu
 
@@ -657,11 +686,12 @@ Her milestone **durulabilir** ve **gösterilebilir** — yarım iş bırakmaz.
 | **M2** | **Walking Skeleton** | 22,0 sa | Swagger'dan login → token → Book CRUD; sync stub'ları canlı · **Mobil geliştirici başlayabilir** | ✅ |
 | **M3** | **Publish Works** | 29,0 sa | v1 yayınla → içeriği düzenle → mobil hâlâ v1 görüyor → v2 yayınla · **En büyük risk kapandı** | ✅ |
 | **M4** | **Sync Contract Live** | 35,5 sa | Gerçek delta; sözleşme dokümanı v1.0 teslim · **Kritik yol bitti** | ✅ |
-| **M5** | CMS Complete | 42,5 sa | Admin dashboard tüm içerik ağacını yönetiyor | ❌ |
-| **M6** | Media Live | 48,5 sa | Resim yükle → publish → mobil manifest'te checksum'lı URL | ❌ |
-| **M7** | Secured | 52,5 sa | Refresh token, roller, lockout; yetkisiz erişim testleri geçiyor | ❌ |
+| **M5** | CMS Complete | 42,5 sa | Admin dashboard tüm içerik ağacını yönetiyor | ✅ |
+| **M6** | Media Live | 48,5 sa | Resim yükle → publish → mobil manifest'te checksum'lı URL | ✅ |
+| **M7** | Secured | 52,5 sa | Refresh token, roller, lockout; yetkisiz erişim testleri geçiyor | ✅ |
 | **M8** | **MVP Deployable** | 56,0 sa | `docker compose up` ile prod imajı ayakta, health yeşil | ✅ |
 | **M9** | Hardened | 68,0 sa | ETag, cache, rollback, coverage, final review | ❌ |
+| **M10** | Mobil & Web Uyumlu | 77,0 sa | Mobil/web geri bildirimindeki tüm additive düzeltmeler yayında | ❌ |
 
 ---
 
@@ -850,7 +880,7 @@ ve deploy edilemeyen bir sistem kalır.
 - [x] 8.1-8.6 CMS Completion — Module/Content/ContentBlock CRUD + reorder (`ReorderHelper`) + paging (`PagedResult<T>`), `feature/phase5-cms-completion` (PR #9)
 - [x] 10.1-10.6 Media Pipeline — `IStorageService`/`LocalFileStorageService`, magic-byte upload validation, dedup, orphan cleanup, `feature/phase6-media-pipeline` (PR #10)
 - [x] 9.1-9.4 Auth Feature Set — refresh token rotation + reuse detection, Admin-provisions-Editor, lockout, login rate limiting, `feature/phase7-auth-feature-set` (PR #11)
-- [ ] 11.1-11.4 Release Readiness
+- [x] 11.1-11.4 Release Readiness — health check'ler (`/health` liveness, `/health/ready` readiness), güvenlik başlıkları (`Response.OnStarting` ile 500'lerde de garanti), HSTS, response compression, `Dockerfile`/`compose.prod.yaml`/`docs/Deployment.md`, ghcr.io CD, `feature/phase8-release-readiness` (PR #13) — gerçek `docker compose up` ile doğrulandı, review 2 gerçek bug buldu (storage yazma izni, container-içi curl eksikliği)
 
 > Ara adım (Faz 8 öncesi, `fix/architecture-review-findings`, PR #12): 5 paralel uzman ajan +
 > graphify bağımlılık grafiğiyle mimari inceleme — katmanlama temiz çıktı, 9 gerçek bulgu
@@ -861,4 +891,344 @@ ve deploy edilemeyen bir sistem kalır.
 
 ### PHASE 9 — Hardening → M9
 
-- [ ] 12.1-12.9 Hardening & Optimization
+- [x] 12.1 Payload boyut ölçümü — gerçek seed kitabına (Book id=1, v16, 97 content) karşı
+      ölçüldü: manifest 16,8 KB ham / ~6,1 KB gzip; tam snapshot 139,6 KB ham / ~42,8 KB
+      gzip; gerçekçi bir delta (v15→v16, tek publish sonrası) sadece 1,8 KB. Sunucu-içi
+      yanıt süresi 5-115 ms arası (çoğu <15ms). **Sonuç: 12.2 (cache) YAGNI — ölçüm
+      cache'i gerektirmiyor**, snapshot zaten küçük ve response compression (Faz 8) tek
+      başına yeterli; en gerçekçi mobil senaryo olan delta-sync zaten KB mertebesinde.
+      Cache eklemek şu an spekülatif optimizasyon olurdu (roadmap'in kendi YAGNI
+      gerekçesiyle tutarlı) — ölçüm rakamları değişirse (çok daha büyük bir kitap/çok
+      daha yüksek trafik) yeniden değerlendirilebilir.
+- [x] 12.3 `AsNoTracking` / projeksiyon denetimi, N+1 avı — N+1 bulunmadı
+      (`GetWithFullTreeAsync` zaten tum agaci tek sorguda Include/ThenInclude ile
+      eager-load ediyor, `SnapshotBuilder` sadece bellek-ici mapping yapiyor).
+      `AsNoTracking()` sadece salt-okunur oldugu tek tek dogrulanan sorgulara
+      eklendi (`FindAllAsync`, `GetPagedAsync`'ler, sibling `FindAllByXAsync`'ler,
+      Media dedup/orphan sorgulari) — `FindByIdAsync`, `RefreshTokenRepository.
+      FindByTokenHashAsync` (dogrudan property mutation) ve `GetWithFullTreeAsync`
+      (Book kok'u Version bump ile mutate ediliyor) bilinçli olarak tracked
+      birakildi. `PublicationRepository`'nin manifest/snapshot/changes sorgulari
+      zaten `Select()` projeksiyonu ile örtük olarak tracking-disi. 139 test yeşil.
+- [x] 12.5 Coverage denetimi + eksik test tamamlama — `dotnet test --collect:"XPlat
+      Code Coverage"` (coverlet) çalıştırıldı, cobertura raporu ayrıştırıldı. Genel
+      satır oranı zaten %89,9 (migration/OpenAPI generated kod hariç tutulunca gerçek
+      resim netleşti) ama gerçek bir sıfır-kapsam bulundu: **`BookService`'in kendi
+      CRUD'u (Create/Update/Delete/GetById) hiçbir testte hiç çağrılmamış** — Module/
+      Content/ContentBlock testleri hep `unitOfWork.Books.AddAsync` ile doğrudan test
+      kitabı açıyor, `BookService`'i baypas ediyor. `BookServiceTests.cs` eklendi.
+      Bu testi yazarken gerçek bir bug ortaya çıktı: `BookService.CreateAsync`/
+      `UpdateAsync`'te `Book.Slug` unique index ihlali hiç yakalanmıyordu (Media/
+      PublishingService'teki aynı desenin aksine) — tekrar eden slug 500'e düşerdi,
+      düzeltildi (409 Conflict). Ayrıca `GlobalExceptionHandler.TryHandleAsync`
+      (tek global beklenmedik-hata yakalama noktası) ve `LoginDtoValidator` da hiç
+      test edilmiyordu — ikisi için de doğrudan unit test eklendi (`tests/.../Unit/`).
+      156/156 test yeşil (139 mevcut + 17 yeni).
+- [x] 12.6 Rollback / restore endpoint'i — `POST /api/v1/books/{bookId}/rollback`
+      (Admin-only, `{toVersion}`). Publication modeli immutable oldugu icin "rollback"
+      eski bir satiri degistirmek degil, o versiyonun zaten saklanmis `SnapshotJson`'ini
+      YENI bir versiyon olarak tekrar yayinlamak (git revert deseni) — CMS draft agacina
+      hic dokunmuyor, sadece mobilin gordugu yayin gecmisini etkiliyor. `PublishAsync`'in
+      paylasilan statik yardimcilarini (`BuildPublicationShell`/`AppendChangedContents`/
+      `AppendTombstones`) degistirmeden yeniden kullaniyor — `PublishAsync`'in kendisi
+      dokunulmadan %100 coverage'da kaldi. `toVersion >= mevcut en son versiyon` Validation,
+      var olmayan versiyon NotFound. Gercek seed kitaba (v16 → v15'e rollback → v17, 98
+      gercek content) karsi da dogrulandi — manifest/snapshot checksum invariant'i tutuyor,
+      draft agac degismedigi teyit edildi. 166/166 test yeşil (13 yeni).
+- [x] 12.8 Global rate limiting — `GlobalRateLimitOptions` (300/60s varsayılan, IP başına),
+      TÜM endpoint'lere `AddRateLimiter`'ın `GlobalLimiter`'ı ile otomatik uygulanıyor
+      (named "login" politikasının aksine opt-in gerekmez, ikisi TOPLANIR). `/health` ve
+      `/health/ready` bilinçli olarak `DisableRateLimiting()` ile muaf — canlı doğrulamada
+      (PermitLimit=3 ile manuel test) muafiyet olmadan health check'in de 429 döndüğü
+      görüldü, bu orkestratörün uygulamayı "ölü" sanıp gereksiz yeniden başlatmasına yol
+      açardı. `compose.prod.yaml`/`.env.example`/`docs/Deployment.md`'ye işlendi.
+- 12.2 (cache), 12.4 (ETag), 12.7 (WebP), 12.9 (Public read) — roadmap'in kendi ön
+      koşulları (ölçüm/mobil stabilite/lisans/müşteri talebi) karşılanmadığı için bu
+      fazda bilinçli olarak ERTELENDİ, görev-görev karar verildi.
+- [x] 12.7 (WebP + thumbnail) — yeniden gündeme geldi (2026-08-31, mobil optimizasyon
+      sorusu), kullanıcı onayıyla **artık ERTELENMİYOR, uygulandı** (iki ön koşul —
+      medya hacmi artışı, lisans doğrulaması — resmi tetiklenme şartı olmaktan çıktı,
+      doğrudan yapıldı). `SixLabors.ImageSharp`'ın Split License'ı yerine `SkiaSharp`
+      (MIT) seçildi — ticari kullanımda kısıtlama yok. `MediaService.UploadAsync`
+      artık her yüklenen görseli SkiaSharp ile decode edip **storage'a yazılan asıl
+      dosyayı WebP'ye çeviriyor** (`ContentType` her zaman `image/webp`, orijinal
+      format ne olursa olsun) + `Media.ThumbnailStoragePath` (yeni, nullable kolon,
+      migration `AddMediaThumbnailStoragePath`) altında `Storage:ThumbnailMaxDimension`
+      (varsayılan 400px) ile sınırlı bir küçük önizleme üretiyor. `Checksum` artık
+      WebP-sonrası baytlardan hesaplanıyor (dedup + mobil bütünlük doğrulaması **tek
+      alanla** çalışmaya devam ediyor — WebP encode deterministik olduğu için ayrı bir
+      "orijinal" checksum alanına gerek çıkmadı, ilk tasarım varsayımı yanlıştı).
+      Sync sözleşmesine additive `MediaSummaryDto.ThumbnailUrl` eklendi (Faz 10'daki
+      `book`/`ContentCount` ile aynı "trailing nullable param" deseni). **Sadece bu
+      özellikten SONRAKİ yüklemeler** — mevcut 93 medyaya geriye dönük backfill
+      YAPILMADI, `ThumbnailStoragePath` o satırlarda `null` kalıyor.
+      **Kod incelemesinde bulunan gerçek bir hata:** `SKBitmap.Decode`, imza doğru
+      ama gövdesi bozuk bir dosyada (`ImageSignatureDetectorTests.BuildMinimalPng`
+      gibi sahte-header-gerçek-piksel-yok girdilerde) beklenenin aksine `null` değil
+      `ArgumentNullException` fırlatıyordu — yakalanmasaydı saldırgan kontrollü böyle
+      bir dosya `400 Validation` yerine `500`'e düşerdi; dar bir try/catch ile
+      düzeltildi, doğrudan regresyon testi eklendi. Docker: `SkiaSharp.NativeAssets.
+      Linux` API projesine eklendi, `Dockerfile`'a `libfontconfig1` (SkiaSharp'ın
+      Linux'taki bilinen bağımlılığı — Faz 8'deki curl/`/storage` izin sınıfı bir
+      "sadece `docker compose up`'ta ortaya çıkar" riski, henüz canlı compose ile
+      doğrulanmadı, birleştirmeden önce önerilir). 208/208 test yeşil.
+
+### PHASE 10 — Mobil & Web Uyumluluk Düzeltmeleri → M10
+
+Kaynak: `docs/mobil_ekip_geri_bildirim_v1.1.md` (4 madde) +
+`docs/Web-Frontend-Geri-Bildirim-v2.md` / `docs/Frontend-Notlar-ve-Oneriler.md`
+(8 madde) — iki takımın gerçek çalışan backend'e karşı entegrasyon sırasında
+bulduğu, sözleşmeyi bozmayan boşluk/uyumsuzluklar. Detaylı gerekçe/tasarım
+her alt görevin kendi commit mesajında ve §5.13'teki WBS tablosunda.
+
+- [x] 13.1 Sync/CMS sözleşme netleştirmeleri — medya base URL (aynı host, `/api/v{version}`
+      öneki YOK), varyant grubunun üst listede hangi title/summary'yi göstereceği (en küçük
+      `displayOrder`'lı varyant kazanır), `POST /auth/login`'in 401'inin (diğer uçların aksine)
+      dolu ProblemDetails döndüğü, CORS'un zaten config-driven olduğu (`Cors:AllowedOrigins`/
+      `CORS_ALLOWED_ORIGIN_0..`) — dördü de dokümantasyon-only, kod zaten doğru davranıyordu.
+- [x] 13.2 `/sync/changes`'e `book` alanı ekle — `Modules`'la ayni gerekce ve
+      desen (7.3-b), koşulsuz her yanıtta gelir. Örneği canlı v17→v18 verisine
+      karşı yeniden üretirken keşfedilen bir yan bulgu: dev DB'de Faz 6'dan kalma
+      test verisi (Module 13/Content 100/Media 94) gerçek kitaba karışmış,
+      contentCount'u 97 yerine 98 gösteriyordu — temizlenip yeniden yayınlandı
+      (v18), gerçek sayı 97'ye döndü.
+- [x] 13.3 Publish `IsPublished`'a göre süzsün + tek seferlik backfill + `Book.IsPublished`
+      bugfix'i — canlı doğrulama önce yapıldı: 8/10 gerçek Modül ve 85/97 gerçek Content
+      `IsPublished=false`'du (mobile'a zaten servis edilmesine rağmen) — filtre kod
+      değişikliğinden ÖNCE kapsamlı bir SQL backfill (sadece Book id=1, silinmemiş satırlar)
+      ile hepsi `true` yapıldı, yoksa bir sonraki publish 85 gerçek content'i sessizce
+      tombstone'lardı. `SnapshotBuilder.BuildSnapshot` artık Module/Content'i kendi
+      `IsPublished` bayrağına göre süzüyor — mevcut `AppendTombstones` mekanizması özel kod
+      gerekmeden bunu otomatik tombstone'lıyor. Yan bulgu: `Book.IsPublished` hiçbir yerde
+      set edilmiyordu (19+ gerçek yayından sonra bile hep varsayılan false) — `PublishAsync`
+      artık `book.Version` ile birlikte bunu da `true` yapıyor. Gerçek kitaba karşı doğrulandı:
+      backfill sonrası yeniden yayında contentCount hâlâ tam 97 (regresyon yok). 170/170 test
+      yeşil (4 yeni).
+- [x] 13.4 `ModuleDto.ContentCount` (admin panel N+1 düzeltmesi) — `IModuleRepository.GetPagedAsync`
+      artık `ModuleWithContentCount` (`Module` + `Contents.Count(!IsDeleted)`) döner, tek sorguda
+      hesaplanır; `ModuleDto`'ya additive `ContentCount = 0` alanı eklendi (sadece bu liste ucu
+      doldurur, tekil/create/update/reorder'da hep `0`). 171/171 test yeşil (1 yeni:
+      soft-delete edilmiş content'in sayılmadığını doğruluyor). `docs/CMS-API-Sozlesmesi-v1.md`
+      Module liste yanıtı güncellendi.
+- [x] 13.5 Reorder'ın alakasız bloğun `dataJson`'ını bozmasını önle — `ReorderHelper`'ın
+      `markDirty`'si artık `IRepository<T>.Update(entity)` (tüm kolonları kirli işaretler)
+      yerine yeni `IRepository<T>.UpdateProperty(entity, x => x.DisplayOrder)`
+      (`EfRepository<T>`, `dbContext.Entry(entity).Property(...).IsModified = true`) kullanıyor
+      — UPDATE artık sadece `DisplayOrder` (+ audit `UpdatedAt`) kolonunu kapsıyor,
+      `ContentBlock.DataJson` (jsonb) hiç dokunulmuyor. Regresyon testi yazarken bir yan bulgu:
+      Postgres jsonb kolonu zaten İLK INSERT'te kendi kanonik biçimine dönüştürüyor (anahtar
+      sırası uzunluğa göre değişiyor, örn. `{"headers":...,"rows":...}` → `{"rows":...,
+      "headers":...}`) — bu yüzden test, orijinal gönderilen string'e değil, reorder ÖNCESİ
+      DB'den okunan kanonik değere karşı reorder SONRASI değeri karşılaştırıyor (tam eşleşme
+      bekleniyor, taşınan blok dahil). 172/172 test yeşil (1 yeni:
+      `ReorderAsync_DoesNotAlterSiblingsDataJson`).
+- [x] 13.6 Tam `/users` CRUD (liste, rol değiştirme, pasifleştirme, kendi şifresini değiştirme) —
+      `IUserService`'e `GetAllAsync`/`ChangeRoleAsync`/`DeactivateAsync`/`ChangeOwnPasswordAsync`
+      eklendi (`UserManager<ApplicationUser>` üzerinden, aynı `CreateAsync` deseni). Deaktivasyon
+      hard delete değil — `SetLockoutEndDateAsync(..., DateTimeOffset.MaxValue)`, FK bütünlüğünü
+      bozmaz; bir Admin kendi hesabını kilitleyemez (self-lockout guard, `400 Validation`).
+      **Auth tasarımı canlı testle düzeltildi:** ilk deneme sınıf seviyesine
+      `[Authorize(Roles = "Admin")]` koyup `PUT /users/me/password`'e sadece `[Authorize]`
+      eklemekti ("eylem seviyesi sınıfı geçersiz kılar" varsayımıyla) — bir Editor token'ıyla
+      canlı HTTP testi `403` döndürdü, çünkü ASP.NET Core çoklu `[Authorize]` filtrelerini
+      **birleştirir** (AND), en yakını kazanmaz. Düzeltme: sınıf seviyesi sadece `[Authorize]`,
+      Admin-only dört eylemin (Create/GetAll/ChangeRole/Deactivate) her biri kendi
+      `[Authorize(Roles = "Admin")]`'ini taşıyor, `me/password` ek kısıt taşımıyor.
+
+      **Faz sonu parallel security-reviewer + csharp-reviewer geçişi bir CRITICAL + bir HIGH +
+      üç MEDIUM bulgu çıkardı, hepsi bu görev bitmeden düzeltildi:**
+      - **CRITICAL** — `DeactivateAsync` sadece `SetLockoutEndDateAsync` çağırıyordu;
+        `IsLockedOutAsync` sadece `LoginAsync`'te kontrol ediliyordu, `RefreshAsync`'te değil —
+        yani zaten alınmış bir refresh token pasifleştirmeden SONRA bile rotasyonla süresiz
+        yenilenebiliyordu (deaktivasyon erişimi gerçekte KESMİYORDU). Düzeltme:
+        `DeactivateAsync`/`ChangeOwnPasswordAsync` artık `unitOfWork.RefreshTokens.
+        RevokeAllActiveForUserAsync` çağırıyor (`AuthService`'in reuse-tespitinde kullandığı
+        aynı metod); `AuthService.RefreshAsync`'e de defense-in-depth olarak `IsLockedOutAsync`
+        kontrolü eklendi.
+      - **HIGH** — `ChangeRoleAsync` önce TÜM mevcut rolleri kaldırıp sonra yeni rolü ekliyordu;
+        `UserManager` her çağrıyı ayrı/anında commit ettiği için (tek transaction değil) ikinci
+        adım başarısız olursa kullanıcı kalıcı olarak rolsüz kalabilirdi. Düzeltme: sıra
+        tersine çevrildi (önce ekle, sonra kaldır) — ara başarısızlık kullanıcıyı rolsüz değil
+        fazla-rollü bırakır.
+      - **MEDIUM** — Sistemdeki son Admin'i `ChangeRoleAsync` ile düşürmek ya da `DeactivateAsync`
+        ile pasifleştirmek mümkündü (kurtarılamaz kilitlenme, self-lockout guard'ın önlediği
+        AYNI senaryo ama başka bir yoldan) — her iki metoda da `GetUsersInRoleAsync(Admin).Count
+        <= 1` kontrolü eklendi (`User.LastAdminProtected`). **Not:** bu sınırı gerçek bir
+        entegrasyon testiyle kanıtlamak, paylaşılan seed `admin` hesabının rolünü değiştirmeyi
+        gerektirirdi — testler bunu yapmamalı (bkz. CLAUDE.md "Testing": "don't mutate the
+        shared seed ... admin user", düzinelerce başka test buna güveniyor) — bu yüzden bilerek
+        sadece kod incelemesiyle doğrulandı, otomatik testi yok.
+      - **MEDIUM** — `IdentityResult` hata mesajı birleştirme deseni (`string.Join("; ",
+        ...Errors.Select(...))`) `UserService.cs` içinde 6 kez tekrarlanmıştı — yeni
+        `Business/Common/IdentityResultExtensions.cs` (`ValidationResultExtensions`'ın
+        FluentValidation-dışı eşdeğeri) tüm çağrı noktalarına uygulandı.
+      - **MEDIUM** — `ChangeRole` (ayrıcalık yükseltme riski taşıyan en hassas eylem) HTTP
+        seviyesinde 403 testi eksikti — `ChangeRole_WithEditorToken_ReturnsForbidden` eklendi.
+
+      Düzeltmeler sırasında bir test-özel EF Core tuzağı da bulundu: `RevokeAllActiveForUserAsync`
+      (`ExecuteUpdateAsync`, change tracker'ı atlar) + aynı DbContext scope'unda önceden tracked
+      edilmiş bir `RefreshToken` + hemen ardından aynı scope'ta tracked bir sorgu (`FindByTokenHashAsync`)
+      birleşince, entity'nin bellekteki (stale) hâli döner — EF'in identity resolution'ı. Gerçek
+      üretimde her HTTP isteği ayrı bir scope aldığı için bu oluşmaz; testler bu yüzden
+      login/revoke/refresh adımlarını AYRI `CreateScope()` bloklarında çalıştırıyor (gerçek
+      istek sınırlarını taklit eder) — tek bir paylaşılan scope kullanan ilk hâli yanlışlıkla
+      yeşil çıkabiliyordu (bkz. `DeactivateAsync_RevokesTargetUsersActiveRefreshToken`'ın kod
+      yorumu).
+
+      187/187 test yeşil (15 yeni: 8 servis + 1 HTTP-seviyesi ilk turdan, +2 servis regresyon
+      testi + 1 eksik HTTP-seviyesi testi review sonrası eklendi). `docs/CMS-API-Sozlesmesi-v1.md`
+      §3.5 dört yeni uç + auth-tasarım notu + son-Admin/refresh-token-iptal davranışlarıyla
+      güncellendi. `pageSize` üst sınırı olmaması bilerek kapsam dışı bırakıldı (LOW,
+      Modules/Contents/ContentBlocks'ta da aynı ön-var-olan desen, bu branch'in dışında).
+- [x] 13.7 Video/Animation `dataJson` taslak şeması (provisional) — doküman-only, kod
+      değişikliği yok (`ContentBlock.DataJson` zaten şemasız arbitrary JSON kabul ediyor,
+      Table/Warning'le aynı). `docs/Sync-Sozlesmesi-v2.md` §4.1/§4.2'ye eklendi, açıkça
+      "PROVISIONAL — henüz gerçek içerik yok" uyarısıyla işaretli: Video için mevcut `media`
+      alanı yeterli, sadece elle seçilmiş kapak görseli gerekirse `dataJson.thumbnailMediaId`;
+      Animation için `dataJson.steps` dizisi (her adım kendi `text` + opsiyonel `mediaId`'si).
+      Zamanlama/süre bilgisi bilerek dışarıda bırakıldı (YAGNI, gerçek ihtiyaç yok).
+- 13.8 Acil Durum Bandı (web #1) — backend desteği (Book'a alan + Admin PUT + manifest'e
+      ek alan ya da yeni anonim endpoint) İPTAL EDİLDİ (2026-08-31, kullanıcı onayıyla):
+      önceki not "ERTELENDİ" diyordu, artık backlog'da da değil — yapılmayacak.
+- [x] 13.10 (2026-08-31, web'in "bazen oturum süresi doldu diyor, elle çıkış yapmam gerekiyor"
+      geri bildirimi) — **backend tarafı düzeltildi: rotasyona kısa bir grace window eklendi.**
+      Kök neden hipotezi doğrulanmadan (log/gerçek kullanım kanıtı olmadan) ama zararsız ve
+      geriye dönük güvenli olduğu için uygulandı: `AuthService.RefreshAsync`'in tek kullanımlık
+      rotasyonu, zaten iptal edilmiş bir token tekrar sunulduğunda artık koşulsuz "hırsızlık"
+      saymıyor — `RefreshToken.RevokedByRotation` (yeni kolon, migration
+      `AddRefreshTokenRevokedByRotation`) bu iptalin rotasyondan mı (grace window uygulanabilir)
+      yoksa açık logout/toplu iptalden mi (`RevokeAsync`, `RevokeAllActiveForUserAsync` —
+      deaktivasyon/reuse-cezası) geldiğini ayırt ediyor; **sadece rotasyon kaynaklı ve
+      `Jwt:RefreshTokenRotationGraceSeconds` (varsayılan 10 sn) içindeki** iptaller için yeni bir
+      çift üretilip kullanıcı zorla logout edilmiyor — açık logout'tan hemen sonra aynı token'la
+      "tekrar giriş" gibi bir güvenlik açığı oluşmuyor (grace window'un bilerek rotasyona özel
+      tutulma gerekçesi). Grace window dışında ya da rotasyon-dışı bir iptalse davranış
+      değişmedi: tüm aktif token'lar iptal edilir. Mevcut iki reuse testi
+      (`AuthServiceTests`/`AuthTests`) yeni davranışa göre güncellendi + iki yeni test eklendi
+      (grace window içinde başarı, grace window dışında hâlâ toplu iptal — zaman aşımını
+      gerçekten beklemek yerine `RevokedAtUtc`'yi geriye alarak deterministik simüle edilir).
+      206/206 test yeşil. **Hâlâ doğrulanmadı/tamamlanmadı:** web dashboard'ın refresh
+      çağrılarını tek-uçuşlu (single-flight) yapıp yapmadığı ve otomatik 401→login
+      yönlendirmesi olup olmadığı — bkz. `Frontend-Notlar-ve-Oneriler.md` madde 10, bu backend
+      repo'sunun dışında, web ekibinin kendi kontrol etmesi gerekiyor.
+- [x] 12.4 (2026-09-01) — ETag + `If-None-Match` desteği eklendi, kullanıcı onayıyla
+      **artık ERTELENMİYOR, uygulandı** (ön koşul — "sözleşme oturması" — resmi bir tetiklenme
+      şartı olmaktan çıktı, doğrudan yapıldı; 12.7'deki karar deseniyle aynı). Sadece API
+      katmanında (`ResultExtensions.ToJsonContentResultWithETag` + `SyncController`) — Business
+      katmanına, `SnapshotBuilder`'a, frozen canonical serialization sözleşmesine hiç
+      dokunulmadı, sıfır risk. ETag, zaten dönen JSON gövdesinin içindeki `version` (manifest/
+      snapshot) veya `fromVersion`+`toVersion` (changes) alanlarından `bookId` ile birlikte
+      türetiliyor (`"{bookId}.{version}"` biçiminde, weak ETag `W/"..."`) — yayın defteri
+      immutable olduğu için aynı ETag = aynı gövde garantisi var, yeni bir DB sorgusu
+      gerekmiyor. İstemci `If-None-Match` ile aynı değeri geri gönderirse gövdesiz
+      `304 Not Modified` döner (mobil bant genişliği tasarrufu); başlığı hiç göndermeyen eski
+      istemciler için davranış birebir aynı kalıyor (tam additive). `docs/Sync-Sozlesmesi-v2.md`
+      §2'ye additive not + §10 sürüm geçmişine v1.3 satırı eklendi. 213/213 test yeşil (5 yeni:
+      manifest'te eşleşen/eşleşmeyen If-None-Match, snapshot'ta eşleşen, changes'te eşleşen +
+      farklı `fromVersion`'ların farklı ETag ürettiği).
+- [x] 12.2 (2026-09-01) — Manifest/snapshot cache eklendi, kullanıcı onayıyla **artık
+      ERTELENMİYOR, uygulandı** — roadmap'in kendi 12.1 ölçümü bunu YAGNI bulmuştu (yanıt süresi
+      zaten 5-115ms, çoğu <15ms, compression zaten devrede); yine de 12.4/12.7 karar desenindeki
+      gibi kullanıcı bilerek ön koşulu es geçip ilerletti. Yeni `ISyncCache` arayüzü +
+      `MemoryCacheSyncCache` (`IMemoryCache`, tek instance'lik dağıtıma uygun — Redis YOK,
+      `IStorageService`/Strategy deseniyle aynı mantıkla ileride tek yeni sınıfla geçilebilir).
+      `SyncService.GetManifestAsync`/`GetSnapshotAsync` VE `GetChangesAsync`'in içindeki
+      "güncel manifest/snapshot" okumaları (üçü de aynı veriye bakıyor) artık ortak bir
+      cache-aware yardımcıdan geçiyor — `changes`'in kendisi cache'lenmiyor (fromVersion'a göre
+      değişken), ama içindeki güncel-durum okuması cache'den faydalanıyor. **Invalidation
+      event-driven:** `PublishingService.FinalizeAsync` (publish VE rollback'in ortak tek commit
+      noktası, Faz 9 review'de çıkarılmıştı) başarılı commit'ten hemen sonra o kitabın cache'ini
+      temizliyor — TTL (30dk) sadece savunma amaçlı bir güvenlik ağı, asıl tazelik garantisi bu
+      invalidation'dan geliyor. 219/219 test yeşil (6 yeni: `MemoryCacheSyncCache` için 5 saf
+      birim testi + republish sonrası manifest'in bayat değil taze versiyonu döndüğünü kanıtlayan
+      1 entegrasyon testi — asıl kritik regresyon senaryosu budur).
+- 12.9 (2026-09-01) — İPTAL EDİLDİ, bkz. §12 erteleme tablosu.
+
+### `Backend-Yapilacaklar.md` incelemesi (2026-09-01, web ekibinin entegrasyon bulguları)
+
+Web frontend ekibi 6 maddelik yeni bir doküman gönderdi (`docs/Backend-Yapilacaklar.md`).
+Her madde koda karşı tek tek doğrulandı — sonuç beklenenden farklı çıktı: **3 madde zaten
+kod incelemesiyle/testle sağlam bulundu (muhtemelen bulgular eski bir deploy'a karşı test
+edilmiş), 2 madde gerçek ve aksiyon gerektiren bug, 1 madde bilinçli olarak ertelendi.**
+
+- [x] **pageSize üst sınırı** (#2, GÜVENLİK) — doğrulandı, gerçek gap. `Modules`/`Contents`
+      (x2)/`ContentBlocks`/`Users` controller'larının hepsinde aynı `pageSize <= 0 ? 50 :
+      pageSize` deseni tekrarlanıyordu, üst sınır yoktu. Yeni `Isbak_SAR_Guide.API.Common.
+      PagingDefaults` (`NormalizePage`/`NormalizePageSize`, max 200) 5 controller'a da
+      uygulandı — reddetmek yerine KIRPMA tercih edildi (page≤0'ın zaten "sessizce normalize
+      et" davranışıyla tutarlı). `CMS-API-Sozlesmesi-v1.md` §10 güncellendi.
+- [x] **Aynı içerikli medya soft-delete sonrası kalıcı 500** (#5, BUG) — **root cause
+      bulundu ve doğrulandı.** `Media.Checksum`'ın unique index'i `Module`/`Content`'in
+      `(ParentId, DisplayOrder)` indexinin aksine partial DEĞİLDİ (`WHERE NOT "IsDeleted"`
+      yok). Soft-delete edilen bir medyanın checksum'ı tabloyu kalıcı işgal ediyordu; aynı
+      içerik tekrar yüklenince unique violation'a çarpıyor, "eşzamanlı yükleme yarışı"
+      kurtarma kodu devreye giriyordu, ama `FindByChecksumAsync` da soft-delete filtresine
+      tabi olduğu için "kazananı" hiç bulamıyordu → kalıcı (retry'la düzelmeyen)
+      `Media.ConcurrentUploadUnresolved` 500. Migration `MakeMediaChecksumIndexPartial` —
+      index artık `ContentConfiguration`/`ModuleConfiguration` ile aynı desende, sadece
+      silinmemiş satırlar arasında tekil. Regresyon testi eklendi (soft-delete + aynı içerik
+      tekrar yükleme → başarı, yeni satır).
+- [x] **isPublished varsayılan değeri** (#3'ün gerçek kök nedeni) — doküman "publish'e dahil
+      edilenlerin isPublished'i true'ya çevrilsin" diye öneriyordu, ama bu zaten tanım gereği
+      no-op (13.3 filtresi zaten sadece true olanları dahil ediyor, dahil edilen küme
+      tanım gereği hep true). Kod incelemesiyle asıl tuzak bulundu: `CreateModuleDto`/
+      `CreateContentDto`'da `IsPublished` varsayılanı **false**'tu — yani editör yeni bir
+      modül/içerik oluşturup hemen kitabı yayınlarsa, o içerik sessizce dışarıda kalıyordu
+      (elle bir checkbox işaretlemediği sürece). Kullanıcı onayıyla varsayılan **true**'ya
+      çevrildi ("opt-out draft" modeli — sürpriz daha az). `CMS-API-Sozlesmesi-v1.md` §5/§6
+      güncellendi.
+- **CORS, currentPassword mesajı, ContentBlocks reorder `dataJson` mutasyonu, login 401
+      dokümantasyonu** (#1, #4'ün üç alt maddesi) — hepsi kod/test incelemesiyle **zaten
+      doğru/çözülmüş** bulundu: CORS zaten config-driven (13.1), `TurkishIdentityErrorDescriber.
+      PasswordMismatch` zaten Türkçe ve DI'a bağlı, `ReorderAsync_DoesNotAlterSiblingsDataJson`
+      regresyon testi hâlâ yeşil (13.5 sağlam), `CMS-API-Sozlesmesi-v1.md` §3.4 zaten login
+      401 istisnasını belgeliyor (13.1). Muhtemel açıklama: web ekibi eski bir deploy'a karşı
+      test etmiş. Kod değişikliği yapılmadı.
+- **`POST /media` 200 vs 201** (#6) — doğrulandı ama kullanıcı onayıyla **atlandı**: sadece
+      `/media`'ya özgü değil, `ResultExtensions.ToActionResult` sayesinde TÜM API'de sistemik
+      (Books/Modules/Contents/ContentBlocks/Users/Media hepsi 200 dönüyor). Düşük öncelikli bir
+      REST-purity notu için tüm controller'ları, testleri ve sözleşme dokümanlarını değiştirmek
+      orantısız risk — bilinçli olarak dokunulmadı.
+
+230/230 test yeşil (11 yeni: 9 `PagingDefaults` birim testi + 1 `pageSize` kırpma HTTP testi +
+1 medya soft-delete/re-upload regresyon testi).
+
+### Yayınla — değişiklik yoksa no-op (2026-09-01, kullanıcı bulgusu)
+
+Kullanıcı gözlemi: "Yayınla butonu değişiklik olmasa da yayınlama yapıyor ve version
+değişiyor." Doğrulandı — mevcut, kasıtlı, test edilmiş bir davranıştı (`PublishAsync`
+her çağrıda `newVersion = max(versiyon) + 1` yapıyordu, içerik değişmiş olsun olmasın;
+"publish bir komuttur" felsefesi, journal boş kalsa da). Kullanıcı onayıyla davranış
+değiştirildi: **artık içerikte gerçek bir değişiklik yoksa (Book/Module/Content'ten
+hiçbiri) `PublishAsync` yeni bir `BookPublication`/versiyon üretmiyor, mevcut son
+yayının sonucunu aynen dönüyor.**
+
+**Nasıl:** Yeni `IPublicationRepository.GetLatestSummaryAsync` (dar projeksiyon: Id,
+Version, Checksum, PublishedAt). `PublishingService.PublishAsync`, transaction'a hiç
+girmeden önce `book.Version`'i son yayının GERÇEK versiyonuna eşitleyip (`Book.Version`
+"gerçeğin kaynağı" değil, drift edebilir) bir aday snapshot kurar, checksum'ini son
+yayının saklı checksum'ıyla kıyaslar — eşitse mevcut son yayının sonucunu aynen döner
+(`TryBuildNoOpResult`), transaction hiç açılmaz. Değiştiyse normal akışa (yeni versiyon,
+transaction, journal yazımı) devam eder. **Rollback'e dokunulmadı** — o zaten adı üstünde
+kasıtlı bir versiyon eylemi, no-op'a tabi tutulması admin'in "şu versiyona dön" kararını
+sessizce yok sayardı.
+
+**Etkilenen testler:** `PublishAsync_UnchangedContent_WritesNoContentRows` artık
+`PublishAsync_NoRealChangeSinceLastPublish_IsNoOpAndDoesNotBumpVersion` — eski davranışı
+(v2 üretilir ama journal boş) değil yeni davranışı (v2 hiç üretilmez) kanıtlıyor.
+`PublishingEndpointTests.Rollback_AsAdmin_ReturnsOkWithNewVersion` ve
+`SyncManifestTests.GetManifest_AfterRepublish_ReturnsFreshVersionNotStale` — ikisi de
+"içerik aynı olsa bile ikinci publish yeni versiyon üretir" varsayımıyla yazılmıştı, artık
+araya gerçek bir değişiklik (başlık/içerik mutasyonu) eklenerek düzeltildi.
+`PublishAsync_ContentDeleted_WritesTombstoneOnce`'daki üçüncü (değişikliksiz) publish
+çağrısı artık hiç v3 üretmiyor — testin "tombstone tekrarlanmadı" assert'i (v3'te ilgili
+content'e ait satır yok) bu durumda da doğal olarak geçerli kalıyor, dokunulmadı.
+
+230/230 test yeşil.
+
+**Yan bulgu — commit'lenmemiş WIP:** `Program.cs`'te, bu oturumun yazmadığı, önceki bir
+oturumdan kalma commit'lenmemiş bir değişiklik bulundu (`AddRateLimiter`'ın `OnRejected`
+callback'i — 429 yanıtına artık boş gövde yerine dolu bir `ProblemDetails` gövdesi
+ekliyor). Derlemeyi bozuyordu (`using Microsoft.AspNetCore.Mvc;` eksikti) — bu satırın
+kendisi eklenip derlenebilir hale getirildi, ama özelliğin kendisi bu oturumun kapsamı
+dışında, ayrıca gözden geçirilip onaylanmalı.

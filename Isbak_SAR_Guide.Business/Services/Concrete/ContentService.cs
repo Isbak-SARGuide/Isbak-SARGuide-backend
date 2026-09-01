@@ -31,6 +31,20 @@ public class ContentService(
         return Result.Success(pagedResult);
     }
 
+    public async Task<Result<PagedResult<ContentDto>>> GetPagedByBookIdAsync(
+        int bookId, int page, int pageSize, bool? isPublished, CancellationToken cancellationToken = default)
+    {
+        var book = await unitOfWork.Books.FindByIdAsync(bookId, cancellationToken);
+        if (book is null)
+        {
+            return Result.Failure<PagedResult<ContentDto>>(Error.NotFound("Book.NotFound", $"Id={bookId} olan kitap bulunamadı."));
+        }
+
+        var (items, totalCount) = await unitOfWork.Contents.GetPagedByBookIdAsync(bookId, page, pageSize, isPublished, cancellationToken);
+        var pagedResult = new PagedResult<ContentDto>(items.Adapt<List<ContentDto>>(), totalCount, page, pageSize);
+        return Result.Success(pagedResult);
+    }
+
     public async Task<Result<ContentDto>> GetByIdAsync(int moduleId, int id, CancellationToken cancellationToken = default)
     {
         var content = await unitOfWork.Contents.FindByIdAsync(id, cancellationToken);
@@ -126,7 +140,7 @@ public class ContentService(
             dto.OrderedIds,
             getId: c => c.Id,
             setDisplayOrder: (c, order) => c.DisplayOrder = order,
-            markDirty: unitOfWork.Contents.Update,
+            markDirty: c => unitOfWork.Contents.UpdateProperty(c, x => x.DisplayOrder),
             mismatchError: Error.Validation("Content.ReorderMismatch", "OrderedIds, modülün mevcut içerik kümesiyle birebir eşleşmeli."),
             conflictError: Error.Conflict("Content.ReorderConflict", "Aynı anda başka bir sıralama işlemi yapıldı, lütfen tekrar deneyin."),
             cancellationToken);

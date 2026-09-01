@@ -86,7 +86,7 @@ Backend şemasının salt-okunur bir aynası + senkronizasyon durumu için bir t
 | `books` | `id`, `title`, `slug`, `description`, `languageCode`, `version` | |
 | `modules` | `id`, `bookId`, `name`, `description`, `displayOrder` | Her `changes` yanıtında **tamamen** silinip yeniden yazılır (§7, Sync-Sozlesmesi) |
 | `contents` | `id`, `moduleId`, `title`, `summary`, `displayOrder`, `variantGroupKey`, `variantLabel` | `deletedContentIds`'e göre silinir, `upsertedContents`'e göre upsert edilir |
-| `content_blocks` | `id`, `contentId`, `type`, `text`, `dataJson`, `mediaId`, `displayOrder` | Content silinince cascade silinir |
+| `content_blocks` | `id`, `contentId`, `type`, `text`, `dataJson`, `dataJsonParsed`, `mediaId`, `displayOrder` | Content silinince cascade silinir. `dataJson` sözleşmedeki ham string'in **aynen** kopyası (denetim/yeniden-doğrulama için); `dataJsonParsed` aynı veriyi Drift'in yerel JSON/BLOB tipinde **bir kez, yazım anında** çözümlenmiş halde tutar — render tarafı hep `dataJsonParsed`'ı okur, hiçbir widget kendi `jsonDecode` çağırmaz |
 | `media` | `id`, `url`, `checksum`, `size`, `localPath` (nullable — indirilene kadar null) | `localPath` doluysa dosya diskte var demektir |
 
 **Kritik kural:** `contents`/`content_blocks` upsert'i **content bazında tam değiştirme**
@@ -120,8 +120,8 @@ title + subtitle kartları  ──>  modülün alt başlıkları   ──>  cont
 | 2 | Image | `Image.file(mediaLocalPath)` | İndirilmemişse yer tutucu + indirme göstergesi |
 | 3 | Video | `video_player` + basit kontroller | v1'de seed veri yok, widget iskeleti hazır tutulur |
 | 4 | Animation | Placeholder ikon + "desteklenmiyor" notu | Seed veri yok; gerçek ihtiyaç çıkınca tasarlanır (YAGNI) |
-| 5 | Warning | Turuncu/kırmızı banner, `dataJson.severity`'ye göre renk | `dataJson` her zaman string — `jsonDecode` iki kez gerekebilir (Sync-Sozlesmesi §4 notu) |
-| 6 | Table | `DataTable` (headers/rows `dataJson`'dan) | Geniş tablolarda yatay scroll (`SingleChildScrollView`) — mobil ekranda GCS/yoğunluk tabloları gibi çok sütunlu tablolar var |
+| 5 | Warning | Turuncu/kırmızı banner, `dataJsonParsed.severity`'ye göre renk | Ham `dataJson` sözleşmede string (Sync-Sozlesmesi §4 notu) — widget hiç `jsonDecode` çağırmaz, §3'teki `dataJsonParsed`'ı okur |
+| 6 | Table | `DataTable` (headers/rows `dataJsonParsed`'dan) | Geniş tablolarda yatay scroll (`SingleChildScrollView`) — mobil ekranda GCS/yoğunluk tabloları gibi çok sütunlu tablolar var |
 
 ---
 
@@ -138,6 +138,11 @@ Sync-Sozlesmesi-v1.md §7'deki akışın birebir uygulanması:
    kullanıcıya "indirme başarısız, tekrar deneyin" göster — sessizce bozuk veriyle devam **etme**.
 5. Tüm DB yazımı **tek transaction** içinde olmalı — yarıda kesilen senkronizasyon (uygulama
    arka plana alınır, işlem sonlanır) önceki geçerli veriyi bozmamalı.
+6. Her `content_blocks` satırı yazılırken `dataJson` **bir kez** `jsonDecode` edilip
+   `dataJsonParsed`'a da yazılır (§3) — sözleşmenin kendisi hâlâ string taşır (kanonik
+   serileştirme donmuş, bkz. CLAUDE.md), ama mobil bunu sadece senkronizasyon anında bir kez
+   çözer; ekran her açıldığında tekrar parse etmez. Performans endişesi (UI thread'de tekrarlı
+   JSON parse) böylece sözleşmeyi kırmadan çözülür.
 
 ---
 

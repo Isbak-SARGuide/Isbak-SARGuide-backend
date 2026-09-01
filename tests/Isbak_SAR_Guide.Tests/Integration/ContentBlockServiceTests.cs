@@ -103,6 +103,40 @@ public class ContentBlockServiceTests(ApiFactory factory)
         paged.Value.Items.Select(b => b.Id).ShouldBe([b2.Value.Id, b1.Value.Id]);
     }
 
+    [Fact]
+    public async Task ReorderAsync_DoesNotAlterSiblingsDataJson()
+    {
+        // 13.5: ReorderHelper artik her kardeste sadece DisplayOrder'i kirli
+        // isaretliyor (UpdateProperty), tum entity'yi degil. DataJson jsonb
+        // oldugu icin Postgres ZATEN ilk INSERT'te kendi kanonik bicimine
+        // (anahtar sirasi/bosluk) donusturur - bu yuzden burada orijinal
+        // gonderilen string'e degil, reorder ONCESI DB'den okunan kanonik
+        // degere karsi karsilastiriyoruz: reorder bu degeri hic degistirmemeli,
+        // tasinan b1 dahil.
+        var contentId = await CreateContentAsync();
+        const string tableJson = "{\"headers\":[\"a\",\"b\"],\"rows\":[[1,2]]}";
+        const string warningJson = "{\"severity\":\"high\"}";
+        var b1 = await CreateAsync(contentId, new CreateContentBlockDto(ContentBlockType.Table, null, tableJson, null));
+        var b2 = await CreateAsync(contentId, new CreateContentBlockDto(ContentBlockType.Text, "B2", null, null));
+        var b3 = await CreateAsync(contentId, new CreateContentBlockDto(ContentBlockType.Warning, null, warningJson, null));
+
+        using var scope = factory.Services.CreateScope();
+        var blockService = scope.ServiceProvider.GetRequiredService<IContentBlockService>();
+
+        var beforeReorder = await blockService.GetPagedAsync(contentId, page: 1, pageSize: 10);
+        var b1DataJsonBefore = beforeReorder.Value.Items.Single(b => b.Id == b1.Value.Id).DataJson;
+        var b3DataJsonBefore = beforeReorder.Value.Items.Single(b => b.Id == b3.Value.Id).DataJson;
+
+        // Sadece b1/b2'yi yer degistir - b3'un pozisyonu (index 2) ayni kalir.
+        var reorderResult = await blockService.ReorderAsync(
+            contentId, new ReorderDto([b2.Value.Id, b1.Value.Id, b3.Value.Id]));
+        reorderResult.IsSuccess.ShouldBeTrue();
+
+        var afterReorder = await blockService.GetPagedAsync(contentId, page: 1, pageSize: 10);
+        afterReorder.Value.Items.Single(b => b.Id == b1.Value.Id).DataJson.ShouldBe(b1DataJsonBefore);
+        afterReorder.Value.Items.Single(b => b.Id == b3.Value.Id).DataJson.ShouldBe(b3DataJsonBefore);
+    }
+
     // ---- Yardımcılar ----
 
     private async Task<Result<ContentBlockDto>> CreateAsync(int contentId, CreateContentBlockDto dto)

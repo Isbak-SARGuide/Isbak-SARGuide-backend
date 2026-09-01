@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Asp.Versioning;
 using Isbak_SAR_Guide.API.Extensions;
+using Isbak_SAR_Guide.Business.DTOs.Publishing;
 using Isbak_SAR_Guide.Business.Services.Abstract;
 using Isbak_SAR_Guide.Entities.Identity;
 using Microsoft.AspNetCore.Authorization;
@@ -44,6 +45,34 @@ public class PublishingController(IPublishingService publishingService) : Contro
         // Basari 200 OK + PublishResultDto: Location verilecek bir
         // GET /publications/{id} ucumuz yok - olmayan adrese isaret eden 201,
         // yalan soyleyen 201 olurdu. Yayin gecmisi endpoint'i gelirse evrilir.
+        return result.ToActionResult(this);
+    }
+
+    // Mutlak route: sinif seviyesindeki template "/publish" ile bitiyor,
+    // rollback onun ALTINDA degil YANINDA bir kaynak - "/" ile baslayan
+    // mutlak override, sinif template'ini bu eylem icin gecersiz kilar.
+    [HttpPost("/api/v{version:apiVersion}/books/{bookId:int}/rollback")]
+    public async Task<IActionResult> Rollback(int bookId, RollbackRequestDto dto, CancellationToken cancellationToken)
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (userId is null)
+        {
+            return Unauthorized();
+        }
+
+        var result = await publishingService.RollbackAsync(bookId, dto.ToVersion, userId, cancellationToken);
+
+        return result.ToActionResult(this);
+    }
+
+    // Rollback ile ayni gerekce: mutlak route, sinif template'inin "/publish"
+    // ile bitmesinden bagimsiz bir kardes kaynak. Web ekibinin geri bildirimi
+    // (Frontend-Notlar-ve-Oneriler.md madde 9b) - rollback'in toVersion girdisi
+    // elle ezberlenen bir sayiydi, bu uc gercek bir surum listesi saglar.
+    [HttpGet("/api/v{version:apiVersion}/books/{bookId:int}/publications")]
+    public async Task<IActionResult> GetHistory(int bookId, CancellationToken cancellationToken)
+    {
+        var result = await publishingService.GetHistoryAsync(bookId, cancellationToken);
         return result.ToActionResult(this);
     }
 }

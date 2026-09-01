@@ -9,6 +9,10 @@ public interface IContentService
     Task<Result<PagedResult<ContentDto>>> GetPagedAsync(
         int moduleId, int page, int pageSize, bool? isPublished, CancellationToken cancellationToken = default);
 
+    /// <summary>Kitap genelinde duz (flat) icerik listesi - GetPagedAsync'in modul-scope karsiligi, N+1'i onler.</summary>
+    Task<Result<PagedResult<ContentDto>>> GetPagedByBookIdAsync(
+        int bookId, int page, int pageSize, bool? isPublished, CancellationToken cancellationToken = default);
+
     Task<Result<ContentDto>> GetByIdAsync(int moduleId, int id, CancellationToken cancellationToken = default);
 
     Task<Result<ContentDto>> CreateAsync(int moduleId, CreateContentDto dto, CancellationToken cancellationToken = default);

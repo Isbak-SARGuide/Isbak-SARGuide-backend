@@ -279,6 +279,10 @@ namespace Isbak_SAR_Guide.DataAccess.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<string>("ThumbnailStoragePath")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -288,7 +292,8 @@ namespace Isbak_SAR_Guide.DataAccess.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("Checksum")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("\"IsDeleted\" = false");
 
                     b.ToTable("Media", t =>
                         {
@@ -474,6 +479,9 @@ namespace Isbak_SAR_Guide.DataAccess.Migrations
 
                     b.Property<DateTime?>("RevokedAtUtc")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("RevokedByRotation")
+                        .HasColumnType("boolean");
 
                     b.Property<string>("TokenHash")
                         .IsRequired()

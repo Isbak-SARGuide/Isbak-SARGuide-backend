@@ -51,6 +51,74 @@ public class SyncManifestTests(ApiFactory factory)
     }
 
     [Fact]
+    public async Task GetManifest_MatchingIfNoneMatch_Returns304WithoutBody()
+    {
+        // Arrange
+        var bookId = await CreateBookAsync();
+        await PublishAsync(bookId);
+        var client = factory.CreateClient();
+        var firstResponse = await client.GetAsync($"/api/v1/sync/manifest?bookId={bookId}");
+        var eTag = firstResponse.Headers.ETag!.ToString();
+
+        // Act - ayni ETag'i If-None-Match olarak geri gonder
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"/api/v1/sync/manifest?bookId={bookId}");
+        request.Headers.TryAddWithoutValidation("If-None-Match", eTag);
+        var response = await client.SendAsync(request);
+
+        // Assert - 304, govde yok
+        response.StatusCode.ShouldBe(HttpStatusCode.NotModified);
+        var body = await response.Content.ReadAsStringAsync();
+        body.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task GetManifest_StaleIfNoneMatch_Returns200WithBody()
+    {
+        // Arrange
+        var bookId = await CreateBookAsync();
+        await PublishAsync(bookId);
+        var client = factory.CreateClient();
+
+        // Act - eski/uydurma bir ETag gonder
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"/api/v1/sync/manifest?bookId={bookId}");
+        request.Headers.TryAddWithoutValidation("If-None-Match", "W/\"999999.999999\"");
+        var response = await client.SendAsync(request);
+
+        // Assert - normal 200 + govde, yeni ETag baslikta
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        response.Headers.ETag.ShouldNotBeNull();
+        var body = await response.Content.ReadAsStringAsync();
+        body.ShouldNotBeEmpty();
+    }
+
+    [Fact]
+    public async Task GetManifest_AfterRepublish_ReturnsFreshVersionNotStale()
+    {
+        // Arrange - 12.2 cache'in asil kritik ozelligi: republish sonrasi
+        // bayat (v1) degil taze (v2) manifest gelmeli. Publish artik icerik
+        // gercekten degismedikce no-op oldugu icin (kullanicinin bulgusu,
+        // PublishingService.TryBuildNoOpResult) araya GERCEK bir degisiklik
+        // konur - aksi halde ikinci PublishAsync hic v2 uretmez.
+        var bookId = await CreateBookAsync();
+        await PublishAsync(bookId);
+        var client = factory.CreateClient();
+
+        var firstResponse = await client.GetAsync($"/api/v1/sync/manifest?bookId={bookId}");
+        var firstBody = await firstResponse.Content.ReadAsStringAsync();
+        firstBody.ShouldContain("\"version\":1");
+
+        // Act - icerigi degistir, sonra tekrar yayinla
+        await MutateContentTitleAsync(bookId, "Sync İçeriği (değişti)");
+        await PublishAsync(bookId);
+        var secondResponse = await client.GetAsync($"/api/v1/sync/manifest?bookId={bookId}");
+        var secondBody = await secondResponse.Content.ReadAsStringAsync();
+
+        // Assert - cache invalidation calismasaydi burasi hala v1 dönerdi.
+        secondBody.ShouldContain("\"version\":2");
+        secondBody.ShouldNotBe(firstBody);
+    }
+
+    [Fact]
     public async Task GetManifest_BookNeverPublished_Returns404WithNotPublishedCode()
     {
         // Arrange - kendi kitabini yarat, publish ETME. (Seed kitap artik
@@ -90,8 +158,10 @@ public class SyncManifestTests(ApiFactory factory)
         using var scope = factory.Services.CreateScope();
         var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
 
-        var module = new Module { Name = "Sync Modülü", DisplayOrder = 1 };
-        module.Contents.Add(new Content { Title = "Sync İçeriği", DisplayOrder = 1 });
+        // Faz 13.3: IsPublished=true bilincli - bu testler manifest/publish
+        // motorunu test ediyor, IsPublished filtresinin kendisini degil.
+        var module = new Module { Name = "Sync Modülü", DisplayOrder = 1, IsPublished = true };
+        module.Contents.Add(new Content { Title = "Sync İçeriği", DisplayOrder = 1, IsPublished = true });
 
         var book = new Book
         {
@@ -114,5 +184,14 @@ public class SyncManifestTests(ApiFactory factory)
         var publishingService = scope.ServiceProvider.GetRequiredService<IPublishingService>();
         var result = await publishingService.PublishAsync(bookId, adminId);
         result.IsSuccess.ShouldBeTrue(result.Error?.Message);
+    }
+
+    private async Task MutateContentTitleAsync(int bookId, string newTitle)
+    {
+        using var scope = factory.Services.CreateScope();
+        var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+        var book = await unitOfWork.Books.GetWithFullTreeAsync(bookId);
+        book!.Modules.Single().Contents.Single().Title = newTitle;
+        await unitOfWork.SaveChangesAsync();
     }
 }

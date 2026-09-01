@@ -55,6 +55,13 @@ public interface IPublicationRepository
     Task<string?> GetLatestSnapshotJsonAsync(int bookId, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Belirli bir versiyonun SnapshotJson'unu doner; o versiyon yoksa null.
+    /// Faz 12.6 rollback icin: GetManifestJsonAsync'in aynasi ama SnapshotJson
+    /// icin - geri alinacak versiyonun TAM icerigi lazim, sadece manifesti degil.
+    /// </summary>
+    Task<string?> GetSnapshotJsonAsync(int bookId, int version, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Content basina yayin gunlugundeki en son satirin ozetini doner
     /// (greatest-per-group). Journal modelinin temeli: satir tablosu tam
     /// kopya degil degisiklik gunlugu oldugu icin "v'deki satirlar" sorusu
@@ -69,4 +76,21 @@ public interface IPublicationRepository
     /// eder - PublishedContent icin ayri bir repo bilerek yok.
     /// </summary>
     Task AddAsync(BookPublication publication, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Son yayinin no-op karsilastirmasi icin dar bir ozet doner (Id, Version,
+    /// Checksum, PublishedAt); hic yayin yoksa null. PublishingService.
+    /// PublishAsync, yeni bir aday snapshot'in checksum'ini bununla
+    /// karsilastirip icerikte gercek bir degisiklik olup olmadigina karar
+    /// verir - degismediyse yeni bir BookPublication/versiyon uretilmez.
+    /// </summary>
+    Task<LatestPublicationSummary?> GetLatestSummaryAsync(int bookId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Kitabin tum yayin gecmisini (en yeniden eskiye) doner - rollback UI'inin
+    /// "hangi versiyona donulebilir" listesi icin (web ekibinin geri bildirimi,
+    /// bkz. Frontend-Notlar-ve-Oneriler.md madde 9b). SnapshotJson'a HIC
+    /// dokunmaz - GetLatestManifestJsonAsync ile ayni projection ilkesi.
+    /// </summary>
+    Task<IReadOnlyList<PublicationHistoryRow>> GetHistoryAsync(int bookId, CancellationToken cancellationToken = default);
 }

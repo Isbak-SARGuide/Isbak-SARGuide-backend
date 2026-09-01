@@ -41,6 +41,12 @@ public static class BusinessServiceCollectionExtensions
         services.AddScoped<IMediaService, MediaService>();
         services.AddScoped<IUserService, UserService>();
 
+        // ISyncCache tek instance'lik icerik icin process-genelinde bir tek
+        // IMemoryCache paylasmali - Scoped olsaydi her HTTP istegi kendi bos
+        // cache'ini gorurdu, cache hic isabet almazdi (12.2).
+        services.AddMemoryCache();
+        services.AddSingleton<ISyncCache, MemoryCacheSyncCache>();
+
         return services;
     }
 }
