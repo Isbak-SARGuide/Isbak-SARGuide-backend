@@ -78,6 +78,15 @@ public interface IPublicationRepository
     Task AddAsync(BookPublication publication, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Son yayinin no-op karsilastirmasi icin dar bir ozet doner (Id, Version,
+    /// Checksum, PublishedAt); hic yayin yoksa null. PublishingService.
+    /// PublishAsync, yeni bir aday snapshot'in checksum'ini bununla
+    /// karsilastirip icerikte gercek bir degisiklik olup olmadigina karar
+    /// verir - degismediyse yeni bir BookPublication/versiyon uretilmez.
+    /// </summary>
+    Task<LatestPublicationSummary?> GetLatestSummaryAsync(int bookId, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Kitabin tum yayin gecmisini (en yeniden eskiye) doner - rollback UI'inin
     /// "hangi versiyona donulebilir" listesi icin (web ekibinin geri bildirimi,
     /// bkz. Frontend-Notlar-ve-Oneriler.md madde 9b). SnapshotJson'a HIC

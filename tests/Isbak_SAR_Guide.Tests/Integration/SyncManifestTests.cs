@@ -95,7 +95,10 @@ public class SyncManifestTests(ApiFactory factory)
     public async Task GetManifest_AfterRepublish_ReturnsFreshVersionNotStale()
     {
         // Arrange - 12.2 cache'in asil kritik ozelligi: republish sonrasi
-        // bayat (v1) degil taze (v2) manifest gelmeli.
+        // bayat (v1) degil taze (v2) manifest gelmeli. Publish artik icerik
+        // gercekten degismedikce no-op oldugu icin (kullanicinin bulgusu,
+        // PublishingService.TryBuildNoOpResult) araya GERCEK bir degisiklik
+        // konur - aksi halde ikinci PublishAsync hic v2 uretmez.
         var bookId = await CreateBookAsync();
         await PublishAsync(bookId);
         var client = factory.CreateClient();
@@ -104,7 +107,8 @@ public class SyncManifestTests(ApiFactory factory)
         var firstBody = await firstResponse.Content.ReadAsStringAsync();
         firstBody.ShouldContain("\"version\":1");
 
-        // Act - tekrar yayinla (icerik degismese bile versiyon her zaman +1 olur)
+        // Act - icerigi degistir, sonra tekrar yayinla
+        await MutateContentTitleAsync(bookId, "Sync İçeriği (değişti)");
         await PublishAsync(bookId);
         var secondResponse = await client.GetAsync($"/api/v1/sync/manifest?bookId={bookId}");
         var secondBody = await secondResponse.Content.ReadAsStringAsync();
@@ -180,5 +184,14 @@ public class SyncManifestTests(ApiFactory factory)
         var publishingService = scope.ServiceProvider.GetRequiredService<IPublishingService>();
         var result = await publishingService.PublishAsync(bookId, adminId);
         result.IsSuccess.ShouldBeTrue(result.Error?.Message);
+    }
+
+    private async Task MutateContentTitleAsync(int bookId, string newTitle)
+    {
+        using var scope = factory.Services.CreateScope();
+        var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+        var book = await unitOfWork.Books.GetWithFullTreeAsync(bookId);
+        book!.Modules.Single().Contents.Single().Title = newTitle;
+        await unitOfWork.SaveChangesAsync();
     }
 }

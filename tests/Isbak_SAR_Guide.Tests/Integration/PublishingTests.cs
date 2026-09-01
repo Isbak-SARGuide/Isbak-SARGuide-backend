@@ -204,43 +204,38 @@ public class PublishingTests(ApiFactory factory)
     }
 
     [Fact]
-    public async Task PublishAsync_UnchangedContent_WritesNoContentRows()
+    public async Task PublishAsync_NoRealChangeSinceLastPublish_IsNoOpAndDoesNotBumpVersion()
     {
+        // Kullanicinin bulgusu: Yayinla, icerikte GERCEK bir degisiklik olmasa
+        // bile her tiklamada yeni bir versiyon/BookPublication uretiyordu.
         // Arrange
         var bookId = await CreateBookWithContentsAsync("Sabit İçerik", "Diğer İçerik");
         var adminId = await GetAdminIdAsync();
-        await PublishAsync(bookId, adminId);
+        var first = await PublishAsync(bookId, adminId);
 
         // Act - arada hicbir degisiklik yok
-        var result = await PublishAsync(bookId, adminId);
+        var second = await PublishAsync(bookId, adminId);
 
-        // Assert - publish bir komuttur: yayin eylemi kaydedilir (v2 +
-        // snapshot olusur) ama JOURNAL BOSTUR - degismeyen icerik yeniden
-        // yazilmaz. Bu, "delta = tam indirme" tuzagini kapatan kuralin kaniti
-        // (7.3-a journal modeli); deterministik serilestirme (6.2) sayesinde
-        // degismeyen icerigin checksum'i tutar ve satir atlanabilir.
-        result.Value.Version.ShouldBe(2);
+        // Assert - no-op: ikinci cagri BIRINCI yayinin sonucunu aynen doner,
+        // yeni bir versiyon/BookPublication/PublishedContent satiri uretmez.
+        second.Value.PublicationId.ShouldBe(first.Value.PublicationId);
+        second.Value.Version.ShouldBe(1);
+        second.Value.Checksum.ShouldBe(first.Value.Checksum);
+        // Saniyeye yuvarlanmis karsilastirma: second.Value.PublishedAt DB'den
+        // geri okunuyor (GetLatestSummaryAsync), first.Value.PublishedAt ise
+        // ilk cagrinin bellek-ici DateTime.UtcNow'u - Postgres timestamp
+        // hassasiyeti .NET tick'inden dusuk oldugu icin tam esitlik yerine
+        // saniye hassasiyetiyle kiyaslaniyor.
+        second.Value.PublishedAt.ShouldBe(first.Value.PublishedAt, TimeSpan.FromSeconds(1));
 
         using var scope = factory.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<Isbak_SAR_GuideDbContext>();
 
-        var rows = await dbContext.Set<PublishedContent>()
-            .Where(pc => pc.BookId == bookId)
-            .ToListAsync();
+        (await dbContext.Set<BookPublication>().CountAsync(p => p.BookId == bookId)).ShouldBe(1);
+        (await dbContext.Set<PublishedContent>().CountAsync(pc => pc.BookId == bookId)).ShouldBe(2);
 
-        rows.Where(r => r.Version == 1).Count().ShouldBe(2);
-        rows.Where(r => r.Version == 2).ShouldBeEmpty();
-
-        // Yayin-seviyesi checksum'lar ise FARKLI olmali - bug degil, tasarim:
-        // o checksum snapshot'in ozeti ve snapshot Version alanini iceriyor
-        // (v1'de 1, v2'de 2). Yayin seviyesinde versiyon zaten degisen seyin
-        // ta kendisi.
-        var publications = await dbContext.Set<BookPublication>()
-            .Where(p => p.BookId == bookId)
-            .ToListAsync();
-
-        publications.Single(p => p.Version == 1).Checksum
-            .ShouldNotBe(publications.Single(p => p.Version == 2).Checksum);
+        var book = await dbContext.Set<Book>().SingleAsync(b => b.Id == bookId);
+        book.Version.ShouldBe(1);
     }
 
     [Fact]

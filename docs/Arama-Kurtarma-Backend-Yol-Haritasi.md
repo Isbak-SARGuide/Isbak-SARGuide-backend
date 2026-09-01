@@ -1192,3 +1192,43 @@ edilmiş), 2 madde gerçek ve aksiyon gerektiren bug, 1 madde bilinçli olarak e
 
 230/230 test yeşil (11 yeni: 9 `PagingDefaults` birim testi + 1 `pageSize` kırpma HTTP testi +
 1 medya soft-delete/re-upload regresyon testi).
+
+### Yayınla — değişiklik yoksa no-op (2026-09-01, kullanıcı bulgusu)
+
+Kullanıcı gözlemi: "Yayınla butonu değişiklik olmasa da yayınlama yapıyor ve version
+değişiyor." Doğrulandı — mevcut, kasıtlı, test edilmiş bir davranıştı (`PublishAsync`
+her çağrıda `newVersion = max(versiyon) + 1` yapıyordu, içerik değişmiş olsun olmasın;
+"publish bir komuttur" felsefesi, journal boş kalsa da). Kullanıcı onayıyla davranış
+değiştirildi: **artık içerikte gerçek bir değişiklik yoksa (Book/Module/Content'ten
+hiçbiri) `PublishAsync` yeni bir `BookPublication`/versiyon üretmiyor, mevcut son
+yayının sonucunu aynen dönüyor.**
+
+**Nasıl:** Yeni `IPublicationRepository.GetLatestSummaryAsync` (dar projeksiyon: Id,
+Version, Checksum, PublishedAt). `PublishingService.PublishAsync`, transaction'a hiç
+girmeden önce `book.Version`'i son yayının GERÇEK versiyonuna eşitleyip (`Book.Version`
+"gerçeğin kaynağı" değil, drift edebilir) bir aday snapshot kurar, checksum'ini son
+yayının saklı checksum'ıyla kıyaslar — eşitse mevcut son yayının sonucunu aynen döner
+(`TryBuildNoOpResult`), transaction hiç açılmaz. Değiştiyse normal akışa (yeni versiyon,
+transaction, journal yazımı) devam eder. **Rollback'e dokunulmadı** — o zaten adı üstünde
+kasıtlı bir versiyon eylemi, no-op'a tabi tutulması admin'in "şu versiyona dön" kararını
+sessizce yok sayardı.
+
+**Etkilenen testler:** `PublishAsync_UnchangedContent_WritesNoContentRows` artık
+`PublishAsync_NoRealChangeSinceLastPublish_IsNoOpAndDoesNotBumpVersion` — eski davranışı
+(v2 üretilir ama journal boş) değil yeni davranışı (v2 hiç üretilmez) kanıtlıyor.
+`PublishingEndpointTests.Rollback_AsAdmin_ReturnsOkWithNewVersion` ve
+`SyncManifestTests.GetManifest_AfterRepublish_ReturnsFreshVersionNotStale` — ikisi de
+"içerik aynı olsa bile ikinci publish yeni versiyon üretir" varsayımıyla yazılmıştı, artık
+araya gerçek bir değişiklik (başlık/içerik mutasyonu) eklenerek düzeltildi.
+`PublishAsync_ContentDeleted_WritesTombstoneOnce`'daki üçüncü (değişikliksiz) publish
+çağrısı artık hiç v3 üretmiyor — testin "tombstone tekrarlanmadı" assert'i (v3'te ilgili
+content'e ait satır yok) bu durumda da doğal olarak geçerli kalıyor, dokunulmadı.
+
+230/230 test yeşil.
+
+**Yan bulgu — commit'lenmemiş WIP:** `Program.cs`'te, bu oturumun yazmadığı, önceki bir
+oturumdan kalma commit'lenmemiş bir değişiklik bulundu (`AddRateLimiter`'ın `OnRejected`
+callback'i — 429 yanıtına artık boş gövde yerine dolu bir `ProblemDetails` gövdesi
+ekliyor). Derlemeyi bozuyordu (`using Microsoft.AspNetCore.Mvc;` eksikti) — bu satırın
+kendisi eklenip derlenebilir hale getirildi, ama özelliğin kendisi bu oturumun kapsamı
+dışında, ayrıca gözden geçirilip onaylanmalı.

@@ -89,12 +89,23 @@ public class PublishingEndpointTests(ApiFactory factory)
     [Fact]
     public async Task Rollback_AsAdmin_ReturnsOkWithNewVersion()
     {
-        // Arrange - v1 yayinla, sonra ayni kitabi tekrar yayinla (v2), v1'e don.
+        // Arrange - v1 yayinla, kitabin kendi basligini degistir (12.6 sonrasi
+        // eklenen no-op korumasi yuzunden GERCEK bir degisiklik sart - aksi
+        // halde ikinci publish yeni bir versiyon uretmez), v2'ye yayinla, v1'e don.
         var client = factory.CreateClient();
         var bookId = await CreateBookAsync();
         await AuthenticateAsync(client, "admin", "Admin!Dev123");
         await client.PostAsync($"/api/v1/books/{bookId}/publish", content: null); // v1
-        await client.PostAsync($"/api/v1/books/{bookId}/publish", content: null); // v2 (icerik ayni, yine de yeni versiyon)
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+            var book = await unitOfWork.Books.FindByIdAsync(bookId);
+            book!.Title = "Endpoint Test Kitabı (değişti)";
+            await unitOfWork.SaveChangesAsync();
+        }
+
+        await client.PostAsync($"/api/v1/books/{bookId}/publish", content: null); // v2
 
         // Act
         var response = await client.PostAsJsonAsync($"/api/v1/books/{bookId}/rollback", new { toVersion = 1 });

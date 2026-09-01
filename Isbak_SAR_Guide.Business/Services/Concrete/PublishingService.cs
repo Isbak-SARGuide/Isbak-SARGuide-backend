@@ -37,6 +37,17 @@ public class PublishingService(IUnitOfWork unitOfWork, ILogger<PublishingService
                 Error.NotFound("Publishing.BookNotFound", $"Id={bookId} olan kitap bulunamadı."));
         }
 
+        var latestSummary = await _unitOfWork.Publications.GetLatestSummaryAsync(bookId, cancellationToken);
+
+        if (latestSummary is not null)
+        {
+            var noOpResult = TryBuildNoOpResult(book, bookId, latestSummary);
+            if (noOpResult is not null)
+            {
+                return Result.Success(noOpResult);
+            }
+        }
+
         // Gercek bir kez hesaplanir, sonra akar: ayni an hem manifest'e hem
         // PublishedAt kolonuna gider - iki UtcNow cagrisi iki farkli gercek olurdu.
         var publishedAt = DateTime.UtcNow;
@@ -45,8 +56,7 @@ public class PublishingService(IUnitOfWork unitOfWork, ILogger<PublishingService
         // rollback yapar - ayrica catch { Rollback } gerekmez.
         await using var transaction = await _unitOfWork.BeginTransactionAsync(cancellationToken);
 
-        var latestVersion = await _unitOfWork.Publications.GetLatestVersionAsync(bookId, cancellationToken);
-        var newVersion = latestVersion + 1;
+        var newVersion = (latestSummary?.Version ?? 0) + 1;
 
         // Snapshot kurulmadan ONCE bump: BuildSnapshot DTO'ya book.Version'i
         // yazar. Entity zaten izleniyor (tracked) - SaveChanges farki gorur.
@@ -210,6 +220,39 @@ public class PublishingService(IUnitOfWork unitOfWork, ILogger<PublishingService
             snapshot.Contents.Count,
             publication.Checksum,
             publishedAt));
+    }
+
+    /// <summary>
+    /// Backend-Yapilacaklar sonrasi bulunan davranis: Yayinla, Book/Module/
+    /// Content'te GERCEK bir degisiklik olmasa bile her tiklamada yeni bir
+    /// BookPublication/versiyon uretiyordu. Bu, o kararin karsilastirmasi:
+    /// book.Version'i son yayinin GERCEK versiyonuna esitleyip (Book.Version
+    /// "gercegin kaynagi" degil, drift edebilir - bkz. BookPublication.Version
+    /// yorumu) bir aday snapshot kurar, checksum'ini son yayinin sakli
+    /// checksum'iyla kiyaslar. Esitse null DEGIL, mevcut son yayinin sonucunu
+    /// aynen doner - PublishAsync bunu gorunce transaction'a hic girmeden
+    /// erken cikar. book.Version'e buradaki gecici atama SaveChanges'e kadar
+    /// kalici olmaz; degisiklik varsa cagiran taraf onu newVersion'la ustune
+    /// yazar.
+    /// </summary>
+    private static PublishResultDto? TryBuildNoOpResult(Book book, int bookId, LatestPublicationSummary latestSummary)
+    {
+        book.Version = latestSummary.Version;
+        var candidateSnapshot = SnapshotBuilder.BuildSnapshot(book);
+        var candidateChecksum = SnapshotBuilder.ComputeChecksum(SnapshotBuilder.Serialize(candidateSnapshot));
+
+        if (candidateChecksum != latestSummary.Checksum)
+        {
+            return null;
+        }
+
+        return new PublishResultDto(
+            latestSummary.Id,
+            bookId,
+            latestSummary.Version,
+            candidateSnapshot.Contents.Count,
+            latestSummary.Checksum,
+            latestSummary.PublishedAt);
     }
 
     /// <summary>
