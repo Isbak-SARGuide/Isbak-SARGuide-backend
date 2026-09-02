@@ -97,42 +97,44 @@ public class UsersControllerTests(ApiFactory factory)
     }
 
     [Fact]
-    public async Task Deactivate_WithEditorToken_ReturnsForbidden()
+    public async Task Delete_WithEditorToken_ReturnsForbidden()
     {
         var client = await CreateAuthenticatedEditorClientAsync();
 
-        var response = await client.PostAsync($"/api/v1/users/{Guid.NewGuid()}/deactivate", content: null);
+        var response = await client.DeleteAsync($"/api/v1/users/{Guid.NewGuid()}");
 
         response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
     }
 
     [Fact]
-    public async Task Activate_WithEditorToken_ReturnsForbidden()
-    {
-        var client = await CreateAuthenticatedEditorClientAsync();
-
-        var response = await client.PostAsync($"/api/v1/users/{Guid.NewGuid()}/activate", content: null);
-
-        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
-    }
-
-    [Fact]
-    public async Task Activate_WithAdminToken_ReactivatesDeactivatedUser()
+    public async Task Delete_WithAdminToken_RemovesEditorUser()
     {
         var adminClient = await CreateAuthenticatedAdminClientAsync();
-        var newUser = new { userName = $"activate-http-{Guid.NewGuid():N}", password = "Editor!2026Pass", fullName = "HTTP Aktivasyon", role = RoleNames.Editor };
+        var newUser = new { userName = $"delete-http-{Guid.NewGuid():N}", password = "Editor!2026Pass", fullName = "HTTP Silme", role = RoleNames.Editor };
         var createResponse = await adminClient.PostAsJsonAsync("/api/v1/users", newUser);
         var created = await createResponse.Content.ReadFromJsonAsync<JsonElement>();
         var userId = created.GetProperty("id").GetString();
 
-        (await adminClient.PostAsync($"/api/v1/users/{userId}/deactivate", content: null)).StatusCode.ShouldBe(HttpStatusCode.NoContent);
+        var deleteResponse = await adminClient.DeleteAsync($"/api/v1/users/{userId}");
 
-        var activateResponse = await adminClient.PostAsync($"/api/v1/users/{userId}/activate", content: null);
-
-        activateResponse.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+        deleteResponse.StatusCode.ShouldBe(HttpStatusCode.NoContent);
 
         var loginResponse = await factory.CreateClient().PostAsJsonAsync("/api/v1/auth/login", new { userName = newUser.userName, password = newUser.password });
-        loginResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
+        loginResponse.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task Delete_WithAdminTokenTargetingAdminUser_ReturnsBadRequest()
+    {
+        var adminClient = await CreateAuthenticatedAdminClientAsync();
+
+        using var scope = factory.Services.CreateScope();
+        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        var admin = await userManager.FindByNameAsync("admin");
+
+        var response = await adminClient.DeleteAsync($"/api/v1/users/{admin!.Id}");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
     }
 
     [Fact]

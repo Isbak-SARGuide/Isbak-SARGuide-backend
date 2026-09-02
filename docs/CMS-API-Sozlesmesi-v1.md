@@ -158,7 +158,7 @@ Ayrım: `/auth/login` hariç her uçtaki 401 boş gövdelidir.
 **Auth modeli (Faz 13.6):** `UsersController` sınıf seviyesinde sadece
 `[Authorize]` taşır (kimlik doğrulanmış olmak yeterli) — her uç kendi rol
 gereksinimini **ayrıca** bildirir. `POST`/`GET`/`PUT .../role`/
-`POST .../deactivate` eylem-seviyesinde `[Authorize(Roles = "Admin")]`
+`DELETE` eylem-seviyesinde `[Authorize(Roles = "Admin")]`
 taşıdığı için Admin-only kalır; `PUT /users/me/password` ek rol kısıtı
 taşımadığı için herhangi bir authenticated kullanıcı (Admin veya Editor)
 kendi şifresini değiştirebilir. **Not:** ilk tasarım sınıf seviyesine
@@ -220,26 +220,21 @@ kalır. Sistemdeki **son Admin**'i Editor'a düşüremezsiniz
 (`400 Validation`, kod: `User.LastAdminProtected`) — kurtarılamaz bir
 admin-panel kilitlenmesini önler. Başarılı yanıt güncel `UserDto`.
 
-#### `POST /users/{id}/deactivate` — `Admin`
+#### `DELETE /users/{id}` — `Admin`
 
-Gövde yok. Hard delete **değil** — Identity'nin `LockoutEnd` mekanizmasıyla
-süresiz kilitler (`SetLockoutEndDateAsync(..., DateTimeOffset.MaxValue)`),
-`RefreshToken.UserId`/`BookPublication.PublishedById` gibi FK'ler bozulmaz.
-**Ayrıca kullanıcının tüm aktif refresh token'larını da iptal eder** —
-sadece `LockoutEnd` yeterli değildir, aksi halde zaten alınmış bir refresh
-token pasifleştirmeden sonra bile rotasyonla yenilenmeye devam edebilirdi.
-Bir Admin **kendi hesabını** pasifleştiremez (`id` == çağıran kullanıcının
-kimliği ise `400 Validation`, kod: `User.SelfDeactivationForbidden`).
-Sistemdeki **son Admin** de pasifleştirilemez (`400 Validation`, kod:
-`User.LastAdminProtected`). Başarılı yanıt `204 No Content`.
-
-#### `POST /users/{id}/activate` — `Admin`
-
-`deactivate`'in tersi — `LockoutEnd`'i kaldırır (`SetLockoutEndDateAsync(...,
-null)`), kullanıcı tekrar giriş yapabilir hale gelir. Gövde yok. **İdempotent**:
-zaten aktif bir kullanıcı için de `204` döner, hata değil. Refresh token'ları
-geri getirmez — kullanıcı yeniden `login` olmak zorunda (beklenen davranış,
-deaktivasyon sırasında iptal edilenler kalıcı olarak geçersizdir).
+Gövde yok. **Hard delete** — kullanıcı satırı gerçekten silinir (Identity
+`UserManager.DeleteAsync`), önceki `deactivate`/`activate` (soft lockout)
+çiftinin yerine geçti. `RefreshToken.UserId` FK'si `Cascade` olduğu için
+silinen kullanıcının tüm refresh token satırları da otomatik gider — ayrıca
+bir iptal çağrısına gerek yok. **Admin hesapları hiç silinemez**
+(`400 Validation`, kod: `User.AdminDeletionForbidden`) — hem ürün kararı
+hem de `BookPublication.PublishedById` FK'sinin (`Restrict`) kasıtlı olarak
+sadece Admin'lere işaret edebilmesi (yayın geçmişi kaybolmamalı) bu kısıtı
+gerektiriyor; bu yüzden ayrıca bir "son Admin" kontrolüne gerek yok — hiçbir
+Admin, tek kalsa da kalmasa da, silinemez. Silinen kullanıcının oluşturduğu
+Book/Module/Content/ContentBlock/Media hiçbir şekilde etkilenmez — hiçbir
+içerik entity'si "bunu kim oluşturdu" bilgisini tutmuyor, sahiplik/yazarlık
+kavramı şemada yok. Başarılı yanıt `204 No Content`.
 
 #### `PUT /users/me/password` — herhangi bir authenticated kullanıcı
 
@@ -256,7 +251,7 @@ Gövde:
 Yanlış `currentPassword` ya da Identity şifre politikasına uymayan
 `newPassword` → `400 Validation`. Başarılı olursa, çalınmış olabilecek bir
 kimlik bilgisi senaryosuna karşı kullanıcının **tüm aktif refresh
-token'ları iptal edilir** (deactivate ile aynı gerekçe) — bu isteği yapan
+token'ları iptal edilir** — bu isteği yapan
 istemcinin mevcut access token'ı kendi süresi dolana kadar geçerli kalır,
 ama refresh token'ı da dahil her cihaz/oturum bir sonraki yenilemede
 `401` alır ve yeniden login olmak zorunda kalır. Başarılı yanıt
