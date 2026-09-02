@@ -723,6 +723,40 @@ engellemez (blok `mediaId`'si `null`'a düşer, blok görselsiz kalır).
 
 ## 9. Publishing
 
+### `GET /books/{bookId}/publish/preview` — sadece `Admin`
+
+**Salt-okur — hiçbir şey yazmaz.** `POST /publish` şimdi çağrılsa neyin
+eklenip/değişip/kaldırılacağının önizlemesi; admin "Yayınla" demeden önce
+gerçek bir onay ekranı kurmak için (2026-09-02, kullanıcı geri bildirimi —
+önceden Yayınla hiçbir geri bildirim vermeden direkt commit ediyordu). İki
+uç tamamen bağımsız istekler — bu uç çağrılınca hiçbir `BookPublication`
+satırı yazılmaz, `POST /publish`'i tetiklemek istemcinin ayrı bir kararı.
+
+**Gerçek yanıt** (bir içerik başlığı değiştirilmiş, yeni bir modül eklenmiş):
+
+```json
+{
+  "hasChanges": true,
+  "bookMetadataChanged": false,
+  "addedModules": [{ "id": 11, "title": "Referans" }],
+  "changedModules": [],
+  "removedModules": [],
+  "addedContents": [],
+  "changedContents": [{ "id": 42, "title": "Yeni Başlık" }],
+  "removedContents": []
+}
+```
+
+- `bookMetadataChanged`: kitabın kendi başlığı/açıklaması **tek başına**
+  değiştiyse `true` — bu durumda modül/içerik listeleri boş kalabilir,
+  `hasChanges` yine de `true`'dur (bu bayrak olmasaydı değişiklik
+  sessizce kaybolurdu).
+- Kitap hiç yayınlanmamışsa: taslak ağacın **tamamı** `addedModules`/
+  `addedContents` içinde döner.
+- Hiçbir değişiklik yoksa: tüm diziler boş, `hasChanges: false`.
+- `IsPublished=false` (taslak) işaretli içerik bu listelere hiç girmez —
+  önizleme mevcut yayın filtresini değiştirmez, sadece görünür kılar.
+
 ### `POST /books/{bookId}/publish` — sadece `Admin`
 
 Gövde yok. O anki taslak ağacın tamamını donmuş bir sürüm olarak açar

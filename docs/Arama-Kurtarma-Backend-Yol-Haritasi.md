@@ -1232,3 +1232,37 @@ callback'i — 429 yanıtına artık boş gövde yerine dolu bir `ProblemDetails
 ekliyor). Derlemeyi bozuyordu (`using Microsoft.AspNetCore.Mvc;` eksikti) — bu satırın
 kendisi eklenip derlenebilir hale getirildi, ama özelliğin kendisi bu oturumun kapsamı
 dışında, ayrıca gözden geçirilip onaylanmalı.
+
+### Publish Preview — onay ekranı (2026-09-02, kullanıcı bulgusu, `/plan` ile önce planlandı)
+
+Kullanıcı gözlemi: "Yayınla butonuna basınca değişiklik olmasa da hiçbir geri bildirim
+vermeden direkt yayınlanıyor, ne değişeceğini görmeden." Netleştirme sorusuyla kapsam
+teyit edildi: sadece bir **önizleme/onay** akışı isteniyor, `IsPublished=false`
+davranışı (taslak içerik yayına dahil olmaz) DEĞİŞMİYOR.
+
+**Yeni, salt-okur uç:** `GET /books/{bookId}/publish/preview` (Admin-only,
+`PublishingController`). `POST /publish`'i tetiklemez, hiçbir şey yazmaz — sadece
+"şimdi yayınlasan ne olur" sorusunun cevabı. İki uç tamamen bağımsız istekler; mevcut
+`POST /publish`'in davranışı/sözleşmesi hiç değişmedi.
+
+**Nasıl:** `PublishingService.PreviewAsync` mevcut taslak ağaçtan bir aday snapshot
+kurar (`SnapshotBuilder.BuildSnapshot`, hiçbir alan yazılmaz — `PublishAsync`'in aksine
+`book.Version`'e bile dokunulmaz), son yayının donmuş `SnapshotJson`'ını çözer
+(`SnapshotBuilder.Deserialize<T>`, 12.6 rollback'te zaten var olan kapasite) ve ikisini
+Id bazında karşılaştırır — Module ve Content için aynı jenerik yardımcı
+(`DiffByCanonicalEquality`). Karşılaştırma **kanonik JSON string eşitliğiyle** yapılır,
+`record` `Equals`/`==` ile DEĞİL: `SyncContentDto.Blocks` gibi iç içe koleksiyonlar için
+varsayılan record eşitliği referans eşitliğine düşerdi — `AppendChangedContents`'in
+zaten kullandığı checksum yaklaşımıyla aynı. Kitabın kendi başlığı/açıklaması **tek
+başına** değişirse (modül/içerik listeleri boş kalsa bile) ayrı bir `bookMetadataChanged`
+bayrağıyla yakalanıyor — aksi halde bu değişiklik önizlemede sessizce kaybolurdu.
+
+**Editor/Admin yetki haritası netleştirildi** (kullanıcının sorusu): Editor tam CRUD +
+medya yükleme/silme + kendi şifresini değiştirme yapabilir; sadece Admin
+yayınlayabilir/rollback yapabilir/yayın geçmişini görebilir/kullanıcı yönetebilir/medya
+toplu temizliği yapabilir. `Preview` de `Publish` ile AYNI Admin kısıtını taşıyor —
+önizleme de yayınlama karar sürecinin parçası.
+
+238/238 test yeşil (8 yeni: `PublishPreviewTests.cs` — ilk yayın/değişiklik yok/başlık
+değişti/yeni içerik/silinen içerik/kitap meta verisi değişti/kitap yok senaryoları, +
+`PublishingEndpointTests.cs`'e 3 yetki testi — Admin/Editor/tokensiz).
