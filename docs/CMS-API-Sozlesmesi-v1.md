@@ -158,7 +158,7 @@ Ayrım: `/auth/login` hariç her uçtaki 401 boş gövdelidir.
 **Auth modeli (Faz 13.6):** `UsersController` sınıf seviyesinde sadece
 `[Authorize]` taşır (kimlik doğrulanmış olmak yeterli) — her uç kendi rol
 gereksinimini **ayrıca** bildirir. `POST`/`GET`/`PUT .../role`/
-`POST .../deactivate` eylem-seviyesinde `[Authorize(Roles = "Admin")]`
+`DELETE` eylem-seviyesinde `[Authorize(Roles = "Admin")]`
 taşıdığı için Admin-only kalır; `PUT /users/me/password` ek rol kısıtı
 taşımadığı için herhangi bir authenticated kullanıcı (Admin veya Editor)
 kendi şifresini değiştirebilir. **Not:** ilk tasarım sınıf seviyesine
@@ -220,26 +220,21 @@ kalır. Sistemdeki **son Admin**'i Editor'a düşüremezsiniz
 (`400 Validation`, kod: `User.LastAdminProtected`) — kurtarılamaz bir
 admin-panel kilitlenmesini önler. Başarılı yanıt güncel `UserDto`.
 
-#### `POST /users/{id}/deactivate` — `Admin`
+#### `DELETE /users/{id}` — `Admin`
 
-Gövde yok. Hard delete **değil** — Identity'nin `LockoutEnd` mekanizmasıyla
-süresiz kilitler (`SetLockoutEndDateAsync(..., DateTimeOffset.MaxValue)`),
-`RefreshToken.UserId`/`BookPublication.PublishedById` gibi FK'ler bozulmaz.
-**Ayrıca kullanıcının tüm aktif refresh token'larını da iptal eder** —
-sadece `LockoutEnd` yeterli değildir, aksi halde zaten alınmış bir refresh
-token pasifleştirmeden sonra bile rotasyonla yenilenmeye devam edebilirdi.
-Bir Admin **kendi hesabını** pasifleştiremez (`id` == çağıran kullanıcının
-kimliği ise `400 Validation`, kod: `User.SelfDeactivationForbidden`).
-Sistemdeki **son Admin** de pasifleştirilemez (`400 Validation`, kod:
-`User.LastAdminProtected`). Başarılı yanıt `204 No Content`.
-
-#### `POST /users/{id}/activate` — `Admin`
-
-`deactivate`'in tersi — `LockoutEnd`'i kaldırır (`SetLockoutEndDateAsync(...,
-null)`), kullanıcı tekrar giriş yapabilir hale gelir. Gövde yok. **İdempotent**:
-zaten aktif bir kullanıcı için de `204` döner, hata değil. Refresh token'ları
-geri getirmez — kullanıcı yeniden `login` olmak zorunda (beklenen davranış,
-deaktivasyon sırasında iptal edilenler kalıcı olarak geçersizdir).
+Gövde yok. **Hard delete** — kullanıcı satırı gerçekten silinir (Identity
+`UserManager.DeleteAsync`), önceki `deactivate`/`activate` (soft lockout)
+çiftinin yerine geçti. `RefreshToken.UserId` FK'si `Cascade` olduğu için
+silinen kullanıcının tüm refresh token satırları da otomatik gider — ayrıca
+bir iptal çağrısına gerek yok. **Admin hesapları hiç silinemez**
+(`400 Validation`, kod: `User.AdminDeletionForbidden`) — hem ürün kararı
+hem de `BookPublication.PublishedById` FK'sinin (`Restrict`) kasıtlı olarak
+sadece Admin'lere işaret edebilmesi (yayın geçmişi kaybolmamalı) bu kısıtı
+gerektiriyor; bu yüzden ayrıca bir "son Admin" kontrolüne gerek yok — hiçbir
+Admin, tek kalsa da kalmasa da, silinemez. Silinen kullanıcının oluşturduğu
+Book/Module/Content/ContentBlock/Media hiçbir şekilde etkilenmez — hiçbir
+içerik entity'si "bunu kim oluşturdu" bilgisini tutmuyor, sahiplik/yazarlık
+kavramı şemada yok. Başarılı yanıt `204 No Content`.
 
 #### `PUT /users/me/password` — herhangi bir authenticated kullanıcı
 
@@ -256,7 +251,7 @@ Gövde:
 Yanlış `currentPassword` ya da Identity şifre politikasına uymayan
 `newPassword` → `400 Validation`. Başarılı olursa, çalınmış olabilecek bir
 kimlik bilgisi senaryosuna karşı kullanıcının **tüm aktif refresh
-token'ları iptal edilir** (deactivate ile aynı gerekçe) — bu isteği yapan
+token'ları iptal edilir** — bu isteği yapan
 istemcinin mevcut access token'ı kendi süresi dolana kadar geçerli kalır,
 ama refresh token'ı da dahil her cihaz/oturum bir sonraki yenilemede
 `401` alır ve yeniden login olmak zorunda kalır. Başarılı yanıt
@@ -418,7 +413,14 @@ modülü sayan ayrı bir sorgu çalıştırmaz).
 ### `POST /books/{bookId}/modules` — oluştur
 
 Gövde (`CreateModuleDto`) — **`displayOrder` yok, göndermeyin**, sunucu
-otomatik atar (mevcut son sıradan +1). **`isPublished` gönderilmezse
+otomatik atar (mevcut son sıradan +1). **Silme sonrası otomatik yeniden
+numaralandırma (2026-09-03, kullanıcı bulgusu):** bir kardeş (Module/
+Content/ContentBlock — üçü de aynı davranışa sahip) silindiğinde, kalan
+kardeşler bağıl sıraları korunarak **ardışık** `displayOrder` değerlerine
+(0, 1, 2, ...) yeniden numaralandırılır — önceden boşluklu kalıyordu
+(örn. A=0, B=1, C=2 iken B silinince A=0, C=2 kalıyordu; artık A=0, C=1
+olur). Boşluklu sıralama teknik olarak sıralamayı bozmuyordu ama admin
+panelinde ham gösterilince tutarsız görünüyordu. **`isPublished` gönderilmezse
 varsayılan `true`'dur** (2026-09-01'de `false`'tan değiştirildi —
 `Backend-Yapilacaklar.md` #3: aksi halde yeni oluşturulan içerik, elle
 işaretlenmediği sürece bir sonraki yayına sessizce dahil olmuyordu):
@@ -438,9 +440,18 @@ Gövde (`UpdateModuleDto`) — aynı 3 alan (`name`, `description`,
 
 ### `DELETE /books/{bookId}/modules/{id}`
 
-204, soft delete. **Modülün altındaki tüm Content/ContentBlock'lar da
-cascade soft-delete olur** (backend'de eager-load edilip tek tek
-işaretlenir).
+204, soft delete. **Düzeltme (2026-09-03):** bu dokümanın önceki hâli
+"altındaki Content/ContentBlock'lar da cascade soft-delete olur" diyordu —
+bu **yanlıştı**, gerçek kodda (`ModuleService.DeleteAsync`) hiçbir
+eager-load/cascade adımı yok, canlı veriyle doğrulandı (soft-deleted bir
+modülün altında `IsDeleted=false` kalan Content satırları bulundu).
+**Gerçek davranış: cascade YOK** — modül silindiğinde altındaki
+Content/ContentBlock'lar `IsDeleted=false` olarak, artık ulaşılamayan
+("orphan") satırlar hâlinde DB'de kalır. Publish/sync bunları hiç
+göstermez (snapshot ağacı silinmemiş modülleri gezerek kurulur, orphan
+içerik bu gezinmeden erişilemez) ama CMS'te silinmeden kalırlar. Aynı
+modüldeki KALAN (silinmemiş) kardeş modüllerin `displayOrder`'ı
+ardışık kalacak şekilde otomatik yeniden numaralandırılır (aşağıya bakın).
 
 ### `PUT /books/{bookId}/modules/reorder` — sırala
 
@@ -549,7 +560,14 @@ Gövde (`UpdateContentDto`) — aynı alanlar.
 
 ### `DELETE /modules/{moduleId}/contents/{id}`
 
-204, soft delete, altındaki bloklar cascade silinir.
+204, soft delete. **Düzeltme (2026-09-03):** "altındaki bloklar cascade
+silinir" ifadesi yanlıştı — canlı veriyle doğrulandı (`ContentService.
+DeleteAsync`'te hiçbir cascade adımı yok, soft-deleted content'lerin
+altında `IsDeleted=false` kalan ContentBlock satırları bulundu).
+**Cascade YOK**, §5'teki Module notuyla aynı durum — bloklar orphan
+kalır, publish/sync'te görünmezler ama CMS'te silinmeden dururlar. Aynı
+modüldeki KALAN kardeş content'lerin `displayOrder`'ı ardışık kalacak
+şekilde otomatik yeniden numaralandırılır (aşağıya bakın).
 
 ### `PUT /modules/{moduleId}/contents/reorder`
 
@@ -642,7 +660,8 @@ Aynı gövde şekli.
 
 ### `DELETE /contents/{contentId}/blocks/{id}`
 
-204, soft delete.
+204, soft delete. Aynı content'teki KALAN kardeş blokların `displayOrder`'ı
+ardışık kalacak şekilde otomatik yeniden numaralandırılır (aşağıya bakın).
 
 ### `PUT /contents/{contentId}/blocks/reorder`
 
@@ -676,14 +695,20 @@ Max dosya boyutu `Storage:MaxFileSizeBytes` (dev'de ~20MB); magic-byte +
 MIME doğrulaması yapılıyor, sadece uzantıya güvenilmiyor.
 
 **Faz 12.7 (mobil optimizasyon) — sadece bu özellikten SONRAKİ yüklemeler:**
-storage'a yazılan asıl dosya artık her zaman **WebP**'ye çevrilmiş hali
-(`contentType` her zaman `"image/webp"`, `storagePath` her zaman `.webp` ile
-biter — yüklenen orijinal format PNG/JPEG/GIF/WEBP fark etmez). Ayrıca küçük
-bir WebP önizleme (`thumbnailStoragePath`, en uzun kenarı `Storage:
-ThumbnailMaxDimension` — varsayılan 400px — ile sınırlı) üretilir. Bu
-özellikten ÖNCE yüklenmiş medya geriye dönük dönüştürülmedi —
-`thumbnailStoragePath` o satırlarda `null` kalır, istemci bunu "önizleme
-yok, `storagePath`'i kullan" olarak ele almalı.
+storage'a yazılan asıl dosya artık **GIF hariç** her zaman **WebP**'ye
+çevrilmiş hali (`contentType` `"image/webp"`, `storagePath` `.webp` ile
+biter). **GIF istisna** (2026-09-03 bug fix — kullanıcı bulgusu, "GIF
+eklerken çalışmıyor"): SkiaSharp'ın decode katmanı animasyonlu bir GIF'in
+sadece ilk karesini statik bitmap olarak okur, WebP'ye çevirmek yüklenen
+dosya gerçekten animasyonlu olsa bile animasyonu backend'de kalıcı olarak
+yok ederdi — bu yüzden GIF **orijinal baytlarıyla** (`contentType`
+`"image/gif"`, `storagePath` `.gif` ile biter, animasyon korunur) saklanır.
+Her iki durumda da küçük bir statik WebP önizleme (`thumbnailStoragePath`,
+en uzun kenarı `Storage:ThumbnailMaxDimension` — varsayılan 400px — ile
+sınırlı) üretilir — thumbnail GIF için de her zaman WebP'dir, animasyonsuz
+tek kare önizleme amaçlıdır. Bu özellikten ÖNCE yüklenmiş medya geriye
+dönük dönüştürülmedi — `thumbnailStoragePath` o satırlarda `null` kalır,
+istemci bunu "önizleme yok, `storagePath`'i kullan" olarak ele almalı.
 
 ### `GET /media/{id}` — tekil
 
@@ -722,6 +747,40 @@ engellemez (blok `mediaId`'si `null`'a düşer, blok görselsiz kalır).
 ---
 
 ## 9. Publishing
+
+### `GET /books/{bookId}/publish/preview` — sadece `Admin`
+
+**Salt-okur — hiçbir şey yazmaz.** `POST /publish` şimdi çağrılsa neyin
+eklenip/değişip/kaldırılacağının önizlemesi; admin "Yayınla" demeden önce
+gerçek bir onay ekranı kurmak için (2026-09-02, kullanıcı geri bildirimi —
+önceden Yayınla hiçbir geri bildirim vermeden direkt commit ediyordu). İki
+uç tamamen bağımsız istekler — bu uç çağrılınca hiçbir `BookPublication`
+satırı yazılmaz, `POST /publish`'i tetiklemek istemcinin ayrı bir kararı.
+
+**Gerçek yanıt** (bir içerik başlığı değiştirilmiş, yeni bir modül eklenmiş):
+
+```json
+{
+  "hasChanges": true,
+  "bookMetadataChanged": false,
+  "addedModules": [{ "id": 11, "title": "Referans" }],
+  "changedModules": [],
+  "removedModules": [],
+  "addedContents": [],
+  "changedContents": [{ "id": 42, "title": "Yeni Başlık" }],
+  "removedContents": []
+}
+```
+
+- `bookMetadataChanged`: kitabın kendi başlığı/açıklaması **tek başına**
+  değiştiyse `true` — bu durumda modül/içerik listeleri boş kalabilir,
+  `hasChanges` yine de `true`'dur (bu bayrak olmasaydı değişiklik
+  sessizce kaybolurdu).
+- Kitap hiç yayınlanmamışsa: taslak ağacın **tamamı** `addedModules`/
+  `addedContents` içinde döner.
+- Hiçbir değişiklik yoksa: tüm diziler boş, `hasChanges: false`.
+- `IsPublished=false` (taslak) işaretli içerik bu listelere hiç girmez —
+  önizleme mevcut yayın filtresini değiştirmez, sadece görünür kılar.
 
 ### `POST /books/{bookId}/publish` — sadece `Admin`
 

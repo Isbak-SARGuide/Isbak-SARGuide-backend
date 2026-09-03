@@ -24,6 +24,22 @@ namespace Isbak_SAR_Guide.API.Controllers;
 [Authorize(Roles = RoleNames.Admin)]
 public class PublishingController(IPublishingService publishingService) : ControllerBase
 {
+    /// <summary>
+    /// Kullanicinin bulgusu: Yayinla hicbir geri bildirim olmadan direkt
+    /// commit ediyordu. Salt-okur - hicbir sey yazmaz; Publish simdi
+    /// cagrilsa neyin ekleneceginin/degisecegini/kaldirilacaginin onizlemesi.
+    /// Frontend akisi: bu uc -> listeyi goster -> admin onaylarsa asil
+    /// POST /publish cagrilir (iki ayri istek, tek bir "onayli publish"
+    /// endpoint'i degil - boylece mevcut POST /publish'in davranisi/
+    /// sozlesmesi hic bozulmaz).
+    /// </summary>
+    [HttpGet("preview")]
+    public async Task<IActionResult> Preview(int bookId, CancellationToken cancellationToken)
+    {
+        var result = await publishingService.PreviewAsync(bookId, cancellationToken);
+        return result.ToActionResult(this);
+    }
+
     [HttpPost]
     public async Task<IActionResult> Publish(int bookId, CancellationToken cancellationToken)
     {

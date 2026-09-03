@@ -137,6 +137,31 @@ public class ContentBlockServiceTests(ApiFactory factory)
         afterReorder.Value.Items.Single(b => b.Id == b3.Value.Id).DataJson.ShouldBe(b3DataJsonBefore);
     }
 
+    [Fact]
+    public async Task DeleteAsync_MiddleBlock_CompactsRemainingSiblingsDisplayOrder()
+    {
+        // ContentServiceTests.DeleteAsync_MiddleContent_CompactsRemainingSiblingsDisplayOrder'daki
+        // ayni gerekce - ContentBlock'ta unique index olmasa da tutarlilik icin.
+        var contentId = await CreateContentAsync();
+        var a = await CreateAsync(contentId, new CreateContentBlockDto(ContentBlockType.Text, "A", null, null));
+        var b = await CreateAsync(contentId, new CreateContentBlockDto(ContentBlockType.Text, "B", null, null));
+        var c = await CreateAsync(contentId, new CreateContentBlockDto(ContentBlockType.Text, "C", null, null));
+
+        using (var deleteScope = factory.Services.CreateScope())
+        {
+            var blockService = deleteScope.ServiceProvider.GetRequiredService<IContentBlockService>();
+            (await blockService.DeleteAsync(contentId, b.Value.Id)).IsSuccess.ShouldBeTrue();
+        }
+
+        using var scope = factory.Services.CreateScope();
+        var verifyService = scope.ServiceProvider.GetRequiredService<IContentBlockService>();
+        var paged = await verifyService.GetPagedAsync(contentId, page: 1, pageSize: 10);
+
+        var items = paged.Value.Items.OrderBy(x => x.DisplayOrder).ToList();
+        items.Select(x => x.Id).ShouldBe([a.Value.Id, c.Value.Id]);
+        items.Select(x => x.DisplayOrder).ShouldBe([0, 1]);
+    }
+
     // ---- Yardımcılar ----
 
     private async Task<Result<ContentBlockDto>> CreateAsync(int contentId, CreateContentBlockDto dto)

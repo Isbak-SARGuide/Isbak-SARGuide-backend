@@ -11,7 +11,7 @@ namespace Isbak_SAR_Guide.Tests.Integration;
 
 /// <summary>
 /// Faz 9.2: Admin'in Editor hesabi acmasi (kayit/self sign-up yok, bilerek).
-/// Faz 13.6: liste, rol degistirme, pasiflestirme (self-lockout guard dahil)
+/// Faz 13.6: liste, rol degistirme, silme (Admin-silinemez guard dahil)
 /// ve kendi sifresini degistirme.
 /// </summary>
 [Collection("Api")]
@@ -125,54 +125,44 @@ public class UserServiceTests(ApiFactory factory)
     }
 
     [Fact]
-    public async Task DeactivateAsync_ByAnotherAdmin_LocksOutTargetUser()
+    public async Task DeleteAsync_EditorUser_RemovesUser()
     {
-        var dto = new CreateUserDto($"deact-{Guid.NewGuid():N}", "Editor!2026Pass", "Pasifleşecek", RoleNames.Editor);
+        var dto = new CreateUserDto($"del-{Guid.NewGuid():N}", "Editor!2026Pass", "Silinecek", RoleNames.Editor);
         var created = await CreateAsync(dto);
 
         using var scope = factory.Services.CreateScope();
-        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
-        var admin = await userManager.FindByNameAsync("admin");
-
         var userService = scope.ServiceProvider.GetRequiredService<IUserService>();
-        var result = await userService.DeactivateAsync(created.Value.Id, actingUserId: admin!.Id);
+        var result = await userService.DeleteAsync(created.Value.Id);
 
         result.IsSuccess.ShouldBeTrue();
-        var target = await userManager.FindByIdAsync(created.Value.Id);
-        (await userManager.IsLockedOutAsync(target!)).ShouldBeTrue();
+        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        (await userManager.FindByIdAsync(created.Value.Id)).ShouldBeNull();
     }
 
     [Fact]
-    public async Task DeactivateAsync_OwnAccount_ReturnsValidationError()
+    public async Task DeleteAsync_AdminUser_ReturnsValidationError()
     {
         using var scope = factory.Services.CreateScope();
         var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
         var admin = await userManager.FindByNameAsync("admin");
 
         var userService = scope.ServiceProvider.GetRequiredService<IUserService>();
-        var result = await userService.DeactivateAsync(admin!.Id, actingUserId: admin.Id);
+        var result = await userService.DeleteAsync(admin!.Id);
 
         result.IsFailure.ShouldBeTrue();
         result.Error!.Type.ShouldBe(ErrorType.Validation);
-        (await userManager.IsLockedOutAsync(admin)).ShouldBeFalse();
+        (await userManager.FindByIdAsync(admin.Id)).ShouldNotBeNull();
     }
 
     [Fact]
-    public async Task DeactivateAsync_RevokesTargetUsersActiveRefreshToken()
+    public async Task DeleteAsync_RemovesUsersActiveRefreshToken()
     {
-        // Kod inceleme bulgusu (CRITICAL): SetLockoutEndDateAsync TEK BASINA
-        // yetmiyordu - IsLockedOutAsync sadece LoginAsync'te kontrol ediliyordu,
-        // RefreshAsync'te degil, yani zaten alinmis bir refresh token
-        // pasiflestirmeden SONRA bile rotasyonla yenilenmeye devam edebiliyordu.
-        // Bu test, deaktivasyondan sonra o token'in artik ise yaramadigini
-        // dogrudan kanitliyor. Her adim KENDI scope'unda (ayri DbContext) -
-        // gercekte her HTTP istegi ayri bir scope alir; login/deactivate/refresh'i
-        // TEK scope'ta cagirmak, RevokeAllActiveForUserAsync'in (ExecuteUpdateAsync,
-        // change tracker'i atlar) zaten tracked olan RefreshToken nesnesini
-        // guncellemiyor gibi gorunmesine yol acan test-ozel bir EF identity-
-        // resolution artifact'i uretir - gercek uretimde olmayan bir durum.
+        // RefreshTokenConfiguration'da UserId FK'si Cascade - silinen kullanicinin
+        // refresh token satirlari da otomatik gider, ayrica bir RevokeAllActiveForUserAsync
+        // cagrisina gerek yok. Bu test o kaskadin gercekten calistigini dogrudan
+        // kanitlar: silme sonrasi eski token'la refresh artik basarisiz olmali.
         const string password = "Editor!2026Pass";
-        var dto = new CreateUserDto($"revoke-{Guid.NewGuid():N}", password, "Token İptal Edilecek", RoleNames.Editor);
+        var dto = new CreateUserDto($"delrevoke-{Guid.NewGuid():N}", password, "Token Silinecek", RoleNames.Editor);
         var created = await CreateAsync(dto);
 
         string refreshToken;
@@ -184,12 +174,10 @@ public class UserServiceTests(ApiFactory factory)
             refreshToken = loginResult.Value.RefreshToken;
         }
 
-        using (var deactivateScope = factory.Services.CreateScope())
+        using (var deleteScope = factory.Services.CreateScope())
         {
-            var userManager = deactivateScope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
-            var admin = await userManager.FindByNameAsync("admin");
-            var userService = deactivateScope.ServiceProvider.GetRequiredService<IUserService>();
-            (await userService.DeactivateAsync(created.Value.Id, actingUserId: admin!.Id)).IsSuccess.ShouldBeTrue();
+            var userService = deleteScope.ServiceProvider.GetRequiredService<IUserService>();
+            (await userService.DeleteAsync(created.Value.Id)).IsSuccess.ShouldBeTrue();
         }
 
         using (var refreshScope = factory.Services.CreateScope())
@@ -203,51 +191,11 @@ public class UserServiceTests(ApiFactory factory)
     }
 
     [Fact]
-    public async Task ActivateAsync_ReactivatesADeactivatedUser()
-    {
-        const string password = "Editor!2026Pass";
-        var dto = new CreateUserDto($"reactivate-{Guid.NewGuid():N}", password, "Yeniden Aktive Edilecek", RoleNames.Editor);
-        var created = await CreateAsync(dto);
-
-        using var scope = factory.Services.CreateScope();
-        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
-        var admin = await userManager.FindByNameAsync("admin");
-        var userService = scope.ServiceProvider.GetRequiredService<IUserService>();
-
-        (await userService.DeactivateAsync(created.Value.Id, actingUserId: admin!.Id)).IsSuccess.ShouldBeTrue();
-        var lockedUser = await userManager.FindByIdAsync(created.Value.Id);
-        (await userManager.IsLockedOutAsync(lockedUser!)).ShouldBeTrue();
-
-        var activateResult = await userService.ActivateAsync(created.Value.Id);
-
-        activateResult.IsSuccess.ShouldBeTrue();
-        var reactivatedUser = await userManager.FindByIdAsync(created.Value.Id);
-        (await userManager.IsLockedOutAsync(reactivatedUser!)).ShouldBeFalse();
-
-        var authService = scope.ServiceProvider.GetRequiredService<IAuthService>();
-        var loginResult = await authService.LoginAsync(new LoginDto(dto.UserName, password));
-        loginResult.IsSuccess.ShouldBeTrue();
-    }
-
-    [Fact]
-    public async Task ActivateAsync_WithAlreadyActiveUser_IsIdempotent()
-    {
-        var dto = new CreateUserDto($"already-active-{Guid.NewGuid():N}", "Editor!2026Pass", "Zaten Aktif", RoleNames.Editor);
-        var created = await CreateAsync(dto);
-
-        using var scope = factory.Services.CreateScope();
-        var userService = scope.ServiceProvider.GetRequiredService<IUserService>();
-        var result = await userService.ActivateAsync(created.Value.Id);
-
-        result.IsSuccess.ShouldBeTrue();
-    }
-
-    [Fact]
-    public async Task ActivateAsync_WithNonExistentUser_ReturnsNotFound()
+    public async Task DeleteAsync_WithNonExistentUser_ReturnsNotFound()
     {
         using var scope = factory.Services.CreateScope();
         var userService = scope.ServiceProvider.GetRequiredService<IUserService>();
-        var result = await userService.ActivateAsync(Guid.NewGuid().ToString());
+        var result = await userService.DeleteAsync(Guid.NewGuid().ToString());
 
         result.IsFailure.ShouldBeTrue();
         result.Error!.Type.ShouldBe(ErrorType.NotFound);
@@ -276,7 +224,7 @@ public class UserServiceTests(ApiFactory factory)
     {
         // Sifre calinmis olabilecegi icin degistiriliyor olabilir - eski
         // oturumlarin hayatta kalmasi bu senaryoda korumayi bosa cikarirdi.
-        // Ayri scope'lar icin bkz. DeactivateAsync_RevokesTargetUsersActiveRefreshToken'daki not.
+        // Ayri scope'lar icin bkz. DeleteAsync_RemovesUsersActiveRefreshToken'daki not.
         const string oldPassword = "Editor!2026Pass";
         const string newPassword = "Editor!2027PassNew";
         var dto = new CreateUserDto($"pwdrevoke-{Guid.NewGuid():N}", oldPassword, "Oturum İptal", RoleNames.Editor);

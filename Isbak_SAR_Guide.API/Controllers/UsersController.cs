@@ -20,7 +20,7 @@ namespace Isbak_SAR_Guide.API.Controllers;
 /// BIRLESTIRIR (AND), en yakini kazanmaz: sonuc yine "authenticated VE Admin"
 /// oldu, Editor icin 403. Canli HTTP testiyle (ChangeOwnPassword_WithEditorToken_ReturnsNoContent)
 /// yakalandi. Dogru cozum: rol kisitini sinif yerine SADECE Admin-only
-/// eylemlere (Create/GetAll/ChangeRole/Deactivate) tek tek koymak.
+/// eylemlere (Create/GetAll/ChangeRole/Delete) tek tek koymak.
 /// </summary>
 [ApiController]
 [ApiVersion("1.0")]
@@ -53,25 +53,11 @@ public class UsersController(IUserService userService) : ControllerBase
         return result.ToActionResult(this);
     }
 
-    [HttpPost("{id}/deactivate")]
+    [HttpDelete("{id}")]
     [Authorize(Roles = RoleNames.Admin)]
-    public async Task<IActionResult> Deactivate(string id, CancellationToken cancellationToken)
+    public async Task<IActionResult> Delete(string id, CancellationToken cancellationToken)
     {
-        var actingUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (actingUserId is null)
-        {
-            return Unauthorized();
-        }
-
-        var result = await userService.DeactivateAsync(id, actingUserId, cancellationToken);
-        return result.ToActionResult(this);
-    }
-
-    [HttpPost("{id}/activate")]
-    [Authorize(Roles = RoleNames.Admin)]
-    public async Task<IActionResult> Activate(string id, CancellationToken cancellationToken)
-    {
-        var result = await userService.ActivateAsync(id, cancellationToken);
+        var result = await userService.DeleteAsync(id, cancellationToken);
         return result.ToActionResult(this);
     }
 

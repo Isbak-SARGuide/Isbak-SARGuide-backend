@@ -102,7 +102,7 @@ public class UserService(
         var currentRoles = await userManager.GetRolesAsync(user);
 
         // Sistemdeki SON Admin'i Editor'a dusuremezsin - kurtarma yolu olmayan
-        // bir kilitlenme senaryosu, DeactivateAsync'teki self-lockout guard'la
+        // bir kilitlenme senaryosu, DeleteAsync'teki Admin-silinemez guard'la
         // ayni gerekce (kod inceleme bulgusu, roadmap 13.6).
         if (currentRoles.Contains(RoleNames.Admin) && dto.Role != RoleNames.Admin)
         {
@@ -140,65 +140,30 @@ public class UserService(
         return Result.Success(new UserDto(user.Id, user.UserName!, user.FullName, [dto.Role]));
     }
 
-    public async Task<Result> DeactivateAsync(string id, string actingUserId, CancellationToken cancellationToken = default)
+    public async Task<Result> DeleteAsync(string id, CancellationToken cancellationToken = default)
     {
-        // Kendi hesabini kilitleyen bir Admin, admin panele bir daha giremezdi -
-        // kurtarma yolu olmayan bir kilitlenme senaryosu (roadmap 13.6).
-        if (id == actingUserId)
-        {
-            return Result.Failure(Error.Validation("User.SelfDeactivationForbidden", "Kendi hesabınızı pasifleştiremezsiniz."));
-        }
-
         var user = await userManager.FindByIdAsync(id);
         if (user is null)
         {
             return Result.Failure(Error.NotFound("User.NotFound", $"Id={id} olan kullanıcı bulunamadı."));
         }
 
-        // Sistemdeki SON Admin pasiflestirilemez - ChangeRoleAsync'teki
-        // last-admin guard'la ayni gerekce (kod inceleme bulgusu).
+        // Admin hesaplari hic silinemez (urun karari) - ayrica
+        // BookPublication.PublishedById (Restrict) sadece Admin'lere isaret
+        // edebilir (PublishingController Admin-only), bu yuzden bu kontrol
+        // ayni zamanda o FK'yi hic tetiklenmeyecek sekilde bastan engeller.
         if (await userManager.IsInRoleAsync(user, RoleNames.Admin))
         {
-            var adminCount = (await userManager.GetUsersInRoleAsync(RoleNames.Admin)).Count;
-            if (adminCount <= 1)
-            {
-                return Result.Failure(Error.Validation("User.LastAdminProtected", "Sistemde en az bir Admin kalmalı, bu kullanıcı pasifleştirilemez."));
-            }
+            return Result.Failure(Error.Validation("User.AdminDeletionForbidden", "Admin hesapları silinemez."));
         }
 
-        var result = await userManager.SetLockoutEndDateAsync(user, DateTimeOffset.MaxValue);
+        // RefreshToken.UserId Cascade oldugu icin (RefreshTokenConfiguration)
+        // ayrica bir RevokeAllActiveForUserAsync cagrisina gerek yok - satirlar
+        // kullaniciyla birlikte otomatik silinir.
+        var result = await userManager.DeleteAsync(user);
         if (!result.Succeeded)
         {
-            return Result.Failure(result.ToValidationError("User.DeactivationFailed"));
-        }
-
-        // LockoutEnd tek basina yeterli DEGIL: mevcut bir refresh token
-        // (14 gunluk omur, JwtOptions.RefreshTokenExpiryDays) hala rotasyonla
-        // yenilenebilirdi - IsLockedOutAsync sadece LoginAsync'te kontrol
-        // edilir, RefreshAsync'te degil. Pasiflestirmenin erisimi GERCEKTEN
-        // kesmesi icin kullanicinin tum aktif refresh token'lari da iptal
-        // edilir (kod inceleme bulgusu, roadmap 13.6 - CRITICAL).
-        await unitOfWork.RefreshTokens.RevokeAllActiveForUserAsync(id, cancellationToken);
-
-        return Result.Success();
-    }
-
-    public async Task<Result> ActivateAsync(string id, CancellationToken cancellationToken = default)
-    {
-        var user = await userManager.FindByIdAsync(id);
-        if (user is null)
-        {
-            return Result.Failure(Error.NotFound("User.NotFound", $"Id={id} olan kullanıcı bulunamadı."));
-        }
-
-        // Idempotent: zaten aktif bir kullaniciyi tekrar "aktive etmek" hata
-        // degil - RevokeAsync'teki (AuthService, acik logout) ayni gerekce.
-        // SetLockoutEndDateAsync(..., null) zaten aktif bir kullanicida da
-        // guvenle cagrilabilir (no-op'a yakin), ekstra kontrole gerek yok.
-        var result = await userManager.SetLockoutEndDateAsync(user, lockoutEnd: null);
-        if (!result.Succeeded)
-        {
-            return Result.Failure(result.ToValidationError("User.ActivationFailed"));
+            return Result.Failure(result.ToValidationError("User.DeletionFailed"));
         }
 
         return Result.Success();

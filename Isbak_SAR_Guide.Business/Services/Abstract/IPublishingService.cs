@@ -6,6 +6,16 @@ namespace Isbak_SAR_Guide.Business.Services.Abstract;
 public interface IPublishingService
 {
     /// <summary>
+    /// Kullanicinin bulgusu: Yayinla hicbir geri bildirim olmadan direkt
+    /// commit ediyordu. Bu uc SALT-OKUR - hicbir sey yazmaz, PublishAsync
+    /// simdi cagrilsa neyin ekleneceginini/degisecegini/kaldirilacagini
+    /// doner. Sozlesme: kitap yoksa NotFound; kitap hic yayinlanmamissa
+    /// mevcut taslak agacinin TAMAMI "eklendi" sayilir; hic degisiklik yoksa
+    /// tum listeler bos, HasChanges false.
+    /// </summary>
+    Task<Result<PublishPreviewDto>> PreviewAsync(int bookId, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Kitabin o anki draft agacini immutable bir yayina cevirir.
     /// Sozlesme: kitap yoksa NotFound; basarida yeni versiyon
     /// max(BookPublication.Version) + 1'dir ve BookPublication +
