@@ -71,6 +71,53 @@ public class PublishingEndpointTests(ApiFactory factory)
     }
 
     [Fact]
+    public async Task Preview_AsAdmin_ReturnsOkWithAddedContent()
+    {
+        // Arrange
+        var client = factory.CreateClient();
+        var bookId = await CreateBookAsync();
+        await AuthenticateAsync(client, "admin", "Admin!Dev123");
+
+        // Act - kitap hic yayinlanmadi, henuz bos (CreateBookAsync icerik eklemiyor)
+        var response = await client.GetAsync($"/api/v1/books/{bookId}/publish/preview");
+
+        // Assert
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var result = await response.Content.ReadFromJsonAsync<PublishPreviewDto>();
+        result!.HasChanges.ShouldBeFalse(); // bos kitap: eklenecek modul/icerik yok
+    }
+
+    [Fact]
+    public async Task Preview_AsEditor_ReturnsForbidden()
+    {
+        // Arrange
+        var client = factory.CreateClient();
+        var bookId = await CreateBookAsync();
+        var (userName, password) = await CreateEditorUserAsync();
+        await AuthenticateAsync(client, userName, password);
+
+        // Act
+        var response = await client.GetAsync($"/api/v1/books/{bookId}/publish/preview");
+
+        // Assert - Publish ile AYNI kisit: onizleme de yayinlama karar surecinin parcasi.
+        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task Preview_WithoutToken_ReturnsUnauthorized()
+    {
+        // Arrange
+        var client = factory.CreateClient();
+        var bookId = await CreateBookAsync();
+
+        // Act
+        var response = await client.GetAsync($"/api/v1/books/{bookId}/publish/preview");
+
+        // Assert
+        response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
     public async Task Rollback_WithoutToken_ReturnsUnauthorized()
     {
         // Arrange

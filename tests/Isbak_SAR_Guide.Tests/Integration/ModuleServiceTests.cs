@@ -103,6 +103,31 @@ public class ModuleServiceTests(ApiFactory factory)
     }
 
     [Fact]
+    public async Task DeleteAsync_MiddleModule_CompactsRemainingSiblingsDisplayOrder()
+    {
+        // ContentServiceTests.DeleteAsync_MiddleContent_CompactsRemainingSiblingsDisplayOrder'daki
+        // ayni gerekce - A(0),B(1),C(2), B silinince A,C bosluksuz (0,1) olmali.
+        var bookId = await CreateBookAsync();
+        var a = await CreateAsync(bookId, new CreateModuleDto("A", null));
+        var b = await CreateAsync(bookId, new CreateModuleDto("B", null));
+        var c = await CreateAsync(bookId, new CreateModuleDto("C", null));
+
+        using (var deleteScope = factory.Services.CreateScope())
+        {
+            var moduleService = deleteScope.ServiceProvider.GetRequiredService<IModuleService>();
+            (await moduleService.DeleteAsync(bookId, b.Value.Id)).IsSuccess.ShouldBeTrue();
+        }
+
+        using var scope = factory.Services.CreateScope();
+        var verifyService = scope.ServiceProvider.GetRequiredService<IModuleService>();
+        var paged = await verifyService.GetPagedAsync(bookId, page: 1, pageSize: 10, isPublished: null);
+
+        var items = paged.Value.Items.OrderBy(x => x.DisplayOrder).ToList();
+        items.Select(x => x.Id).ShouldBe([a.Value.Id, c.Value.Id]);
+        items.Select(x => x.DisplayOrder).ShouldBe([0, 1]);
+    }
+
+    [Fact]
     public async Task GetPagedAsync_ReturnsRequestedPageAndTotalCount()
     {
         var bookId = await CreateBookAsync();
@@ -126,14 +151,29 @@ public class ModuleServiceTests(ApiFactory factory)
         var bookId = await CreateBookAsync();
         var module = await CreateAsync(bookId, new CreateModuleDto("Modül", null));
 
+        // Her adim KENDI scope'unda (ayri DbContext) - gercekte her HTTP istegi
+        // ayri bir scope alir. Content2 (create1 sirasinda tracked) ile
+        // DeleteAsync'in kompaksiyon adiminin AsNoTracking okudugu "kalan
+        // kardesler" listesi AYNI scope'ta olsaydi, ayni Id icin iki farkli
+        // instance tracked olmaya calisilir ve EF identity conflict'i firlatirdi -
+        // gercek uretimde olmayan bir durum (bkz. UserServiceTests'teki ayni
+        // gerekce).
+        Result<ContentDto> content2;
+        using (var createScope = factory.Services.CreateScope())
+        {
+            var contentService = createScope.ServiceProvider.GetRequiredService<IContentService>();
+            await contentService.CreateAsync(module.Value.Id, new CreateContentDto("C1", null));
+            content2 = await contentService.CreateAsync(module.Value.Id, new CreateContentDto("C2", null));
+            await contentService.CreateAsync(module.Value.Id, new CreateContentDto("C3", null));
+        }
+
+        using (var deleteScope = factory.Services.CreateScope())
+        {
+            var contentService = deleteScope.ServiceProvider.GetRequiredService<IContentService>();
+            (await contentService.DeleteAsync(module.Value.Id, content2.Value.Id)).IsSuccess.ShouldBeTrue();
+        }
+
         using var scope = factory.Services.CreateScope();
-        var contentService = scope.ServiceProvider.GetRequiredService<IContentService>();
-
-        var content1 = await contentService.CreateAsync(module.Value.Id, new CreateContentDto("C1", null));
-        var content2 = await contentService.CreateAsync(module.Value.Id, new CreateContentDto("C2", null));
-        await contentService.CreateAsync(module.Value.Id, new CreateContentDto("C3", null));
-        (await contentService.DeleteAsync(module.Value.Id, content2.Value.Id)).IsSuccess.ShouldBeTrue();
-
         var moduleService = scope.ServiceProvider.GetRequiredService<IModuleService>();
         var result = await moduleService.GetPagedAsync(bookId, page: 1, pageSize: 10, isPublished: null);
 

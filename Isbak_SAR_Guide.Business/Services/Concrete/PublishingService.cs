@@ -23,6 +23,58 @@ public class PublishingService(IUnitOfWork unitOfWork, ILogger<PublishingService
 
     private readonly IUnitOfWork _unitOfWork = unitOfWork;
 
+    public async Task<Result<PublishPreviewDto>> PreviewAsync(int bookId, CancellationToken cancellationToken = default)
+    {
+        var book = await _unitOfWork.Books.GetWithFullTreeAsync(bookId, cancellationToken);
+
+        if (book is null)
+        {
+            return Result.Failure<PublishPreviewDto>(
+                Error.NotFound("Publishing.BookNotFound", $"Id={bookId} olan kitap bulunamadı."));
+        }
+
+        // book.Version'e HIC dokunulmaz - onizleme salt-okur, PublishAsync'in
+        // aksine hicbir alani gecici de olsa degistirmez.
+        var candidateSnapshot = SnapshotBuilder.BuildSnapshot(book);
+        var oldSnapshotJson = await _unitOfWork.Publications.GetLatestSnapshotJsonAsync(bookId, cancellationToken);
+
+        if (oldSnapshotJson is null)
+        {
+            // Kitap hic yayinlanmamis: taslak agacinin TAMAMI "eklendi" sayilir.
+            return Result.Success(new PublishPreviewDto(
+                HasChanges: candidateSnapshot.Modules.Count > 0 || candidateSnapshot.Contents.Count > 0,
+                BookMetadataChanged: false,
+                AddedModules: candidateSnapshot.Modules.Select(ToModuleItem).ToList(),
+                ChangedModules: [],
+                RemovedModules: [],
+                AddedContents: candidateSnapshot.Contents.Select(ToContentItem).ToList(),
+                ChangedContents: [],
+                RemovedContents: []));
+        }
+
+        var oldSnapshot = SnapshotBuilder.Deserialize<SyncSnapshotDto>(oldSnapshotJson);
+
+        var (addedModules, changedModules, removedModules) =
+            DiffByCanonicalEquality(candidateSnapshot.Modules, oldSnapshot.Modules, m => m.Id, ToModuleItem);
+        var (addedContents, changedContents, removedContents) =
+            DiffByCanonicalEquality(candidateSnapshot.Contents, oldSnapshot.Contents, c => c.Id, ToContentItem);
+
+        // Kitabin kendi basligi/aciklamasi TEK BASINA degisebilir - o zaman
+        // Modules/Contents listelerinin ucu bos kalir ama HasChanges yine de
+        // true olmali, aksi halde bu degisiklik sessizce kaybolur.
+        var bookMetadataChanged =
+            SnapshotBuilder.Serialize(candidateSnapshot.Book) != SnapshotBuilder.Serialize(oldSnapshot.Book);
+
+        var hasChanges = bookMetadataChanged
+            || addedModules.Count > 0 || changedModules.Count > 0 || removedModules.Count > 0
+            || addedContents.Count > 0 || changedContents.Count > 0 || removedContents.Count > 0;
+
+        return Result.Success(new PublishPreviewDto(
+            hasChanges, bookMetadataChanged,
+            addedModules, changedModules, removedModules,
+            addedContents, changedContents, removedContents));
+    }
+
     public async Task<Result<PublishResultDto>> PublishAsync(
         int bookId,
         string publishedById,
@@ -221,6 +273,46 @@ public class PublishingService(IUnitOfWork unitOfWork, ILogger<PublishingService
             publication.Checksum,
             publishedAt));
     }
+
+    /// <summary>
+    /// PreviewAsync'in Module VE Content icin ortak karsilastirma mantigi -
+    /// tek fark eleman tipi. Kanonik JSON string esitligi kullanilir (== veya
+    /// record Equals DEGIL): SyncContentDto'nun Blocks listesi gibi ic ice
+    /// koleksiyonlar icin varsayilan record esitligi referans esitligine
+    /// dusuyordu - ayni Publish/AppendChangedContents'in checksum yaklasimi.
+    /// </summary>
+    private static (List<PublishPreviewItemDto> Added, List<PublishPreviewItemDto> Changed, List<PublishPreviewItemDto> Removed) DiffByCanonicalEquality<T>(
+        IReadOnlyList<T> candidates, IReadOnlyList<T> previous, Func<T, int> getId, Func<T, PublishPreviewItemDto> toItem)
+    {
+        var previousById = previous.ToDictionary(getId);
+        var candidateIds = candidates.Select(getId).ToHashSet();
+
+        var added = new List<PublishPreviewItemDto>();
+        var changed = new List<PublishPreviewItemDto>();
+
+        foreach (var candidate in candidates)
+        {
+            if (!previousById.TryGetValue(getId(candidate), out var old))
+            {
+                added.Add(toItem(candidate));
+            }
+            else if (SnapshotBuilder.Serialize(candidate) != SnapshotBuilder.Serialize(old))
+            {
+                changed.Add(toItem(candidate));
+            }
+        }
+
+        var removed = previous
+            .Where(p => !candidateIds.Contains(getId(p)))
+            .Select(toItem)
+            .ToList();
+
+        return (added, changed, removed);
+    }
+
+    private static PublishPreviewItemDto ToModuleItem(SyncModuleDto module) => new(module.Id, module.Name);
+
+    private static PublishPreviewItemDto ToContentItem(SyncContentDto content) => new(content.Id, content.Title);
 
     /// <summary>
     /// Backend-Yapilacaklar sonrasi bulunan davranis: Yayinla, Book/Module/

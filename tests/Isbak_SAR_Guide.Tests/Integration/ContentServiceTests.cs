@@ -93,6 +93,33 @@ public class ContentServiceTests(ApiFactory factory)
     }
 
     [Fact]
+    public async Task DeleteAsync_MiddleContent_CompactsRemainingSiblingsDisplayOrder()
+    {
+        // Kullanicinin bulgusu: silme sonrasi bosluklu DisplayOrder (0,2 gibi)
+        // siralamayi bozmuyordu ama admin panelinde ham gosterilince bug gibi
+        // gorunuyordu. A(0),B(1),C(2) - B silinince A,C bosluksuz (0,1) olmali,
+        // bagil sira (A once C sonra) korunmali.
+        var moduleId = await CreateModuleAsync();
+        var a = await CreateAsync(moduleId, new CreateContentDto("A", null));
+        var b = await CreateAsync(moduleId, new CreateContentDto("B", null));
+        var c = await CreateAsync(moduleId, new CreateContentDto("C", null));
+
+        using (var deleteScope = factory.Services.CreateScope())
+        {
+            var contentService = deleteScope.ServiceProvider.GetRequiredService<IContentService>();
+            (await contentService.DeleteAsync(moduleId, b.Value.Id)).IsSuccess.ShouldBeTrue();
+        }
+
+        using var scope = factory.Services.CreateScope();
+        var verifyService = scope.ServiceProvider.GetRequiredService<IContentService>();
+        var paged = await verifyService.GetPagedAsync(moduleId, page: 1, pageSize: 10, isPublished: null);
+
+        var items = paged.Value.Items.OrderBy(x => x.DisplayOrder).ToList();
+        items.Select(x => x.Id).ShouldBe([a.Value.Id, c.Value.Id]);
+        items.Select(x => x.DisplayOrder).ShouldBe([0, 1]);
+    }
+
+    [Fact]
     public async Task ReorderAsync_WithValidPermutation_PersistsNewOrder()
     {
         var moduleId = await CreateModuleAsync();

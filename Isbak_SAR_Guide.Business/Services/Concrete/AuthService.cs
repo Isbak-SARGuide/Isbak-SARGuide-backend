@@ -114,9 +114,9 @@ public class AuthService(
             return Result.Failure<LoginResponseDto>(_invalidRefreshTokenError);
         }
 
-        // Defense-in-depth: UserService.DeactivateAsync zaten bu kullanicinin
-        // aktif token'larini iptal ediyor (RevokeAllActiveForUserAsync), ama bu
-        // ikinci bir bariyer - LoginAsync'in aksine burasi eskiden IsLockedOutAsync
+        // Defense-in-depth: gecici bir lockout (basarisiz sifre denemeleri,
+        // AccessFailedAsync) sirasinda bile eldeki bir refresh token rotasyonla
+        // yenilenebilmemeli - LoginAsync'in aksine burasi eskiden IsLockedOutAsync
         // kontrol etmiyordu (kod inceleme bulgusu, roadmap 13.6).
         if (await userManager.IsLockedOutAsync(user))
         {

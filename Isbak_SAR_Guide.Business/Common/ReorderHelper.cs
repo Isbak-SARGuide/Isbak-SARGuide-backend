@@ -75,4 +75,40 @@ internal static class ReorderHelper
             return Result.Failure(conflictError);
         }
     }
+
+    /// <summary>
+    /// Bir kardes silindikten SONRA cagirilir: kalanlarda bosluk kalmasin diye
+    /// (orn. 0,2,3) ApplyAsync'i kardeslerin zaten sahip olduklari bagil sirayla
+    /// (remainingSiblings DisplayOrder ASC gelmeli - repository metodlari zaten
+    /// boyle sorguluyor) besler. Hicbir GERCEK yeniden siralama yapilmaz, sadece
+    /// numaralar ardisik hale getirilir - kullanicinin bulgusu: bosluklu sayilar
+    /// (0,2,3) sirlamayi BOZMUYOR ama admin panelinde ham gosterilince bug gibi
+    /// gorunuyordu.
+    /// </summary>
+    public static async Task<Result> CompactAsync<T>(
+        IUnitOfWork unitOfWork,
+        ILogger logger,
+        IReadOnlyList<T> remainingSiblings,
+        Func<T, int> getId,
+        Action<T, int> setDisplayOrder,
+        Action<T> markDirty,
+        Error conflictError,
+        CancellationToken cancellationToken)
+    {
+        if (remainingSiblings.Count == 0)
+        {
+            return Result.Success();
+        }
+
+        var orderedIds = remainingSiblings.Select(getId).ToList();
+
+        // mismatchError asla tetiklenmez - orderedIds remainingSiblings'in
+        // KENDI id'lerinden turetiliyor, ApplyAsync'in set-esitligi kontrolu
+        // burada trivially gecer. Imza gerektirdigi icin conflictError tekrar
+        // kullanilir.
+        return await ApplyAsync(
+            unitOfWork, logger, remainingSiblings, orderedIds,
+            getId, setDisplayOrder, markDirty,
+            mismatchError: conflictError, conflictError, cancellationToken);
+    }
 }

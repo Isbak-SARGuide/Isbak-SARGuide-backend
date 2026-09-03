@@ -87,14 +87,19 @@ public class MediaService(
                 "Desteklenmeyen veya bozuk dosya formatı. Desteklenen: PNG, JPEG, GIF, WEBP."));
         }
 
-        // STORAGE'A YAZILAN asil dosya artik orijinal baytlar degil, WebP'ye
-        // cevrilmis hali - checksum da bu YENI baytlardan hesaplanir (dedup
-        // VE mobilin indirdigi dosyanin butunluk dogrulamasi ayni tek alanla
-        // calismaya devam eder, cunku WebP encode deterministik: ayni kaynak
-        // gorsel iki kez yuklense bile ayni cikti/checksum'i uretir).
+        // STORAGE'A YAZILAN asil dosya: GIF DISINDA her format WebP'ye cevrilir
+        // (Faz 12.7, mobil optimizasyon). GIF ISTISNA: SkiaSharp'in SKBitmap.Decode'u
+        // animasyonlu bir GIF'in SADECE ILK KARESINI statik bitmap olarak okur -
+        // WebP'ye cevirmek yuklenen dosya gercekten animasyonlu olsa bile
+        // animasyonu backend'de kalici olarak yok ederdi (bug bulgusu - kullanici
+        // "GIF eklerken calismiyor" diye bildirdi). GIF bu yuzden ORIJINAL
+        // baytlariyla saklanir, checksum de o baytlardan hesaplanir.
+        var isGif = signature.Value.ContentType == "image/gif";
         var webPQuality = storageOptions.Value.WebPQuality;
-        var webpBytes = EncodeWebP(originalBitmap, webPQuality);
-        var checksum = Convert.ToHexString(SHA256.HashData(webpBytes));
+        var (storedBytes, storedContentType, storedExtension) = isGif
+            ? (bytes, "image/gif", ".gif")
+            : (EncodeWebP(originalBitmap, webPQuality), "image/webp", ".webp");
+        var checksum = Convert.ToHexString(SHA256.HashData(storedBytes));
 
         var existing = await unitOfWork.Media.FindByChecksumAsync(checksum, cancellationToken);
         if (existing is not null)
@@ -103,6 +108,8 @@ public class MediaService(
             return Result.Success(existing.Adapt<MediaDto>());
         }
 
+        // Kucuk onizleme HER ZAMAN statik WebP - GIF icin bile: thumbnail zaten
+        // tek kare gostermeyi amacliyor, animasyon burada beklenmiyor/gerekmiyor.
         var thumbnailBytes = EncodeThumbnail(originalBitmap, storageOptions.Value.ThumbnailMaxDimension, webPQuality);
 
         // relativePath hicbir zaman declaredFileName'den turemez - path
@@ -111,7 +118,7 @@ public class MediaService(
         // paylasir - kolayca eslestirilebilsinler diye.
         var now = DateTime.UtcNow;
         var guid = Guid.NewGuid().ToString("N");
-        var relativePath = $"media/{now:yyyy}/{now:MM}/{guid}.webp";
+        var relativePath = $"media/{now:yyyy}/{now:MM}/{guid}{storedExtension}";
         var thumbnailRelativePath = $"media/{now:yyyy}/{now:MM}/{guid}-thumb.webp";
 
         var media = new Entities.Content.Media
@@ -120,16 +127,16 @@ public class MediaService(
             StoragePath = relativePath,
             ThumbnailStoragePath = thumbnailRelativePath,
             MediaType = MediaType.Image,
-            ContentType = "image/webp",
-            FileSize = webpBytes.LongLength,
+            ContentType = storedContentType,
+            FileSize = storedBytes.LongLength,
             Checksum = checksum,
             Width = originalBitmap.Width,
             Height = originalBitmap.Height,
         };
 
-        using (var webpStream = new MemoryStream(webpBytes))
+        using (var mainStream = new MemoryStream(storedBytes))
         {
-            await storageService.SaveAsync(webpStream, relativePath, cancellationToken);
+            await storageService.SaveAsync(mainStream, relativePath, cancellationToken);
         }
 
         using (var thumbnailStream = new MemoryStream(thumbnailBytes))
