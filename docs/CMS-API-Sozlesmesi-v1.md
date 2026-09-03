@@ -413,7 +413,14 @@ modülü sayan ayrı bir sorgu çalıştırmaz).
 ### `POST /books/{bookId}/modules` — oluştur
 
 Gövde (`CreateModuleDto`) — **`displayOrder` yok, göndermeyin**, sunucu
-otomatik atar (mevcut son sıradan +1). **`isPublished` gönderilmezse
+otomatik atar (mevcut son sıradan +1). **Silme sonrası otomatik yeniden
+numaralandırma (2026-09-03, kullanıcı bulgusu):** bir kardeş (Module/
+Content/ContentBlock — üçü de aynı davranışa sahip) silindiğinde, kalan
+kardeşler bağıl sıraları korunarak **ardışık** `displayOrder` değerlerine
+(0, 1, 2, ...) yeniden numaralandırılır — önceden boşluklu kalıyordu
+(örn. A=0, B=1, C=2 iken B silinince A=0, C=2 kalıyordu; artık A=0, C=1
+olur). Boşluklu sıralama teknik olarak sıralamayı bozmuyordu ama admin
+panelinde ham gösterilince tutarsız görünüyordu. **`isPublished` gönderilmezse
 varsayılan `true`'dur** (2026-09-01'de `false`'tan değiştirildi —
 `Backend-Yapilacaklar.md` #3: aksi halde yeni oluşturulan içerik, elle
 işaretlenmediği sürece bir sonraki yayına sessizce dahil olmuyordu):
@@ -433,9 +440,18 @@ Gövde (`UpdateModuleDto`) — aynı 3 alan (`name`, `description`,
 
 ### `DELETE /books/{bookId}/modules/{id}`
 
-204, soft delete. **Modülün altındaki tüm Content/ContentBlock'lar da
-cascade soft-delete olur** (backend'de eager-load edilip tek tek
-işaretlenir).
+204, soft delete. **Düzeltme (2026-09-03):** bu dokümanın önceki hâli
+"altındaki Content/ContentBlock'lar da cascade soft-delete olur" diyordu —
+bu **yanlıştı**, gerçek kodda (`ModuleService.DeleteAsync`) hiçbir
+eager-load/cascade adımı yok, canlı veriyle doğrulandı (soft-deleted bir
+modülün altında `IsDeleted=false` kalan Content satırları bulundu).
+**Gerçek davranış: cascade YOK** — modül silindiğinde altındaki
+Content/ContentBlock'lar `IsDeleted=false` olarak, artık ulaşılamayan
+("orphan") satırlar hâlinde DB'de kalır. Publish/sync bunları hiç
+göstermez (snapshot ağacı silinmemiş modülleri gezerek kurulur, orphan
+içerik bu gezinmeden erişilemez) ama CMS'te silinmeden kalırlar. Aynı
+modüldeki KALAN (silinmemiş) kardeş modüllerin `displayOrder`'ı
+ardışık kalacak şekilde otomatik yeniden numaralandırılır (aşağıya bakın).
 
 ### `PUT /books/{bookId}/modules/reorder` — sırala
 
@@ -544,7 +560,14 @@ Gövde (`UpdateContentDto`) — aynı alanlar.
 
 ### `DELETE /modules/{moduleId}/contents/{id}`
 
-204, soft delete, altındaki bloklar cascade silinir.
+204, soft delete. **Düzeltme (2026-09-03):** "altındaki bloklar cascade
+silinir" ifadesi yanlıştı — canlı veriyle doğrulandı (`ContentService.
+DeleteAsync`'te hiçbir cascade adımı yok, soft-deleted content'lerin
+altında `IsDeleted=false` kalan ContentBlock satırları bulundu).
+**Cascade YOK**, §5'teki Module notuyla aynı durum — bloklar orphan
+kalır, publish/sync'te görünmezler ama CMS'te silinmeden dururlar. Aynı
+modüldeki KALAN kardeş content'lerin `displayOrder`'ı ardışık kalacak
+şekilde otomatik yeniden numaralandırılır (aşağıya bakın).
 
 ### `PUT /modules/{moduleId}/contents/reorder`
 
@@ -637,7 +660,8 @@ Aynı gövde şekli.
 
 ### `DELETE /contents/{contentId}/blocks/{id}`
 
-204, soft delete.
+204, soft delete. Aynı content'teki KALAN kardeş blokların `displayOrder`'ı
+ardışık kalacak şekilde otomatik yeniden numaralandırılır (aşağıya bakın).
 
 ### `PUT /contents/{contentId}/blocks/reorder`
 

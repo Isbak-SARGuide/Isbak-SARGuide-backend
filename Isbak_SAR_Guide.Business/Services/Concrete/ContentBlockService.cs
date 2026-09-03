@@ -118,7 +118,16 @@ public class ContentBlockService(
         unitOfWork.ContentBlocks.Remove(block);
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        return Result.Success();
+        var remaining = await unitOfWork.ContentBlocks.FindAllByContentIdAsync(contentId, cancellationToken);
+        return await ReorderHelper.CompactAsync(
+            unitOfWork,
+            logger,
+            remaining,
+            getId: b => b.Id,
+            setDisplayOrder: (b, order) => b.DisplayOrder = order,
+            markDirty: b => unitOfWork.ContentBlocks.UpdateProperty(b, x => x.DisplayOrder),
+            conflictError: Error.Conflict("ContentBlock.ReorderConflict", "Aynı anda başka bir sıralama işlemi yapıldı, lütfen tekrar deneyin."),
+            cancellationToken);
     }
 
     public async Task<Result> ReorderAsync(int contentId, ReorderDto dto, CancellationToken cancellationToken = default)
