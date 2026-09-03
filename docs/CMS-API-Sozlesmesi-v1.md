@@ -671,14 +671,20 @@ Max dosya boyutu `Storage:MaxFileSizeBytes` (dev'de ~20MB); magic-byte +
 MIME doğrulaması yapılıyor, sadece uzantıya güvenilmiyor.
 
 **Faz 12.7 (mobil optimizasyon) — sadece bu özellikten SONRAKİ yüklemeler:**
-storage'a yazılan asıl dosya artık her zaman **WebP**'ye çevrilmiş hali
-(`contentType` her zaman `"image/webp"`, `storagePath` her zaman `.webp` ile
-biter — yüklenen orijinal format PNG/JPEG/GIF/WEBP fark etmez). Ayrıca küçük
-bir WebP önizleme (`thumbnailStoragePath`, en uzun kenarı `Storage:
-ThumbnailMaxDimension` — varsayılan 400px — ile sınırlı) üretilir. Bu
-özellikten ÖNCE yüklenmiş medya geriye dönük dönüştürülmedi —
-`thumbnailStoragePath` o satırlarda `null` kalır, istemci bunu "önizleme
-yok, `storagePath`'i kullan" olarak ele almalı.
+storage'a yazılan asıl dosya artık **GIF hariç** her zaman **WebP**'ye
+çevrilmiş hali (`contentType` `"image/webp"`, `storagePath` `.webp` ile
+biter). **GIF istisna** (2026-09-03 bug fix — kullanıcı bulgusu, "GIF
+eklerken çalışmıyor"): SkiaSharp'ın decode katmanı animasyonlu bir GIF'in
+sadece ilk karesini statik bitmap olarak okur, WebP'ye çevirmek yüklenen
+dosya gerçekten animasyonlu olsa bile animasyonu backend'de kalıcı olarak
+yok ederdi — bu yüzden GIF **orijinal baytlarıyla** (`contentType`
+`"image/gif"`, `storagePath` `.gif` ile biter, animasyon korunur) saklanır.
+Her iki durumda da küçük bir statik WebP önizleme (`thumbnailStoragePath`,
+en uzun kenarı `Storage:ThumbnailMaxDimension` — varsayılan 400px — ile
+sınırlı) üretilir — thumbnail GIF için de her zaman WebP'dir, animasyonsuz
+tek kare önizleme amaçlıdır. Bu özellikten ÖNCE yüklenmiş medya geriye
+dönük dönüştürülmedi — `thumbnailStoragePath` o satırlarda `null` kalır,
+istemci bunu "önizleme yok, `storagePath`'i kullan" olarak ele almalı.
 
 ### `GET /media/{id}` — tekil
 

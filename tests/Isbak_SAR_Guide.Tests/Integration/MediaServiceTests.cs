@@ -64,16 +64,26 @@ public class MediaServiceTests(ApiFactory factory)
     }
 
     [Fact]
-    public async Task UploadAsync_WithValidGif_DetectsDimensionsAndConvertsToWebP()
+    public async Task UploadAsync_WithValidGif_PreservesOriginalBytesInsteadOfConvertingToWebP()
     {
+        // Bug bulgusu: GIF de digerleri gibi WebP'ye cevriliyordu -
+        // SKBitmap.Decode sadece ilk kareyi okudugu icin bu, yuklenen dosya
+        // gercekten animasyonlu olsa bile animasyonu backend'de kalici olarak
+        // yok ediyordu. GIF artik ORIJINAL baytlariyla saklanmali.
         var bytes = TestImageFactory.BuildRealGif1X1();
 
         var result = await UploadAsync(bytes, "animasyon.gif");
 
         result.IsSuccess.ShouldBeTrue();
-        result.Value.ContentType.ShouldBe("image/webp");
+        result.Value.ContentType.ShouldBe("image/gif");
+        result.Value.StoragePath.ShouldEndWith(".gif");
         result.Value.Width.ShouldBe(1);
         result.Value.Height.ShouldBe(1);
+        result.Value.FileSize.ShouldBe(bytes.Length);
+
+        // Thumbnail yine de statik WebP olarak uretilmeli - GIF icin bile.
+        result.Value.ThumbnailStoragePath.ShouldNotBeNull();
+        result.Value.ThumbnailStoragePath.ShouldEndWith("-thumb.webp");
     }
 
     [Fact]
